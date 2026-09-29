@@ -8,6 +8,7 @@
 const PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js";
 const SOURCE_FILES = [
   "__init__.py",
+  "__main__.py",
   "version.py",
   "language_meta.py",
   "lessons.py",
@@ -24,24 +25,30 @@ const SOURCE_FILES = [
 let pyodide = null;
 let readyPromise = null;
 let inputSequence = 0;
+let inputDisabled = false;
 const pendingInputs = new Map();
 
 self.waitForTerminalInput = (prompt) => new Promise((resolve) => {
+  // Preflight runs have no terminal; answer Input with an empty line
+  // instead of opening the user's input box.
+  if (inputDisabled) {
+    resolve("");
+    return;
+  }
   const id = ++inputSequence;
   pendingInputs.set(id, resolve);
   self.postMessage({ type: "input", id, prompt: String(prompt ?? "") });
 });
 
 function sourceUrl(file) {
-  const url = new URL(`poppop_lang/${file}`, self.location.href);
-  url.searchParams.set("runtime", String(Date.now()));
-  return url;
+  return new URL(`poppop_lang/${file}`, self.location.href);
 }
 
 async function installCurrentSources(runtime) {
+  // "no-cache" always revalidates, so a new deployment is picked up at once
+  // while an unchanged runtime is answered with a cheap 304.
   const archiveUrl = new URL("poppop-runtime.zip", self.location.href);
-  archiveUrl.searchParams.set("runtime", String(Date.now()));
-  const archiveResponse = await fetch(archiveUrl, { cache: "no-store" });
+  const archiveResponse = await fetch(archiveUrl, { cache: "no-cache" });
   if (archiveResponse.ok) {
     runtime.unpackArchive(
       new Uint8Array(await archiveResponse.arrayBuffer()),
@@ -60,9 +67,10 @@ importlib.invalidate_caches()
 
   // A source checkout normally has no generated archive. Load the known core
   // modules directly so `python -m http.server` works without a build step.
+  // tests/test_playground.py checks that SOURCE_FILES lists every module.
   runtime.FS.mkdirTree("/home/pyodide/poppop_lang");
   await Promise.all(SOURCE_FILES.map(async (file) => {
-    const response = await fetch(sourceUrl(file), { cache: "no-store" });
+    const response = await fetch(sourceUrl(file), { cache: "no-cache" });
     if (!response.ok) {
       throw new Error(`${file} を取得できませんでした (${response.status})`);
     }
@@ -208,6 +216,7 @@ async function preflightProgram(source, requestId) {
   runtime.setStdout({ batched: (text) => output.push(String(text)) });
   runtime.setStderr({ batched: () => {} });
   runtime.globals.set("__poppop_source", source);
+  inputDisabled = true;
   const payload = await runtime.runPythonAsync(`
 import json
 from poppop_lang.cli import evaluate, format_error
@@ -217,7 +226,9 @@ try:
 except Exception as __error:
     __payload = {"ok": False, "error": format_error(__error), "result": None}
 json.dumps(__payload, ensure_ascii=False, default=str)
-`);
+`).finally(() => {
+    inputDisabled = false;
+  });
   self.postMessage({
     type: "program-preflight",
     requestId,

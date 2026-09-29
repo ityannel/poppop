@@ -85,8 +85,8 @@ python poppop_playground_server.py
 ```
 
 Then open `http://127.0.0.1:8765`. The browser calls `/api/gemini`; the API key
-stays on the server. If `/api/gemini` is not available, the Playground can still
-ask for a personal browser key and save it locally.
+stays on the server. If `/api/gemini` is not available, ロボット君 falls back to
+built-in replies and the rest of the Playground keeps working.
 
 For Vercel, import this GitHub repository, keep the default static deployment
 settings, and add this environment variable:
@@ -97,6 +97,19 @@ GEMINI_API_KEY=your-key
 
 `api/gemini.js` is the Vercel Function used by ロボット君 to generate practice
 problems and advice.
+
+The function only answers requests from the Playground's own origin (and
+`localhost`), and limits each client to 40 requests per 10 minutes. Optional
+environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `POPPOP_ALLOWED_ORIGINS` | Extra allowed origins, comma separated (for example a custom domain) |
+| `GEMINI_RATE_LIMIT` | Requests per client per 10 minutes (default `40`) |
+| `GEMINI_CHAT_MODEL`, `GEMINI_LESSON_MODEL` | Override the Gemini models |
+
+The rate limit is kept in memory per serverless instance, so it limits bursts
+rather than enforcing an exact global quota.
 
 GitHub Pages is rebuilt automatically after relevant files are pushed to
 `main` or `master`. The deployment packages every current `poppop_lang`

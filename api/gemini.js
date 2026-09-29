@@ -6,8 +6,68 @@ const LESSON_MODEL =
   process.env.GEMINI_LESSON_MODEL ||
   "gemini-3.6-flash";
 
+const MAX_PROMPT_LENGTH = 16000;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = Number(process.env.GEMINI_RATE_LIMIT) || 40;
+const SYSTEM_INSTRUCTION =
+  "あなたはプログラミング言語 PopPop の学習サイトのチューター「ロボット君」です。" +
+  "PopPop の学習、練習問題、コードの説明、エラーの解説にだけ答えてください。" +
+  "それ以外の依頼には、PopPop の学習に戻るよう短く案内してください。";
+
+// Best effort: each serverless instance keeps its own window, so this caps
+// bursts from one client rather than enforcing an exact global quota.
+const recentRequests = new Map();
+
 function sendJson(response, status, payload) {
   response.status(status).json(payload);
+}
+
+function allowedOrigins(request) {
+  const configured = String(process.env.POPPOP_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const host = request.headers["x-forwarded-host"] || request.headers.host;
+  return new Set([
+    ...configured,
+    ...(host ? [`https://${host}`] : []),
+  ]);
+}
+
+export function isAllowedOrigin(request) {
+  const origin = request.headers.origin;
+  if (!origin) return false;
+  if (allowedOrigins(request).has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+export function takeRateLimitSlot(clientId, now = Date.now()) {
+  const recent = (recentRequests.get(clientId) || [])
+    .filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
+    recentRequests.set(clientId, recent);
+    return Math.ceil((RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000);
+  }
+  recent.push(now);
+  recentRequests.set(clientId, recent);
+  if (recentRequests.size > 5000) {
+    for (const [key, times] of recentRequests) {
+      if (!times.some((time) => now - time < RATE_LIMIT_WINDOW_MS)) {
+        recentRequests.delete(key);
+      }
+    }
+  }
+  return 0;
+}
+
+function clientId(request) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "");
+  return forwarded.split(",")[0].trim() || request.socket?.remoteAddress || "unknown";
 }
 
 export default async function handler(request, response) {
@@ -19,6 +79,18 @@ export default async function handler(request, response) {
 
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "POST is required" });
+    return;
+  }
+
+  if (!isAllowedOrigin(request)) {
+    sendJson(response, 403, { error: "This endpoint only serves the PopPop Playground" });
+    return;
+  }
+
+  const retryAfter = takeRateLimitSlot(clientId(request));
+  if (retryAfter) {
+    response.setHeader("Retry-After", String(retryAfter));
+    sendJson(response, 429, { error: "リクエストが多すぎます。少し待ってからもう一度試してください" });
     return;
   }
 
@@ -36,12 +108,13 @@ export default async function handler(request, response) {
     sendJson(response, 400, { error: "prompt is required" });
     return;
   }
-  if (prompt.length > 16000) {
+  if (prompt.length > MAX_PROMPT_LENGTH) {
     sendJson(response, 413, { error: "prompt is too long" });
     return;
   }
 
   const payload = {
+    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: task === "lesson" ? 4096 : 1200,

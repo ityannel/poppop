@@ -1187,7 +1187,8 @@ body.lesson-open .workspace {
 }
 .result-body.input-active .result-panel { padding-bottom: 58px; }
 [data-theme="light"] .result-panel { background: #f8fbff; color: #102344; }
-.result-panel.error { color: var(--danger); }
+.result-panel.error,
+.output-chunk.is-error { color: var(--danger); }
 .result-value { color: #70a7ff; font-weight: 800; }
 [data-theme="light"] .result-value { color: var(--accent); }
 .muted { color: var(--muted); }

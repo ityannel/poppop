@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -30,10 +31,18 @@ def test_playground_uses_the_current_runtime_and_specification():
     worker = (ROOT / "playground-worker.js").read_text(encoding="utf-8")
     application = (ROOT / "playground.js").read_text(encoding="utf-8")
     assert "poppop-runtime.zip" in worker
-    assert 'cache: "no-store"' in worker
+    assert 'cache: "no-cache"' in worker
     assert "poppop_specification.md" in application
-    assert 'cache: "no-store"' in application
+    assert 'cache: "no-cache"' in application
     assert "handleLessonResult" in application
     assert '"lessons": public_lessons()' in worker
     assert '"gallery": public_gallery()' in worker
     assert "friendlySpecificationExamples" in application
+
+
+def test_worker_source_fallback_lists_every_module():
+    worker = (ROOT / "playground-worker.js").read_text(encoding="utf-8")
+    block = worker.split("const SOURCE_FILES = [", 1)[1].split("];", 1)[0]
+    listed = set(re.findall(r'"([^"]+\.py)"', block))
+    expected = {path.name for path in (ROOT / "poppop_lang").glob("*.py")}
+    assert listed == expected
