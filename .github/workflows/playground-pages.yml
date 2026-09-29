@@ -9,6 +9,10 @@ on:
       - "poppop-visual.css"
       - "playground.js"
       - "playground-worker.js"
+      - "playground-gemini.js"
+      - "playground-sandbox.js"
+      - "playground-specification.js"
+      - "playground-modules.test.js"
       - "poppop-formatter.js"
       - "playground-formatter.test.js"
       - "playground-localization.test.js"
@@ -41,7 +45,7 @@ jobs:
       - name: Assemble the current Playground
         run: |
           mkdir _site
-          cp index.html playground.css poppop-visual.css playground.js playground-worker.js poppop-formatter.js poppop-localization.js poppop-logo.png popcorn-logo.png favicon.png poppop-ogp.png _site/
+          cp index.html playground.css poppop-visual.css playground.js playground-worker.js playground-gemini.js playground-sandbox.js playground-specification.js poppop-formatter.js poppop-localization.js poppop-logo.png popcorn-logo.png favicon.png poppop-ogp.png _site/
           cp poppop_specification.md _site/
           touch _site/.nojekyll
           python tools/build_playground_runtime.py _site/poppop-runtime.zip

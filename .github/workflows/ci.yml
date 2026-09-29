@@ -34,3 +34,4 @@ jobs:
         working-directory: vscode-poppop
       - run: node playground-formatter.test.js
       - run: node playground-localization.test.js
+      - run: node playground-modules.test.js

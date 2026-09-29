@@ -21,6 +21,12 @@
 .. >> doubled.
 
 doubled >> Display.`;
+  const {
+    parseSpecification,
+    friendlySpecificationExamples,
+    encodeSource,
+    decodeSource,
+  } = window.PopPopSpecification;
   const LESSON_FEATURES = {
     map: "Map",
     filter: "Filter",
@@ -110,15 +116,10 @@ doubled >> Display.`;
   let tutorLearning = { lessons: {}, recent: [], conversation: [], aiCompleted: 0 };
   let tutorProfileRevision = 0;
   let tutorRequestSequence = 0;
-  // AI-generated lessons are checked in a separate worker, so a runaway
-  // program there can be terminated without touching the user's runtime.
-  let sandboxWorker = null;
-  let sandboxReady = null;
-  let sandboxSequence = 0;
-  const sandboxRequests = new Map();
+  const sandbox = window.PopPopSandbox.create("playground-worker.js");
   let currentChatSection = null;
-  let geminiRequestQueue = Promise.resolve();
-  let lastGeminiRequestAt = 0;
+  const gemini = window.PopPopGemini.createClient();
+  const { extractPartialJsonString, parseJsonText } = window.PopPopGemini;
 
   try {
     completedLessons = new Set(
@@ -157,21 +158,7 @@ doubled >> Display.`;
 
   function getSharedSource() {
     if (!location.hash.startsWith("#code=")) return null;
-    try {
-      const encoded = location.hash.slice(6).replace(/-/g, "+").replace(/_/g, "/");
-      const binary = atob(encoded);
-      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    } catch {
-      return null;
-    }
-  }
-
-  function encodeSource(source) {
-    const bytes = new TextEncoder().encode(source);
-    let binary = "";
-    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return decodeSource(location.hash.slice(6));
   }
 
   function initialSource() {
@@ -973,54 +960,6 @@ doubled >> Display.`;
     elements.astPanel.hidden = name !== "ast";
   }
 
-  function parseSpecification(markdown) {
-    const lines = markdown.split(/\r?\n/);
-    const foundExamples = [];
-    const foundReferences = [];
-    let heading = "基本";
-    let inStandardFunctionSection = false;
-    let inCode = false;
-    let codeLines = [];
-
-    for (const line of lines) {
-      const headingMatch = line.match(/^(#{2,4})\s+(.+)$/);
-      if (!inCode && headingMatch) {
-        heading = headingMatch[2].trim();
-        if (headingMatch[1].length <= 3) {
-          inStandardFunctionSection =
-            heading.replace(/^\d+\.\s*/, "") === "標準関数一覧";
-        }
-      }
-      if (line.trim() === "```poppop") {
-        inCode = true;
-        codeLines = [];
-        continue;
-      }
-      if (inCode && line.trim() === "```") {
-        const code = codeLines.join("\n").trim();
-        if (code) foundExamples.push({ title: heading, code });
-        inCode = false;
-        continue;
-      }
-      if (inCode) codeLines.push(line);
-
-      const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
-      if (
-        inStandardFunctionSection &&
-        cells.length === 4 &&
-        /^`[^`]+`$/.test(cells[1])
-      ) {
-        foundReferences.push({
-          category: cells[0],
-          name: cells[1].slice(1, -1),
-          input: cells[2],
-          description: cells[3],
-        });
-      }
-    }
-    return { examples: foundExamples, references: foundReferences };
-  }
-
   async function loadSpecification() {
     try {
       // "no-cache" revalidates with the server every time, so edits show up
@@ -1050,24 +989,6 @@ doubled >> Display.`;
       elements.referenceList.innerHTML =
         `<p class="muted">仕様書を読み込めませんでした: ${escapeHtml(error.message)}</p>`;
     }
-  }
-
-  function friendlySpecificationExamples(items) {
-    const counts = new Map();
-    return items.map((item, index) => {
-      const base = item.title.replace(/^\d+\.\s*/, "").trim() || "基本";
-      const count = (counts.get(base) ?? 0) + 1;
-      counts.set(base, count);
-      const suffix = count > 1 ? ` ${count}` : "";
-      return {
-        id: `spec-${index}`,
-        category: "仕様の例",
-        title: `仕様の例｜${base}${suffix}`,
-        description: "仕様書に掲載されている実行例です。",
-        interactive: false,
-        code: item.code,
-      };
-    });
   }
 
   function escapeHtml(value) {
@@ -1595,7 +1516,7 @@ doubled >> Display.`;
 
   async function generateTunedLesson(baseLesson) {
     const requiredFeature = LESSON_FEATURES[baseLesson.id];
-    const text = await callGemini(
+    const text = await gemini.call(
       [
           "あなたはPopPop言語の教材編集者です。",
           "次の既存レッスンを参考に、学習者一人のための新しい問題を一問だけ作ってください。",
@@ -1649,8 +1570,8 @@ doubled >> Display.`;
       throw new Error("生成した問題がレッスン条件を満たしませんでした");
     }
     const [starterValidation, solutionValidation] = await Promise.all([
-      validateGeneratedSource(data.starter),
-      validateGeneratedSource(data.solution),
+      sandbox.validate(data.starter),
+      sandbox.validate(data.solution),
     ]);
     if (!starterValidation.ok || !solutionValidation.ok) {
       throw new Error(
@@ -1671,91 +1592,6 @@ doubled >> Display.`;
       hints: data.hints.slice(0, 2).map((hint) => String(hint).slice(0, 180)),
       mood: moods.includes(data.mood) ? data.mood : "neutral",
     };
-  }
-
-  function resetSandboxWorker(error) {
-    sandboxWorker?.terminate();
-    sandboxWorker = null;
-    sandboxReady = null;
-    sandboxRequests.forEach(({ resolve, timeout, fallback }) => {
-      clearTimeout(timeout);
-      resolve({ ...fallback, error });
-    });
-    sandboxRequests.clear();
-  }
-
-  function ensureSandboxWorker() {
-    if (sandboxReady) return sandboxReady;
-    sandboxReady = new Promise((resolve, reject) => {
-      sandboxWorker = new Worker("playground-worker.js");
-      sandboxWorker.addEventListener("message", (event) => {
-        const message = event.data ?? {};
-        if (message.type === "ready") {
-          resolve();
-          return;
-        }
-        if (message.type === "boot-error") {
-          reject(new Error(message.message));
-          resetSandboxWorker("検査用の実行環境を準備できませんでした");
-          return;
-        }
-        const pending = sandboxRequests.get(message.requestId);
-        if (!pending) return;
-        sandboxRequests.delete(message.requestId);
-        clearTimeout(pending.timeout);
-        pending.resolve({
-          ok: message.ok === true,
-          result: message.result,
-          output: String(message.output || ""),
-          error: message.error || "",
-        });
-      });
-      sandboxWorker.addEventListener("error", () => {
-        reject(new Error("検査用の実行環境を開始できません"));
-        resetSandboxWorker("検査用の実行環境を開始できません");
-      });
-    });
-    sandboxReady.catch(() => {});
-    return sandboxReady;
-  }
-
-  async function sandboxRequest(type, source, timeoutMs, timeoutError) {
-    const fallback = { ok: false, result: null, output: "" };
-    try {
-      await ensureSandboxWorker();
-    } catch (error) {
-      return { ...fallback, error: error.message };
-    }
-    const requestId = ++sandboxSequence;
-    return new Promise((resolve) => {
-      // The timer starts after boot, so a slow first Pyodide load is not
-      // mistaken for a runaway program. On timeout the worker is discarded.
-      const timeout = setTimeout(() => {
-        sandboxRequests.delete(requestId);
-        resolve({ ...fallback, error: timeoutError });
-        resetSandboxWorker(timeoutError);
-      }, timeoutMs);
-      sandboxRequests.set(requestId, { resolve, timeout, fallback });
-      sandboxWorker.postMessage({ type, requestId, source: String(source || "") });
-    });
-  }
-
-  function validateGeneratedSource(source) {
-    return sandboxRequest(
-      "validate-source",
-      source,
-      10000,
-      "構文検査が時間切れになりました",
-    );
-  }
-
-  function preflightGeneratedSource(source) {
-    return sandboxRequest(
-      "preflight-program",
-      source,
-      12000,
-      "事前実行が時間切れになりました",
-    );
   }
 
   async function showLessonHint() {
@@ -1815,173 +1651,6 @@ doubled >> Display.`;
     }
   }
 
-  function wait(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
-  }
-
-  async function callGeminiOnce(promptText, jsonMode = false, task = "chat") {
-    const proxyResponse = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: promptText, json: jsonMode, task }),
-    }).catch(() => null);
-    if (proxyResponse?.ok) {
-      const payload = await proxyResponse.json();
-      return payload.text?.trim() || null;
-    }
-    const detail = await proxyResponse?.json().catch(() => ({}));
-    const error = new Error(detail?.error || "Gemini先生に接続できませんでした");
-    error.status = proxyResponse?.status || 0;
-    error.retryAfter = Number(proxyResponse?.headers.get("retry-after")) || 0;
-    throw error;
-  }
-
-  async function callGeminiStreamOnce(
-    promptText,
-    jsonMode = false,
-    task = "chat",
-    onText = () => {},
-  ) {
-    const proxyResponse = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: promptText,
-        json: jsonMode,
-        task,
-        stream: true,
-      }),
-    }).catch(() => null);
-    if (!proxyResponse?.ok) {
-      const detail = await proxyResponse?.json().catch(() => ({}));
-      const error = new Error(detail?.error || "Gemini先生に接続できませんでした");
-      error.status = proxyResponse?.status || 0;
-      error.retryAfter = Number(proxyResponse?.headers.get("retry-after")) || 0;
-      throw error;
-    }
-
-    const reader = proxyResponse.body?.getReader();
-    if (!reader) throw new Error("ストリーミング応答を受信できませんでした");
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullText = "";
-
-    const consumeEvent = (eventText) => {
-      const data = eventText
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart())
-        .join("");
-      if (!data || data === "[DONE]") return;
-      const payload = JSON.parse(data);
-      const delta = (payload.candidates?.[0]?.content?.parts || [])
-        .map((part) => part.text || "")
-        .join("");
-      if (!delta) return;
-      fullText += delta;
-      onText(fullText);
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const events = buffer.split(/\r?\n\r?\n/);
-      buffer = events.pop() || "";
-      events.forEach(consumeEvent);
-      if (done) break;
-    }
-    if (buffer.trim()) consumeEvent(buffer);
-    return fullText.trim();
-  }
-
-  function queueGeminiRequest(runOnce) {
-    const run = async () => {
-      const minimumInterval = 6500;
-      const remaining = minimumInterval - (Date.now() - lastGeminiRequestAt);
-      if (remaining > 0) await wait(remaining);
-      lastGeminiRequestAt = Date.now();
-      try {
-        return await runOnce();
-      } catch (error) {
-        if (error.status !== 429) throw error;
-        const retryDelay = Math.max(12000, error.retryAfter * 1000);
-        await wait(retryDelay);
-        lastGeminiRequestAt = Date.now();
-        return runOnce();
-      }
-    };
-    const request = geminiRequestQueue.then(run, run);
-    geminiRequestQueue = request.catch(() => null);
-    return request;
-  }
-
-  function callGemini(promptText, jsonMode = false, task = "chat") {
-    return queueGeminiRequest(
-      () => callGeminiOnce(promptText, jsonMode, task),
-    );
-  }
-
-  function callGeminiStream(
-    promptText,
-    jsonMode = false,
-    task = "chat",
-    onText = () => {},
-  ) {
-    return queueGeminiRequest(
-      () => callGeminiStreamOnce(promptText, jsonMode, task, onText),
-    );
-  }
-
-  function extractPartialJsonString(text, key) {
-    const source = String(text || "");
-    const keyIndex = source.indexOf(`"${key}"`);
-    if (keyIndex < 0) return "";
-    const colonIndex = source.indexOf(":", keyIndex + key.length + 2);
-    const quoteIndex = source.indexOf('"', colonIndex + 1);
-    if (colonIndex < 0 || quoteIndex < 0) return "";
-    let result = "";
-    for (let index = quoteIndex + 1; index < source.length; index += 1) {
-      const character = source[index];
-      if (character === '"') break;
-      if (character !== "\\") {
-        result += character;
-        continue;
-      }
-      index += 1;
-      if (index >= source.length) break;
-      const escaped = source[index];
-      const escapes = {
-        '"': '"',
-        "\\": "\\",
-        "/": "/",
-        b: "\b",
-        f: "\f",
-        n: "\n",
-        r: "\r",
-        t: "\t",
-      };
-      if (escaped === "u") {
-        const hex = source.slice(index + 1, index + 5);
-        if (!/^[0-9a-f]{4}$/i.test(hex)) break;
-        result += String.fromCharCode(Number.parseInt(hex, 16));
-        index += 4;
-      } else {
-        result += escapes[escaped] ?? escaped;
-      }
-    }
-    return result;
-  }
-
-  function parseJsonText(text) {
-    if (!text) return null;
-    try {
-      return JSON.parse(text);
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      return match ? JSON.parse(match[0]) : null;
-    }
-  }
-
   function hasFinalDisplay(source) {
     return />>\s*Display\.\s*$/.test(String(source || ""));
   }
@@ -1997,7 +1666,7 @@ doubled >> Display.`;
     setTutorBusy(true);
     const streamMessage = beginStreamingRobotMessage();
     try {
-      const text = await callGeminiStream(
+      const text = await gemini.stream(
         [
           "あなたはPopPop Playgroundに住む、親しみやすいロボット先生です。",
           "幼すぎない、短く自然な日本語で話します。1回の発言は原則80文字以内です。",
@@ -2062,7 +1731,7 @@ doubled >> Display.`;
     setTutorBusy(true);
     const streamMessage = beginStreamingRobotMessage();
     try {
-      const text = await callGeminiStream(
+      const text = await gemini.stream(
         [
           "あなたはPopPop言語の練習問題を採点する先生です。",
           "完成例との文字列一致ではなく、目標を達成しているかで判定してください。",
@@ -2133,7 +1802,7 @@ doubled >> Display.`;
   }
 
   async function generateOpenEndedLesson(repairNote = "", onCode = () => {}) {
-    const text = await callGeminiStream(
+    const text = await gemini.stream(
         [
           "あなたはPopPop言語のやさしい先生です。",
           "基礎8問を終えた学習者向けの、少し発展的な練習問題を1つ作ってください。",
@@ -2191,8 +1860,8 @@ doubled >> Display.`;
       throw new Error("事前実行できない Input または Random が含まれています");
     }
     const [starterValidation, solutionValidation] = await Promise.all([
-      validateGeneratedSource(data.starter),
-      validateGeneratedSource(data.solution),
+      sandbox.validate(data.starter),
+      sandbox.validate(data.solution),
     ]);
     if (!solutionValidation.ok) {
       throw new Error(
@@ -2201,12 +1870,12 @@ doubled >> Display.`;
         }`,
       );
     }
-    const solutionRun = await preflightGeneratedSource(data.solution);
+    const solutionRun = await sandbox.preflight(data.solution);
     if (!solutionRun.ok) {
       throw new Error(`完成コードを実行できません: ${solutionRun.error || "実行エラー"}`);
     }
     if (starterValidation.ok) {
-      const starterRun = await preflightGeneratedSource(data.starter);
+      const starterRun = await sandbox.preflight(data.starter);
       if (
         starterRun.ok &&
         JSON.stringify([starterRun.result, starterRun.output]) ===
@@ -2228,7 +1897,7 @@ doubled >> Display.`;
     if (error?.status === 429) {
       return "Geminiの利用上限に達したようです。少し待ってから、もう一度試してね。";
     }
-    if (/文法|構文|Display|形式|読み取れ/.test(message)) {
+    if (/文法|構文|Display|形式|読み取れ|実行|時間切れ|開始コード|Input|Random/.test(message)) {
       return "問題案は届いたけれど、PopPopの検査を通過できなかったよ。もう一度押すと別の案で試せるよ。";
     }
     return "Geminiとの通信に失敗したよ。接続を確認して、もう一度試してね。";
@@ -2390,7 +2059,7 @@ doubled >> Display.`;
     setTutorBusy(true);
     const streamMessage = beginStreamingRobotMessage();
     try {
-      const text = await callGeminiStream(
+      const text = await gemini.stream(
         [
           "あなたはPopPop Playgroundに住むロボット先生です。",
           "短く自然な日本語で、質問に直接答えてください。",
