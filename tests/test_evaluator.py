@@ -383,3 +383,17 @@ def test_destructuring_bind_arity_is_exact():
     except EvaluatorError:
         return
     assert False, "destructuring requires the exact number of values"
+
+
+def test_builtin_errors_report_the_real_problem():
+    import pytest
+    from poppop_lang.evaluator import PopPopError
+
+    with pytest.raises(PopPopError) as length_error:
+        run_code("5 >> Length.")
+    assert "Cannot get length" in str(length_error.value)
+    assert "local variable" not in str(length_error.value)
+
+    with pytest.raises(PopPopError) as thrown:
+        run_code('"boom" >> Throw.')
+    assert "boom" in str(thrown.value)

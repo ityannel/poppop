@@ -12,7 +12,6 @@ from .ast_nodes import *
 from .evaluator import EvaluatorError, PopPopError, ReturnException, BreakException
 
 def _raise_error(msg):
-    from .evaluator import PopPopError
     raise PopPopError("TypeError", msg)
 
 def _is_number(value):
@@ -48,7 +47,6 @@ def _display_value(value):
 BUILTIN_REGISTRY = {}
 
 def builtin_Type(current, env, evaluator):
-    from .evaluator import PopPopError
     try:
         if current is None: return 'Null'
         if isinstance(current, bool): return 'Bool'
@@ -59,7 +57,6 @@ def builtin_Type(current, env, evaluator):
         if isinstance(current, dict): return 'Dict'
         raise PopPopError("TypeError", f"Unsupported runtime value: {type(current).__name__}")
     except Exception as e:
-        from .evaluator import ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Type: {str(e)}")
@@ -74,7 +71,6 @@ def builtin_Sleep(current, env, evaluator):
         time.sleep(current)
         return current
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Sleep: {str(e)}")
@@ -94,7 +90,6 @@ def builtin_Add(current, env, evaluator):
         _raise_error("Add requires two numbers, two Str values, or two List values")
 
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Add: {str(e)}")
@@ -105,11 +100,9 @@ def builtin_Sum(current, env, evaluator):
     try:
         if isinstance(current, list) and all(_is_number(item) for item in current):
             return sum(current)
-        from .evaluator import PopPopError
         raise PopPopError("TypeError", f"Sum requires a list, got {type(current)}")
 
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Sum: {str(e)}")
@@ -125,7 +118,6 @@ def builtin_Max(current, env, evaluator):
             return max(current)
         _raise_error("Max requires a non-empty List of numbers or Str values")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Max: {str(e)}")
@@ -141,7 +133,6 @@ def builtin_Min(current, env, evaluator):
             return min(current)
         _raise_error("Min requires a non-empty List of numbers or Str values")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Min: {str(e)}")
@@ -154,7 +145,6 @@ def builtin_Round(current, env, evaluator):
             return round(current)
         _raise_error("Round requires a number")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Round: {str(e)}")
@@ -167,7 +157,6 @@ def builtin_Abs(current, env, evaluator):
             return abs(current)
         _raise_error("Abs requires a number")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Abs: {str(e)}")
@@ -181,7 +170,6 @@ def builtin_Length(current, env, evaluator):
         except TypeError:
             raise PopPopError("TypeError", f"Cannot get length of {type(current).__name__}")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Length: {str(e)}")
@@ -196,7 +184,6 @@ def builtin_Reverse(current, env, evaluator):
             return current[::-1]
         raise PopPopError("TypeError", "Reverse requires a list or str")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Reverse: {str(e)}")
@@ -209,7 +196,6 @@ def builtin_Uppercase(current, env, evaluator):
             return current.upper()
         raise PopPopError("TypeError", "Uppercase requires a str")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Uppercase: {str(e)}")
@@ -222,7 +208,6 @@ def builtin_Lowercase(current, env, evaluator):
             return current.lower()
         raise PopPopError("TypeError", "Lowercase requires a str")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Lowercase: {str(e)}")
@@ -239,7 +224,6 @@ def builtin_Split(current, env, evaluator):
             return current[0].split(current[1])
         _raise_error("Split requires (Str, Str)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Split: {str(e)}")
@@ -254,7 +238,6 @@ def builtin_Replace(current, env, evaluator):
                 return target.replace(old, new)
         raise PopPopError("TypeError", "Replace requires a parenthesized argument list of 3 (target, old, new)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Replace: {str(e)}")
@@ -269,7 +252,6 @@ def builtin_Join(current, env, evaluator):
                 return delim.join([str(x) for x in target])
         raise PopPopError("TypeError", "Join requires a parenthesized argument list of 2 (list, delimiter)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Join: {str(e)}")
@@ -294,7 +276,6 @@ def builtin_Get(current, env, evaluator):
                 raise PopPopError("TypeError", f"Cannot get '{key}' from {type(target).__name__}")
         raise PopPopError("TypeError", "Get requires a parenthesized argument list of 2 (target, key)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Get: {str(e)}")
@@ -302,7 +283,6 @@ def builtin_Get(current, env, evaluator):
 BUILTIN_REGISTRY['Get'] = builtin_Get
 
 def builtin_Set(current, env, evaluator):
-    from .evaluator import PopPopError, ReturnException, BreakException
     try:
         if isinstance(current, list) and len(current) == 3:
             target, key, value = current
@@ -329,7 +309,6 @@ def builtin_Set(current, env, evaluator):
         raise PopPopError("RuntimeError", f"Error in Set: {str(e)}")
 
 def builtin_Merge(current, env, evaluator):
-    from .evaluator import PopPopError
     try:
         if isinstance(current, list) and len(current) == 2:
             d1, d2 = current
@@ -339,7 +318,6 @@ def builtin_Merge(current, env, evaluator):
                 return res
         raise PopPopError("TypeError", "Merge requires a tuple of 2 dicts (dict1, dict2)")
     except Exception as e:
-        from .evaluator import ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Merge: {str(e)}")
@@ -359,7 +337,6 @@ def builtin_Contains(current, env, evaluator):
                 return item in target
         raise PopPopError("TypeError", "Contains requires a parenthesized argument list of 2 (target, item)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Contains: {str(e)}")
@@ -376,7 +353,6 @@ def builtin_Append(current, env, evaluator):
                 return new_list
         raise PopPopError("TypeError", "Append requires a parenthesized argument list of 2 (list, item)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Append: {str(e)}")
@@ -384,7 +360,6 @@ def builtin_Append(current, env, evaluator):
 BUILTIN_REGISTRY['Append'] = builtin_Append
 
 def builtin_Slice(current, env, evaluator):
-    from .evaluator import PopPopError
     try:
         if isinstance(current, list):
             if len(current) == 2 and isinstance(current[1], list) and len(current[1]) == 2:
@@ -402,7 +377,6 @@ def builtin_Slice(current, env, evaluator):
                     return target[:end]
         raise PopPopError("TypeError", "Slice requires (target, start, end) or Slice(start, end) in pipe")
     except Exception as e:
-        from .evaluator import ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Slice: {str(e)}")
@@ -425,7 +399,6 @@ def builtin_Format(current, env, evaluator):
                     raise PopPopError("RuntimeError", f"Format failed: {e}")
         raise PopPopError("TypeError", "Format requires a parenthesized argument list of at least 2 items (template, args...)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Format: {str(e)}")
@@ -445,7 +418,6 @@ def builtin_Now(current, env, evaluator):
             'second': now.second
         }
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Now: {str(e)}")
@@ -465,7 +437,6 @@ def builtin_Random(current, env, evaluator):
         _raise_error("Random requires (Int, Int)")
         # JSON
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Random: {str(e)}")
@@ -480,7 +451,6 @@ def builtin_ToJson(current, env, evaluator):
         except Exception as e:
             raise PopPopError("RuntimeError", f"ToJson failed: {e}")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in ToJson: {str(e)}")
@@ -497,7 +467,6 @@ def builtin_FromJson(current, env, evaluator):
 
     # File I/O and network
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in FromJson: {str(e)}")
@@ -505,7 +474,6 @@ def builtin_FromJson(current, env, evaluator):
 BUILTIN_REGISTRY['FromJson'] = builtin_FromJson
 
 def builtin_Fetch(current, env, evaluator):
-    from .evaluator import PopPopError, ReturnException, BreakException
     try:
         target = str(current)
         try:
@@ -528,13 +496,11 @@ def builtin_Fetch(current, env, evaluator):
 def builtin_Dict(current, env, evaluator):
     if isinstance(current, dict):
         return current
-    from .evaluator import PopPopError
     raise PopPopError("TypeError", f"Expected Dict, got {type(current).__name__}")
 
 def builtin_List(current, env, evaluator):
     if isinstance(current, list):
         return current
-    from .evaluator import PopPopError
     raise PopPopError("TypeError", f"Expected List, got {type(current).__name__}")
 
 def builtin_Average(current, env, evaluator):
@@ -545,7 +511,6 @@ def builtin_Average(current, env, evaluator):
             raise PopPopError("TypeError", "Average requires a non-empty List of numbers")
         return sum(current) / len(current)
     except Exception as e:
-        from .evaluator import PopPopError
         raise PopPopError("RuntimeError", f"Error in Average: {str(e)}")
 
 BUILTIN_REGISTRY['Average'] = builtin_Average
@@ -561,7 +526,6 @@ def builtin_Num(current, env, evaluator):
             return int(val)
         return val
     except Exception:
-        from .evaluator import PopPopError
         raise PopPopError("TypeError", f"Cannot cast '{current}' to Num")
 
 BUILTIN_REGISTRY['Dict'] = builtin_Dict
@@ -583,7 +547,6 @@ def builtin_PostFetch(current, env, evaluator):
         raise PopPopError("TypeError", "PostFetch requires a parenthesized argument list of 3 (url, headers_dict, body_string)")
 
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in PostFetch: {str(e)}")
@@ -602,7 +565,6 @@ def builtin_WriteFile(current, env, evaluator):
                 raise PopPopError("IOError", f"WriteFile failed: {e}")
         raise PopPopError("TypeError", "WriteFile requires a parenthesized argument list of 2 (content, path)")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in WriteFile: {str(e)}")
@@ -614,7 +576,6 @@ def builtin_Display(current, env, evaluator):
         print(_display_value(current))
         return current
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Display: {str(e)}")
@@ -633,7 +594,6 @@ async def builtin_Input(current, env, evaluator):
             import asyncio
             return await asyncio.to_thread(input, prompt)
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Input: {str(e)}")
@@ -651,7 +611,6 @@ def builtin_Int(current, env, evaluator):
         except (ValueError, TypeError):
             _raise_error(f"Cannot cast '{current}' to Int")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Int: {str(e)}")
@@ -674,7 +633,6 @@ def builtin_Array(current, env, evaluator):
             return [make_array(dimensions[1:]) for _ in range(dimensions[0])]
         return make_array(dims)
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Array: {str(e)}")
@@ -689,7 +647,6 @@ def builtin_Range(current, env, evaluator):
             return list(range(1, current + 1))
         _raise_error(f"Range expects Int or (Int, Int), got {current}")
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Range: {str(e)}")
@@ -700,7 +657,6 @@ def builtin_Return(current, env, evaluator):
     try:
         raise ReturnException(current)
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Return: {str(e)}")
@@ -711,7 +667,6 @@ def builtin_Break(current, env, evaluator):
     try:
         raise BreakException(current)
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Break: {str(e)}")
@@ -722,7 +677,6 @@ def builtin_Str(current, env, evaluator):
     try:
         return str(current)
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Str: {str(e)}")
@@ -758,7 +712,6 @@ def builtin_Debug(current, env, evaluator):
         print(f"[DEBUG] {debug_str}")
         return current
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Debug: {str(e)}")
@@ -769,7 +722,6 @@ def builtin_Throw(current, env, evaluator):
     try:
         raise PopPopError("UserError", str(current))
     except Exception as e:
-        from .evaluator import PopPopError, ReturnException, BreakException
         if isinstance(e, (PopPopError, ReturnException, BreakException)):
             raise e
         raise PopPopError("RuntimeError", f"Error in Throw: {str(e)}")
