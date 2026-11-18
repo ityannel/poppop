@@ -1769,7 +1769,7 @@ doubled >> Display.`;
   }
 
   async function callGeminiOnce(promptText, jsonMode = false, task = "chat") {
-    const proxyResponse = await fetch("/api/gemini", {
+    const proxyResponse = await fetch("api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: promptText, json: jsonMode, task }),
@@ -1791,7 +1791,7 @@ doubled >> Display.`;
     task = "chat",
     onText = () => {},
   ) {
-    const proxyResponse = await fetch("/api/gemini", {
+    const proxyResponse = await fetch("api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
