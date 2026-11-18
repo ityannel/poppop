@@ -58,67 +58,74 @@
     </div>
   </header>
 
-  <nav class="toolbar" aria-label="実行と編集">
-    <div class="toolbar-primary">
-      <button id="runButton" class="button primary" type="button" disabled>
-        <span aria-hidden="true">▶</span> 実行
-        <kbd>Ctrl ↵</kbd>
-      </button>
-      <button id="stopButton" class="button danger" type="button" disabled>
-        <span aria-hidden="true">■</span> 停止
-      </button>
-      <button id="formatButton" class="button format-button" type="button" title="VS Codeと同じ規則で整形（Shift+Alt+F）">
-        <span aria-hidden="true">✦</span> 整形
-      </button>
-    </div>
+  <nav class="toolbar toolbar-empty" aria-hidden="true"></nav>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="レッスン、サンプル、リファレンス">
+      <div class="side-tabs left-bar" role="tablist" aria-label="ツール">
+        <button id="explorerTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="explorerPanel" tabindex="0" title="エクスプローラー" aria-label="エクスプローラー">▤</button>
+        <button id="referenceTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="referencePanel" tabindex="0">仕様書</button>
+        <button id="examplesTab" class="side-tab" role="tab" aria-selected="false" aria-controls="examplesPanel" tabindex="-1">例</button>
+        <button id="lessonTab" class="side-tab lesson-tab" role="tab" aria-selected="false" aria-controls="lessonPanel" tabindex="-1">
+          ロボット君 <span id="lessonTabProgress" class="count">0/0</span>
+        </button>
+        <div class="left-tools">
     <span id="runFeedback" class="run-feedback" aria-hidden="true"></span>
     <span class="toolbar-spacer"></span>
     <div class="toolbar-view-actions" aria-label="画面の表示">
-      <button id="toggleSidebarButton" class="icon-button view-button" type="button" aria-label="サンプル棚を閉じる" aria-pressed="false" title="サンプル棚">◧</button>
-      <button id="toggleResultButton" class="icon-button view-button" type="button" aria-label="結果棚を閉じる" aria-pressed="false" title="結果棚">◨</button>
+          <button id="toggleSidebarButton" class="icon-button view-button" type="button" aria-label="サンプル棚を閉じる" aria-pressed="false" title="サンプル棚">◧</button>
+          <button id="toggleResultButton" class="icon-button view-button" type="button" aria-label="結果棚を閉じる" aria-pressed="false" title="結果棚">◨</button>
     </div>
     <details id="moreTools" class="tool-menu">
-      <summary aria-label="その他の操作"><span aria-hidden="true">•••</span><span class="tool-menu-label">その他</span></summary>
-      <div class="tool-menu-popover">
-        <button id="copyCodeButton" class="button" type="button"><span aria-hidden="true">⧉</span> コピー</button>
-        <button id="downloadButton" class="button" type="button"><span aria-hidden="true">↓</span> 保存</button>
-        <button id="loadFileButton" class="button" type="button"><span aria-hidden="true">↑</span> 読み込む</button>
-        <input id="fileInput" class="sr-only" type="file" accept=".pop,.popcorn,text/plain">
-        <button id="shareButton" class="button" type="button"><span aria-hidden="true">↗</span> 共有</button>
-        <span class="tool-menu-rule" aria-hidden="true"></span>
-        <span class="tool-menu-heading">画面レイアウト</span>
-        <div class="layout-presets" role="group" aria-label="画面レイアウト">
-          <button class="layout-preset" type="button" data-layout-preset="focus">
-            <span aria-hidden="true">▣</span><span>集中</span>
-          </button>
-          <button class="layout-preset" type="button" data-layout-preset="try">
-            <span aria-hidden="true">◫</span><span>試す</span>
-          </button>
-          <button class="layout-preset" type="button" data-layout-preset="learn">
-            <span aria-hidden="true">◧</span><span>学ぶ</span>
-          </button>
-        </div>
-        <span class="tool-menu-rule" aria-hidden="true"></span>
-        <button id="decreaseFontButton" class="button" type="button"><span aria-hidden="true">A−</span> 文字を小さく</button>
-        <button id="increaseFontButton" class="button" type="button"><span aria-hidden="true">A＋</span> 文字を大きく</button>
-        <button id="themeButton" class="button" type="button" aria-label="配色を切り替える" aria-pressed="false"><span aria-hidden="true">☼</span> 配色を切り替える</button>
-      </div>
+          <summary aria-label="その他の操作"><span aria-hidden="true">•••</span><span class="tool-menu-label">その他</span></summary>
+          <div class="tool-menu-popover">
+            <button id="copyCodeButton" class="button" type="button"><span aria-hidden="true">⧉</span> コピー</button>
+            <button id="downloadButton" class="button" type="button"><span aria-hidden="true">↓</span> 保存</button>
+            <button id="loadFileButton" class="button" type="button"><span aria-hidden="true">↑</span> 読み込む</button>
+            <input id="fileInput" class="sr-only" type="file" accept=".pop,.popcorn,text/plain">
+            <button id="shareButton" class="button" type="button"><span aria-hidden="true">↗</span> 共有</button>
+            <span class="tool-menu-rule" aria-hidden="true"></span>
+            <span class="tool-menu-heading">画面レイアウト</span>
+            <div class="layout-presets" role="group" aria-label="画面レイアウト">
+              <button class="layout-preset" type="button" data-layout-preset="focus">
+                <span aria-hidden="true">▣</span><span>集中</span>
+              </button>
+              <button class="layout-preset" type="button" data-layout-preset="try">
+                <span aria-hidden="true">◫</span><span>試す</span>
+              </button>
+              <button class="layout-preset" type="button" data-layout-preset="learn">
+                <span aria-hidden="true">◧</span><span>学ぶ</span>
+              </button>
+            </div>
+            <span class="tool-menu-rule" aria-hidden="true"></span>
+            <button id="decreaseFontButton" class="button" type="button"><span aria-hidden="true">A−</span> 文字を小さく</button>
+            <button id="increaseFontButton" class="button" type="button"><span aria-hidden="true">A＋</span> 文字を大きく</button>
+            <button id="themeButton" class="button" type="button" aria-label="配色を切り替える" aria-pressed="false"><span aria-hidden="true">☼</span> 配色を切り替える</button>
+          </div>
     </details>
-  </nav>
+    </div>
+      <div class="toolbar-primary">
+        <button id="runButton" class="button primary" type="button" disabled>
+          <span aria-hidden="true">▶</span> 実行
+          <kbd>Ctrl ↵</kbd>
+        </button>
+        <button id="stopButton" class="button danger" type="button" disabled>
+          <span aria-hidden="true">■</span> 停止
+        </button>
+        <button id="formatButton" class="button format-button" type="button" title="VS Codeと同じ規則で整形（Shift+Alt+F）">
+          <span aria-hidden="true">✦</span> 整形
+        </button>
 
-  <main class="workspace">
-    <nav class="activity-bar" aria-label="操作">
-      <button id="actExplorer" class="act-btn active" type="button" title="エクスプローラー" aria-label="エクスプローラー" aria-pressed="true"><span aria-hidden="true">▤</span></button>
-      <button id="actSearch" class="act-btn" type="button" title="検索" aria-label="検索"><span aria-hidden="true">⌕</span></button>
-      <button id="actRun" class="act-btn" type="button" title="実行 (Ctrl+Enter)" aria-label="実行"><span aria-hidden="true">▷</span></button>
-      <button id="actMore" class="act-btn" type="button" title="その他" aria-label="その他"><span aria-hidden="true">⋯</span></button>
-    </nav>
-    <aside class="sidebar" aria-label="レッスン、サンプル、リファレンス">
-      <section class="explorer" aria-label="エクスプローラー">
+        </div>
+      </div>
+      <section id="explorerPanel" class="side-panel explorer" role="tabpanel" aria-labelledby="explorerTab">
       <div class="explorer-head">
         <span class="explorer-title" aria-label="エクスプローラー"></span>
         <div class="explorer-actions">
           <button id="newFileButton" class="vs-icon" type="button" title="新しいファイル" aria-label="新しいファイル">+</button>
+          <button id="newFolderButton" class="vs-icon" type="button" title="新しいフォルダー" aria-label="新しいフォルダー">⊞</button>
+          <button id="renameButton" class="vs-icon" type="button" title="名前を変える" aria-label="名前を変える">✎</button>
+          <button id="deleteButton" class="vs-icon" type="button" title="削除" aria-label="削除">✕</button>
           <button id="uploadFileButton" class="vs-icon" type="button" title="アップロード" aria-label="アップロード">↑</button>
           <button id="downloadFileButton" class="vs-icon" type="button" title="ダウンロード" aria-label="ダウンロード">↓</button>
         </div>
@@ -126,14 +133,6 @@
       <input id="uploadInput" class="sr-only" type="file" multiple accept=".pop,.popcorn,.txt,.md,text/plain">
       <ul id="fileList" class="file-list" role="list"></ul>
       </section>
-      <div class="side-tabs" role="tablist">
-        <button id="referenceTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="referencePanel" tabindex="0">仕様書</button>
-        <button id="examplesTab" class="side-tab" role="tab" aria-selected="false" aria-controls="examplesPanel" tabindex="-1">例</button>
-        <button id="lessonTab" class="side-tab lesson-tab" role="tab" aria-selected="false" aria-controls="lessonPanel" tabindex="-1">
-          ロボット君 <span id="lessonTabProgress" class="count">0/0</span>
-        </button>
-      </div>
-
       <section id="examplesPanel" class="side-panel" role="tabpanel" aria-labelledby="examplesTab" hidden>
         <label class="search-box">
           <span class="sr-only">コード例を検索</span>
@@ -144,7 +143,7 @@
         </div>
       </section>
 
-      <section id="referencePanel" class="side-panel" role="tabpanel" aria-labelledby="referenceTab">
+      <section id="referencePanel" class="side-panel" role="tabpanel" aria-labelledby="referenceTab" hidden>
         <label class="search-box">
           <span class="sr-only">標準関数を検索</span>
           <input id="referenceSearch" type="search" placeholder="検索">
@@ -324,8 +323,9 @@
     ></div>
 
     <section class="editor-column" aria-label="コードエディター">
+      <div id="editorTabs" class="editor-tabs" role="tablist"></div>
       <div class="pane-title">
-        <span>main.pop</span>
+        <span id="activeName"></span>
         <span id="saveStatus" class="muted">自動保存</span>
       </div>
       <div id="editor" aria-label="PopCorn コード"></div>

@@ -38,11 +38,11 @@ doubled >> Display.`;
       "runFeedback",
       "formatButton", "copyCodeButton", "downloadButton", "fileInput",
       "loadFileButton", "shareButton", "decreaseFontButton", "increaseFontButton",
-      "themeButton", "newFileButton", "uploadFileButton", "downloadFileButton", "uploadInput", "fileList", "toggleSidebarButton", "toggleResultButton", "moreTools",
+      "themeButton", "newFileButton", "newFolderButton", "renameButton", "deleteButton", "uploadFileButton", "downloadFileButton", "uploadInput", "fileList", "editorTabs", "activeName", "toggleSidebarButton", "toggleResultButton", "moreTools",
       "sidebarResizer", "resultResizer", "resultDrawerHandle",
       "closeResultDrawerButton",
       "examplesTab", "referenceTab", "lessonTab", "lessonTabProgress",
-      "examplesPanel", "referencePanel", "lessonPanel",
+      "examplesPanel", "referencePanel", "lessonPanel", "explorerTab", "explorerPanel",
       "exampleSearch", "referenceSearch", "exampleList", "referenceList",
       "lessonProgressText", "lessonProgressBar", "previousLessonButton",
       "lessonTitleButton", "nextLessonButton", "lessonBadge", "lessonTitle",
@@ -1141,6 +1141,7 @@ doubled >> Display.`;
   function switchSidePanel(panel) {
     currentSidePanel = panel;
     const panels = {
+      explorer: [elements.explorerTab, elements.explorerPanel],
       examples: [elements.examplesTab, elements.examplesPanel],
       reference: [elements.referenceTab, elements.referencePanel],
       lesson: [elements.lessonTab, elements.lessonPanel],
@@ -2477,94 +2478,257 @@ doubled >> Display.`;
     }
   }
 
-  // ===== エクスプローラー（複数ファイル）=====
-  const FILES_KEY = "popcorn.playground.files.v1";
+  // ===== エクスプローラー（フォルダー・ファイル）と、開いているファイルのタブ =====
+  const FS_KEY = "popcorn.playground.fs.v2";
   const SPEC_FILE = "specification.md";
   let files = {};
+  let folders = [];
+  let openTabs = [];
+  let expanded = [];
+  let selected = "main.pop";
   let activeFile = "main.pop";
 
+  const parentOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+  const baseOf = (path) => path.slice(path.lastIndexOf("/") + 1);
+  const joinPath = (folder, name) => (folder ? `${folder}/${name}` : name);
+
+  function allFolders() {
+    const set = new Set(folders);
+    Object.keys(files).forEach((path) => {
+      let parent = parentOf(path);
+      while (parent) { set.add(parent); parent = parentOf(parent); }
+    });
+    return [...set];
+  }
+
+  function isFolder(path) {
+    return allFolders().includes(path) && files[path] === undefined;
+  }
+
   function persistFiles() {
-    if (editor || elements.editorFallback) files[activeFile] = getSource();
-    localStorage.setItem(FILES_KEY, JSON.stringify({ files, active: activeFile }));
+    if (files[activeFile] !== undefined && (editor || elements.editorFallback)) files[activeFile] = getSource();
+    localStorage.setItem(FS_KEY, JSON.stringify({ files, folders, openTabs, expanded, selected, active: activeFile }));
   }
 
   function loadFileStore() {
     try {
-      const saved = JSON.parse(localStorage.getItem(FILES_KEY) || "null");
+      const saved = JSON.parse(localStorage.getItem(FS_KEY) || "null");
       if (saved && saved.files && Object.keys(saved.files).length) {
         files = saved.files;
-        activeFile = saved.active && files[saved.active] !== undefined ? saved.active : Object.keys(files)[0];
+        folders = saved.folders || [];
+        openTabs = (saved.openTabs || []).filter((path) => files[path] !== undefined);
+        expanded = saved.expanded || [];
+        activeFile = files[saved.active] !== undefined ? saved.active : Object.keys(files)[0];
+        selected = saved.selected || activeFile;
+        if (!openTabs.includes(activeFile)) openTabs.push(activeFile);
         setSource(files[activeFile], { markChanged: false, focus: false });
         return;
       }
     } catch {}
     files = { "main.pop": getSource() };
     activeFile = "main.pop";
+    selected = activeFile;
+    openTabs = [activeFile];
     persistFiles();
+  }
+
+  function renderTabs() {
+    elements.editorTabs.innerHTML = openTabs.map((path) => {
+      const on = path === activeFile;
+      return `<div class="etab${on ? " active" : ""}" role="tab" aria-selected="${on}" data-tab="${escapeHtml(path)}"><span>${escapeHtml(baseOf(path))}</span><button type="button" class="etab-close" data-close="${escapeHtml(path)}" aria-label="閉じる">×</button></div>`;
+    }).join("");
+    elements.activeName.textContent = activeFile;
   }
 
   function renderExplorer() {
-    const items = Object.keys(files).map((name) => {
-      const current = name === activeFile ? ' aria-current="true" class="file-item active"' : ' class="file-item"';
-      return `<li><button type="button"${current} data-file="${escapeHtml(name)}"><span aria-hidden="true">▤</span> ${escapeHtml(name)}</button></li>`;
+    const all = allFolders();
+    const rows = [];
+    const walk = (folder, depth) => {
+      const subFolders = all.filter((f) => parentOf(f) === folder).sort();
+      const subFiles = Object.keys(files).filter((f) => parentOf(f) === folder).sort();
+      subFolders.forEach((f) => {
+        const open = expanded.includes(f);
+        rows.push({ path: f, kind: "folder", depth, open });
+        if (open) walk(f, depth + 1);
+      });
+      subFiles.forEach((f) => rows.push({ path: f, kind: "file", depth }));
+    };
+    walk("", 0);
+    const html = rows.map((row) => {
+      const indent = 12 + row.depth * 12;
+      const sel = row.path === selected ? " selected" : "";
+      const act = row.kind === "file" && row.path === activeFile ? " active" : "";
+      const icon = row.kind === "folder" ? (row.open ? "▾" : "▸") : "▤";
+      return `<li><button type="button" class="file-item${sel}${act}" style="padding-left:${indent}px" data-path="${escapeHtml(row.path)}" data-kind="${row.kind}"><span aria-hidden="true">${icon}</span> ${escapeHtml(baseOf(row.path))}</button></li>`;
     });
-    items.push(`<li class="file-sep" aria-hidden="true"></li>`);
-    items.push(`<li><button type="button" class="file-item virtual" data-file="${SPEC_FILE}"><span aria-hidden="true">◧</span> ${SPEC_FILE} <small>仕様書</small></button></li>`);
-    elements.fileList.innerHTML = items.join("");
+    html.push(`<li class="file-sep" aria-hidden="true"></li>`);
+    html.push(`<li><button type="button" class="file-item virtual" data-spec="1"><span aria-hidden="true">◧</span> ${SPEC_FILE}</button></li>`);
+    elements.fileList.innerHTML = html.join("");
+    renderTabs();
   }
 
-  function openFile(name) {
-    if (files[name] === undefined || name === activeFile) return;
-    files[activeFile] = getSource();
-    activeFile = name;
-    setSource(files[name], { markChanged: false });
-    persistFiles();
-    renderExplorer();
-    showToast(`${name} を開きました`);
+  function targetFolder() {
+    if (selected && isFolder(selected)) return selected;
+    return parentOf(selected || "");
   }
 
-  function uniqueName(name) {
-    if (files[name] === undefined) return name;
+  function uniquePath(path) {
+    if (files[path] === undefined && !allFolders().includes(path)) return path;
+    const folder = parentOf(path);
+    const name = baseOf(path);
     const dot = name.lastIndexOf(".");
-    const base = dot > 0 ? name.slice(0, dot) : name;
+    const stem = dot > 0 ? name.slice(0, dot) : name;
     const ext = dot > 0 ? name.slice(dot) : "";
     let n = 2;
-    while (files[`${base}-${n}${ext}`] !== undefined) n += 1;
-    return `${base}-${n}${ext}`;
+    while (files[joinPath(folder, `${stem}-${n}${ext}`)] !== undefined) n += 1;
+    return joinPath(folder, `${stem}-${n}${ext}`);
+  }
+
+  function openFile(path) {
+    if (files[path] === undefined) return;
+    if (path !== activeFile) {
+      files[activeFile] = getSource();
+      activeFile = path;
+      setSource(files[path], { markChanged: false });
+    }
+    if (!openTabs.includes(path)) openTabs.push(path);
+    selected = path;
+    persistFiles();
+    renderExplorer();
+  }
+
+  function closeTab(path) {
+    const index = openTabs.indexOf(path);
+    if (index < 0) return;
+    openTabs.splice(index, 1);
+    if (path === activeFile) {
+      const next = openTabs[index] ?? openTabs[index - 1] ?? Object.keys(files)[0];
+      if (!next) return;
+      if (!openTabs.includes(next)) openTabs.push(next);
+      activeFile = next;
+      setSource(files[next], { markChanged: false });
+      selected = next;
+    }
+    persistFiles();
+    renderExplorer();
   }
 
   function newFile() {
-    let name = "untitled.pop";
-    let n = 2;
-    while (files[name] !== undefined) { name = `untitled-${n}.pop`; n += 1; }
-    files[activeFile] = getSource();
-    files[name] = "";
-    openFile(name);
+    const folder = targetFolder();
+    const path = uniquePath(joinPath(folder, "untitled.pop"));
+    files[path] = "";
+    if (folder && !expanded.includes(folder)) expanded.push(folder);
+    openFile(path);
+  }
+
+  function newFolder() {
+    const folder = targetFolder();
+    const path = uniquePath(joinPath(folder, "folder"));
+    folders.push(path);
+    if (folder && !expanded.includes(folder)) expanded.push(folder);
+    expanded.push(path);
+    selected = path;
+    persistFiles();
+    renderExplorer();
+  }
+
+  function renameSelected() {
+    if (!selected || selected === SPEC_FILE) return;
+    const current = baseOf(selected);
+    const name = window.prompt("新しい名前", current);
+    if (!name || name === current || /[\\/]/.test(name)) return;
+    const next = joinPath(parentOf(selected), name);
+    const from = selected;
+    const remap = (path) => (path === from ? next : path.startsWith(`${from}/`) ? next + path.slice(from.length) : path);
+    if (isFolder(from)) {
+      Object.keys(files).forEach((path) => {
+        if (path.startsWith(`${from}/`)) { files[remap(path)] = files[path]; delete files[path]; }
+      });
+      folders = folders.map(remap);
+      expanded = expanded.map(remap);
+    } else {
+      files[next] = files[from];
+      delete files[from];
+    }
+    openTabs = openTabs.map(remap);
+    activeFile = remap(activeFile);
+    selected = next;
+    persistFiles();
+    renderExplorer();
+  }
+
+  function deleteSelected() {
+    if (!selected || selected === SPEC_FILE) return;
+    if (!window.confirm(`「${baseOf(selected)}」を削除しますか？`)) return;
+    const folder = isFolder(selected);
+    const doomed = (path) => path === selected || path.startsWith(`${selected}/`);
+    Object.keys(files).filter(doomed).forEach((path) => delete files[path]);
+    folders = folders.filter((path) => !doomed(path));
+    expanded = expanded.filter((path) => !doomed(path));
+    openTabs = openTabs.filter((path) => !doomed(path));
+    if (!Object.keys(files).length) files["main.pop"] = "";
+    if (!openTabs.length) openTabs.push(Object.keys(files)[0]);
+    if (doomed(activeFile) || files[activeFile] === undefined) activeFile = openTabs[0];
+    setSource(files[activeFile] ?? "", { markChanged: false });
+    selected = activeFile;
+    persistFiles();
+    renderExplorer();
+    showToast(folder ? "フォルダーを削除しました" : "ファイルを削除しました");
   }
 
   async function uploadFiles(fileList) {
+    const folder = targetFolder();
     let last = null;
     for (const file of Array.from(fileList || [])) {
-      const name = uniqueName(file.name);
-      files[name] = await file.text();
-      last = name;
+      const path = uniquePath(joinPath(folder, file.name));
+      files[path] = await file.text();
+      last = path;
     }
-    if (last) {
-      files[activeFile] = getSource();
-      persistFiles();
-      openFile(last);
-    }
+    if (last) openFile(last);
   }
 
-  function downloadFile(name = activeFile) {
-    const content = name === activeFile ? getSource() : files[name];
+  function downloadFile(path = activeFile) {
+    const content = path === activeFile ? getSource() : files[path];
     const blob = new Blob([content ?? ""], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = name;
+    link.download = baseOf(path);
     link.click();
     URL.revokeObjectURL(link.href);
-    showToast(`${name} をダウンロードしました`);
+    showToast(`${baseOf(path)} をダウンロードしました`);
+  }
+
+  function bindExplorer() {
+    elements.newFileButton.addEventListener("click", newFile);
+    elements.newFolderButton.addEventListener("click", newFolder);
+    elements.renameButton.addEventListener("click", renameSelected);
+    elements.deleteButton.addEventListener("click", deleteSelected);
+    elements.uploadFileButton.addEventListener("click", () => elements.uploadInput.click());
+    elements.uploadInput.addEventListener("change", () => {
+      uploadFiles(elements.uploadInput.files);
+      elements.uploadInput.value = "";
+    });
+    elements.downloadFileButton.addEventListener("click", () => downloadFile(activeFile));
+    elements.fileList.addEventListener("click", (event) => {
+      if (event.target.closest("[data-spec]")) { switchSidePanel("reference"); return; }
+      const button = event.target.closest("[data-path]");
+      if (!button) return;
+      const path = button.dataset.path;
+      if (button.dataset.kind === "folder") {
+        selected = path;
+        expanded = expanded.includes(path) ? expanded.filter((p) => p !== path) : [...expanded, path];
+        persistFiles();
+        renderExplorer();
+        return;
+      }
+      openFile(path);
+    });
+    elements.editorTabs.addEventListener("click", (event) => {
+      const close = event.target.closest("[data-close]");
+      if (close) { event.stopPropagation(); closeTab(close.dataset.close); return; }
+      const tab = event.target.closest("[data-tab]");
+      if (tab) openFile(tab.dataset.tab);
+    });
   }
 
   function downloadSource() {
@@ -2653,20 +2817,8 @@ doubled >> Display.`;
     elements.copyCodeButton.addEventListener("click", () =>
       copyText(getSource(), "コードをコピーしました"));
     elements.downloadButton.addEventListener("click", downloadSource);
-    elements.newFileButton.addEventListener("click", newFile);
-    document.getElementById("actExplorer").addEventListener("click", (event) => {
-      const hidden = document.body.classList.toggle("explorer-hidden");
-      event.currentTarget.setAttribute("aria-pressed", String(!hidden));
-      event.currentTarget.classList.toggle("active", !hidden);
-    });
-    document.getElementById("actSearch").addEventListener("click", () => {
-      const search = document.getElementById(activeSidePanel() === "reference" ? "referenceSearch" : "exampleSearch");
-      if (search) search.focus();
-    });
-    document.getElementById("actRun").addEventListener("click", () => elements.runButton.click());
-    document.getElementById("actMore").addEventListener("click", () => {
-      elements.moreTools.open = !elements.moreTools.open;
-    });
+    bindExplorer();
+    elements.explorerTab.addEventListener("click", () => switchSidePanel("explorer"));
     elements.uploadFileButton.addEventListener("click", () => elements.uploadInput.click());
     elements.uploadInput.addEventListener("change", () => {
       uploadFiles(elements.uploadInput.files);
@@ -2827,6 +2979,7 @@ doubled >> Display.`;
   loadFileStore();
   renderExplorer();
   bindEvents();
+  switchSidePanel("explorer");
   applyWorkspaceSizes();
   updateMobileResultHeight(mobileResultHeight);
   setSidebarCollapsed(sidebarCollapsed, false);
