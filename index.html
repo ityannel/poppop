@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja" data-theme="light" data-editor="dark">
+<html lang="ja" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <script>
@@ -108,6 +108,18 @@
 
   <main class="workspace">
     <aside class="sidebar" aria-label="レッスン、サンプル、リファレンス">
+      <section class="explorer" aria-label="エクスプローラー">
+      <div class="explorer-head">
+        <span class="explorer-title" aria-label="エクスプローラー"></span>
+        <div class="explorer-actions">
+          <button id="newFileButton" class="vs-icon" type="button" title="新しいファイル" aria-label="新しいファイル">+</button>
+          <button id="uploadFileButton" class="vs-icon" type="button" title="アップロード" aria-label="アップロード">↑</button>
+          <button id="downloadFileButton" class="vs-icon" type="button" title="ダウンロード" aria-label="ダウンロード">↓</button>
+        </div>
+      </div>
+      <input id="uploadInput" class="sr-only" type="file" multiple accept=".pop,.popcorn,.txt,.md,text/plain">
+      <ul id="fileList" class="file-list" role="list"></ul>
+      </section>
       <div class="side-tabs" role="tablist">
         <button id="referenceTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="referencePanel" tabindex="0">仕様書</button>
         <button id="examplesTab" class="side-tab" role="tab" aria-selected="false" aria-controls="examplesPanel" tabindex="-1">例</button>
@@ -119,7 +131,7 @@
       <section id="examplesPanel" class="side-panel" role="tabpanel" aria-labelledby="examplesTab" hidden>
         <label class="search-box">
           <span class="sr-only">コード例を検索</span>
-          <input id="exampleSearch" type="search" placeholder="コード例を検索">
+          <input id="exampleSearch" type="search" placeholder="検索">
         </label>
         <div id="exampleList" class="card-list" aria-live="polite">
           <p class="muted">仕様書から読み込み中…</p>
@@ -129,7 +141,7 @@
       <section id="referencePanel" class="side-panel" role="tabpanel" aria-labelledby="referenceTab">
         <label class="search-box">
           <span class="sr-only">標準関数を検索</span>
-          <input id="referenceSearch" type="search" placeholder="標準関数を検索">
+          <input id="referenceSearch" type="search" placeholder="検索">
         </label>
         <div id="referenceList" class="reference-list" aria-live="polite">
           <p class="muted">実装から読み込み中…</p>

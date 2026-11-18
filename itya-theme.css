@@ -1,83 +1,226 @@
-/* itya.site に合わせた見た目（白地・点々・丸みのあるボタン）。元の CSS の後に読み込んで、上書きする */
-:root {
+/* PopCorn の見た目（VS Code 風）。ダーク・ライトの両方。元の CSS の後に読み込んで、上書きする */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --panel-2: #2d2d30;
+  --panel-pop: #2d2d30;
+  --line: #3c3c3c;
+  --text: #cccccc;
+  --muted: #8b8b8b;
+  --accent: #0e639c;
+  --accent-2: #f14c4c;
+  --accent-3: #3794ff;
+  --accent-soft: #094771;
+  --accent-text: #ffffff;
+  --danger: #f48771;
+  --good: #89d185;
+  --shadow: 0 2px 8px rgb(0 0 0 / 40%);
+  --pop-shadow: none;
+  --select: #37373d;
+}
+
+[data-theme="light"] {
   color-scheme: light;
   --bg: #ffffff;
-  --panel: #ffffff;
-  --panel-2: #f5f5f3;
+  --panel: #f3f3f3;
+  --panel-2: #e8e8e8;
   --panel-pop: #ffffff;
-  --line: #d9d9d6;
-  --text: #111111;
-  --muted: #6b6b68;
-  --accent: #111111;
-  --accent-2: #ff526f;
-  --accent-3: #08a7c9;
-  --accent-soft: #111111;
+  --line: #d4d4d4;
+  --text: #333333;
+  --muted: #6e6e6e;
+  --accent: #005fb8;
+  --accent-2: #e51400;
+  --accent-3: #0078d4;
+  --accent-soft: #cce4f7;
   --accent-text: #ffffff;
-  --danger: #d83451;
-  --good: #07845a;
-  --shadow: 0 6px 18px rgb(0 0 0 / 8%);
-  --pop-shadow: 0 0 0 #111111;
+  --danger: #a1260d;
+  --good: #107c10;
+  --shadow: 0 2px 8px rgb(0 0 0 / 12%);
+  --pop-shadow: none;
+  --select: #e4e6f1;
 }
 
 html, body {
-  background: #ffffff radial-gradient(rgba(0, 0, 0, 0.12) 1.8px, transparent 2.1px) 0 0 / 30px 30px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui-font);
+}
+[data-theme="light"] body {
+  background: #ffffff radial-gradient(rgba(0, 0, 0, 0.1) 1.8px, transparent 2.1px) 0 0 / 30px 30px;
 }
 
-/* ロゴは、PopCorn だけに統一（PopCorn のロゴは出さない） */
-.app-header .brand-logo { display: none; }
-.app-header { background: transparent; border-bottom: 1px solid var(--line); }
-.popcorn-logo { filter: none; }
-
-/* ボタンは、サイトと同じ、白地に黒い縁の丸いボタン */
+/* ボタン: VS Code と同じ、角の少し丸い、平らなボタン */
 .button,
 .format-button,
-.toolbar button {
-  background: #ffffff;
-  color: #111111;
-  border: 2px solid #111111;
-  border-radius: 999px;
+.toolbar button,
+.toolbar-primary button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 2px;
   box-shadow: none;
+  font-family: var(--head-font);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 4px 10px;
+  min-height: 26px;
+}
+.button:hover,
+.format-button:hover,
+.toolbar button:hover {
+  background: var(--select);
+  border-color: var(--accent-3);
+  color: var(--text);
 }
 .button.primary,
 .toolbar-primary .primary {
-  background: #111111;
-  color: #ffffff;
-  border-color: #111111;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
-.button:hover,
-.format-button:hover {
-  background: #111111;
-  color: #ffffff;
+.button.primary:hover,
+.toolbar-primary .primary:hover {
+  background: var(--accent-3);
+  border-color: var(--accent-3);
 }
-
-/* 文字は、読みやすい黒（コントラストを上げる） */
-body, .app-header, .toolbar, .side-panel, .result-column, .editor-column {
+.button.danger { color: var(--danger); }
+.icon-button,
+.vs-icon {
+  background: transparent;
   color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-button:hover,
+.vs-icon:hover {
+  background: var(--select);
+  border-color: var(--line);
 }
 
-/* フォント: 英字は Fredoka、日本語は Kosugi に統一。コードの欄は、今のまま等幅 */
-:root {
-  --ui-font: "Fredoka", "Kosugi", ui-sans-serif, system-ui, sans-serif;
-  --head-font: "Fredoka", "Kosugi", sans-serif;
+/* 上のロゴの帯は、VS Code のタイトルバーのように平ら */
+.app-header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
 }
-html, body, button, input, select, textarea {
+.app-header .brand-logo { display: none; }
+
+/* 左の列の上に、エクスプローラー（ファイルの一覧） */
+.explorer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
   font-family: var(--ui-font);
 }
-h1, h2, h3, h4, .button, .format-button, .toolbar button, .side-panel-tab, [role="tab"] {
+.explorer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 8px 6px 10px;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.explorer-actions { display: flex; gap: 2px; }
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  overflow: auto;
+  max-height: 150px;
+}
+.file-list li { margin: 0; }
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 10px 3px 14px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-item:hover { background: var(--select); }
+.file-item.active { background: var(--accent-soft); color: var(--text); }
+.file-item small { margin-left: auto; color: var(--muted); font-size: 11px; }
+.file-sep { height: 1px; background: var(--line); margin: 6px 8px; }
+
+/* タブ: 上の線で、選んだものを示す（VS Code の見た目） */
+.side-tab, .result-tab {
   font-family: var(--head-font);
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid transparent;
+}
+.side-tab.active, .result-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent-3);
 }
 
-/* コードの欄（暗い配色）: ページは白のまま、エディターの周りだけ、濃い紺にする */
-html[data-editor="dark"] .editor-column {
-  --panel: #0b1831;
-  --panel-2: #112243;
-  --panel-pop: #172d55;
-  --line: #24426d;
-  --text: #f7fbff;
-  --muted: #9db1d2;
-  background: #0b1831;
-  color: #f7fbff;
+/* 編集の欄（コード）: 今の配色（テーマに合わせる） */
+.editor-column,
+.sidebar,
+.result-column {
+  background: var(--bg);
 }
-html[data-editor="light"] .editor-column {
-  --line: #d9d9d6;
+@media (max-width: 900px) {
+  .explorer { display: none; }
 }
+
+/* タブ（仕様書・例・ロボット君）: 幅に合わせて柔軟に。入りきらないときは、次の行へ回る */
+.side-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.side-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.side-tab.lesson-tab {
+  flex: 1.45 1 auto;
+}
+.side-tab .count { margin-left: 4px; }
+@media (max-width: 420px) {
+  .side-tab { font-size: 11px; padding: 7px 4px; }
+}
+
+/* 文字は減らす: 求められるまで出さない。説明はボタンの「ツールヒント」（ホバー時）に */
+.header-status,
+.app-header .header-status,
+.run-feedback,
+.toolbar kbd,
+#saveStatus,
+.editor-statusbar span:not(:first-child),
+.run-meta,
+.tool-menu-heading,
+.layout-preset span:last-child,
+.explorer-title,
+.file-item small,
+#outputPanel .muted,
+.app-header .brand-logo {
+  display: none !important;
+}
+.editor-statusbar { justify-content: flex-start; }

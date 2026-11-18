@@ -38,7 +38,7 @@ doubled >> Display.`;
       "runFeedback",
       "formatButton", "copyCodeButton", "downloadButton", "fileInput",
       "loadFileButton", "shareButton", "decreaseFontButton", "increaseFontButton",
-      "themeButton", "toggleSidebarButton", "toggleResultButton", "moreTools",
+      "themeButton", "newFileButton", "uploadFileButton", "downloadFileButton", "uploadInput", "fileList", "toggleSidebarButton", "toggleResultButton", "moreTools",
       "sidebarResizer", "resultResizer", "resultDrawerHandle",
       "closeResultDrawerButton",
       "examplesTab", "referenceTab", "lessonTab", "lessonTabProgress",
@@ -641,7 +641,7 @@ doubled >> Display.`;
     updateEditorStatus();
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      localStorage.setItem(STORAGE.source, getSource());
+      persistFiles();
       elements.saveStatus.textContent = "自動保存済み";
     }, 350);
     scheduleAnalysis();
@@ -2473,14 +2473,104 @@ doubled >> Display.`;
     }
   }
 
+  // ===== エクスプローラー（複数ファイル）=====
+  const FILES_KEY = "popcorn.playground.files.v1";
+  const SPEC_FILE = "specification.md";
+  let files = {};
+  let activeFile = "main.pop";
+
+  function persistFiles() {
+    if (editor || elements.editorFallback) files[activeFile] = getSource();
+    localStorage.setItem(FILES_KEY, JSON.stringify({ files, active: activeFile }));
+  }
+
+  function loadFileStore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FILES_KEY) || "null");
+      if (saved && saved.files && Object.keys(saved.files).length) {
+        files = saved.files;
+        activeFile = saved.active && files[saved.active] !== undefined ? saved.active : Object.keys(files)[0];
+        setSource(files[activeFile], { markChanged: false, focus: false });
+        return;
+      }
+    } catch {}
+    files = { "main.pop": getSource() };
+    activeFile = "main.pop";
+    persistFiles();
+  }
+
+  function renderExplorer() {
+    const items = Object.keys(files).map((name) => {
+      const current = name === activeFile ? ' aria-current="true" class="file-item active"' : ' class="file-item"';
+      return `<li><button type="button"${current} data-file="${escapeHtml(name)}"><span aria-hidden="true">▤</span> ${escapeHtml(name)}</button></li>`;
+    });
+    items.push(`<li class="file-sep" aria-hidden="true"></li>`);
+    items.push(`<li><button type="button" class="file-item virtual" data-file="${SPEC_FILE}"><span aria-hidden="true">◧</span> ${SPEC_FILE} <small>仕様書</small></button></li>`);
+    elements.fileList.innerHTML = items.join("");
+  }
+
+  function openFile(name) {
+    if (files[name] === undefined || name === activeFile) return;
+    files[activeFile] = getSource();
+    activeFile = name;
+    setSource(files[name], { markChanged: false });
+    persistFiles();
+    renderExplorer();
+    showToast(`${name} を開きました`);
+  }
+
+  function uniqueName(name) {
+    if (files[name] === undefined) return name;
+    const dot = name.lastIndexOf(".");
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const ext = dot > 0 ? name.slice(dot) : "";
+    let n = 2;
+    while (files[`${base}-${n}${ext}`] !== undefined) n += 1;
+    return `${base}-${n}${ext}`;
+  }
+
+  function newFile() {
+    let name = "untitled.pop";
+    let n = 2;
+    while (files[name] !== undefined) { name = `untitled-${n}.pop`; n += 1; }
+    files[activeFile] = getSource();
+    files[name] = "";
+    openFile(name);
+  }
+
+  async function uploadFiles(fileList) {
+    let last = null;
+    for (const file of Array.from(fileList || [])) {
+      const name = uniqueName(file.name);
+      files[name] = await file.text();
+      last = name;
+    }
+    if (last) {
+      files[activeFile] = getSource();
+      persistFiles();
+      openFile(last);
+    }
+  }
+
+  function downloadFile(name = activeFile) {
+    const content = name === activeFile ? getSource() : files[name];
+    const blob = new Blob([content ?? ""], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast(`${name} をダウンロードしました`);
+  }
+
   function downloadSource() {
     const blob = new Blob([getSource()], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "main.pop";
+    link.download = activeFile;
     link.click();
     URL.revokeObjectURL(link.href);
-    showToast("main.pop を保存しました");
+    showToast(`${activeFile} を保存しました`);
   }
 
   async function loadFile(file) {
@@ -2507,22 +2597,23 @@ doubled >> Display.`;
     showToast(`文字サイズ: ${next}px`);
   }
 
-  // コードの欄（エディター）だけ、暗い・明るいを切り替える。ページの全体は、白のまま
-  function applyEditorTheme(next) {
-    document.documentElement.dataset.editor = next;
-    if (editor) editor.setTheme(next === "light" ? "ace/theme/tomorrow" : "ace/theme/tomorrow_night_blue");
-    elements.themeButton.setAttribute("aria-label", next === "light" ? "コードの配色: 明るい（暗くする）" : "コードの配色: 暗い（明るくする）");
-    elements.themeButton.setAttribute("title", next === "light" ? "コードの欄を暗くする" : "コードの欄を明るくする");
+  // 画面全体を、ダーク・ライトで切り替える（ボタン☼・保存は、ブラウザに覚える）
+  function updateAceTheme() {
+    if (!editor) return;
+    const light = document.documentElement.dataset.theme === "light";
+    editor.setTheme(light ? "ace/theme/tomorrow" : "ace/theme/tomorrow_night");
   }
 
-  function updateAceTheme() {
-    applyEditorTheme(document.documentElement.dataset.editor === "light" ? "light" : "dark");
+  function applyTheme(next) {
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem(STORAGE.theme, next);
+    elements.themeButton.setAttribute("aria-label", next === "light" ? "ダークモードに切り替える" : "ライトモードに切り替える");
+    elements.themeButton.setAttribute("title", next === "light" ? "ダークモードに切り替える" : "ライトモードに切り替える");
+    updateAceTheme();
   }
 
   function toggleTheme() {
-    const next = document.documentElement.dataset.editor === "light" ? "dark" : "light";
-    localStorage.setItem(STORAGE.editorTheme, next);
-    applyEditorTheme(next);
+    applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
     closeToolMenu();
   }
 
@@ -2558,6 +2649,19 @@ doubled >> Display.`;
     elements.copyCodeButton.addEventListener("click", () =>
       copyText(getSource(), "コードをコピーしました"));
     elements.downloadButton.addEventListener("click", downloadSource);
+    elements.newFileButton.addEventListener("click", newFile);
+    elements.uploadFileButton.addEventListener("click", () => elements.uploadInput.click());
+    elements.uploadInput.addEventListener("change", () => {
+      uploadFiles(elements.uploadInput.files);
+      elements.uploadInput.value = "";
+    });
+    elements.downloadFileButton.addEventListener("click", () => downloadFile(activeFile));
+    elements.fileList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-file]");
+      if (!button) return;
+      if (button.dataset.file === SPEC_FILE) { switchSidePanel("reference"); return; }
+      openFile(button.dataset.file);
+    });
     elements.loadFileButton.addEventListener("click", () => elements.fileInput.click());
     elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
     elements.shareButton.addEventListener("click", shareSource);
@@ -2701,14 +2805,13 @@ doubled >> Display.`;
     });
   }
 
-  document.documentElement.dataset.theme = "light";
-  document.documentElement.dataset.editor =
-    localStorage.getItem(STORAGE.editorTheme) === "light" ? "light" : "dark";
+  applyTheme(localStorage.getItem(STORAGE.theme) === "light" ? "light" : "dark");
   setupEditor();
+  loadFileStore();
+  renderExplorer();
   bindEvents();
   applyWorkspaceSizes();
   updateMobileResultHeight(mobileResultHeight);
-  updateAceTheme();
   setSidebarCollapsed(sidebarCollapsed, false);
   setResultCollapsed(resultCollapsed, false);
   setMobilePane("code");
