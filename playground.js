@@ -2,19 +2,20 @@
   "use strict";
 
   const STORAGE = {
-    source: "poppop.playground.source.v2",
-    theme: "poppop.playground.theme",
-    fontSize: "poppop.playground.fontSize",
-    lessonIndex: "poppop.playground.lessonIndex.v1",
-    lessonProgress: "poppop.playground.lessonProgress.v2",
-    tutorWelcomed: "poppop.playground.tutorWelcomed.v2",
-    tutorProfile: "poppop.playground.tutorProfile.v1",
-    tutorLearning: "poppop.playground.tutorLearning.v1",
-    sidebarCollapsed: "poppop.playground.sidebarCollapsed.v1",
-    resultCollapsed: "poppop.playground.resultCollapsed.v1",
-    sidebarWidth: "poppop.playground.sidebarWidth.v1",
-    resultWidth: "poppop.playground.resultWidth.v1",
-    mobileResultHeight: "poppop.playground.mobileResultHeight.v1",
+    source: "popcorn.playground.source.v2",
+    theme: "popcorn.playground.theme",
+    editorTheme: "popcorn.playground.editorTheme.v1",
+    fontSize: "popcorn.playground.fontSize",
+    lessonIndex: "popcorn.playground.lessonIndex.v1",
+    lessonProgress: "popcorn.playground.lessonProgress.v2",
+    tutorWelcomed: "popcorn.playground.tutorWelcomed.v2",
+    tutorProfile: "popcorn.playground.tutorProfile.v1",
+    tutorLearning: "popcorn.playground.tutorLearning.v1",
+    sidebarCollapsed: "popcorn.playground.sidebarCollapsed.v1",
+    resultCollapsed: "popcorn.playground.resultCollapsed.v1",
+    sidebarWidth: "popcorn.playground.sidebarWidth.v1",
+    resultWidth: "popcorn.playground.resultWidth.v1",
+    mobileResultHeight: "popcorn.playground.mobileResultHeight.v1",
   };
   const FALLBACK_SOURCE = `[1, 2, 3, 4] >> Map(value):
     value * 2.
@@ -177,12 +178,12 @@ doubled >> Display.`;
 
   function defineAceMode() {
     if (!window.ace) return;
-    ace.define("ace/mode/poppop_highlight_rules", [
+    ace.define("ace/mode/popcorn_highlight_rules", [
       "require", "exports", "module", "ace/lib/oop", "ace/mode/text_highlight_rules",
     ], (require, exports) => {
       const oop = require("ace/lib/oop");
       const TextHighlightRules = require("ace/mode/text_highlight_rules").TextHighlightRules;
-      const PopPopHighlightRules = function PopPopHighlightRules() {
+      const PopCornHighlightRules = function PopCornHighlightRules() {
         this.$rules = {
           start: [
             { token: "comment", regex: "\\/\\/.*$" },
@@ -206,20 +207,20 @@ doubled >> Display.`;
         };
         this.normalizeRules();
       };
-      oop.inherits(PopPopHighlightRules, TextHighlightRules);
-      exports.PopPopHighlightRules = PopPopHighlightRules;
+      oop.inherits(PopCornHighlightRules, TextHighlightRules);
+      exports.PopCornHighlightRules = PopCornHighlightRules;
     });
-    ace.define("ace/mode/poppop", [
+    ace.define("ace/mode/popcorn", [
       "require", "exports", "module", "ace/lib/oop", "ace/mode/text",
-      "ace/mode/poppop_highlight_rules",
+      "ace/mode/popcorn_highlight_rules",
     ], (require, exports) => {
       const oop = require("ace/lib/oop");
       const TextMode = require("ace/mode/text").Mode;
-      const Rules = require("ace/mode/poppop_highlight_rules").PopPopHighlightRules;
+      const Rules = require("ace/mode/popcorn_highlight_rules").PopCornHighlightRules;
       const Mode = function Mode() { this.HighlightRules = Rules; };
       oop.inherits(Mode, TextMode);
       Mode.prototype.lineCommentStart = "//";
-      Mode.prototype.$id = "ace/mode/poppop";
+      Mode.prototype.$id = "ace/mode/popcorn";
       exports.Mode = Mode;
     });
   }
@@ -239,7 +240,7 @@ doubled >> Display.`;
     defineAceMode();
     ace.config.set("basePath", "https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict");
     editor = ace.edit("editor");
-    editor.session.setMode("ace/mode/poppop");
+    editor.session.setMode("ace/mode/popcorn");
     editor.session.setUseSoftTabs(true);
     editor.session.setTabSize(4);
     editor.session.setUseWrapMode(true);
@@ -797,7 +798,7 @@ doubled >> Display.`;
           callback(null, names.map((name) => ({
             caption: name,
             value: name,
-            meta: /^[A-Z]/.test(name) ? "PopPop 処理" : "予約語",
+            meta: /^[A-Z]/.test(name) ? "PopCorn 処理" : "予約語",
             score: 1000,
           })));
         },
@@ -930,7 +931,7 @@ doubled >> Display.`;
       items.forEach((item, index) => {
         const line = Math.max(
           1,
-          Number(window.PopPopLocalization?.errorLine(item) ?? 1),
+          Number(window.PopCornLocalization?.errorLine(item) ?? 1),
         );
         const button = document.createElement("button");
         button.type = "button";
@@ -950,7 +951,7 @@ doubled >> Display.`;
     elements.diagnosticsPanel.classList.toggle("error", items.length > 0);
     if (editor) {
       editor.session.setAnnotations(items.map((item, index) => {
-        const line = window.PopPopLocalization?.errorLine(item);
+        const line = window.PopCornLocalization?.errorLine(item);
         return {
           row: Math.max(0, Number(line ?? 1) - 1),
           column: 0,
@@ -962,7 +963,7 @@ doubled >> Display.`;
   }
 
   function localizeError(error) {
-    return window.PopPopLocalization?.localizeError(error)
+    return window.PopCornLocalization?.localizeError(error)
       ?? String(error ?? "不明なエラーが発生しました。");
   }
 
@@ -1003,7 +1004,7 @@ doubled >> Display.`;
             heading.replace(/^\d+\.\s*/, "") === "標準関数一覧";
         }
       }
-      if (line.trim() === "```poppop") {
+      if (line.trim() === "```popcorn") {
         inCode = true;
         codeLines = [];
         continue;
@@ -1035,7 +1036,7 @@ doubled >> Display.`;
 
   async function loadSpecification() {
     try {
-      const url = new URL("poppop_specification.md", location.href);
+      const url = new URL("popcorn_specification.md", location.href);
       url.searchParams.set("spec", String(Date.now()));
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1608,7 +1609,7 @@ doubled >> Display.`;
     const requiredFeature = LESSON_FEATURES[baseLesson.id];
     const text = await callGemini(
       [
-          "あなたはPopPop言語の教材編集者です。",
+          "あなたはPopCorn言語の教材編集者です。",
           "次の既存レッスンを参考に、学習者一人のための新しい問題を一問だけ作ってください。",
           `今回必ず学ぶ機能は ${requiredFeature} です。starterとsolutionの両方で使ってください。`,
           "元のコードのパイプ、文末、ブロック構造は一切増減させないでください。",
@@ -1963,7 +1964,7 @@ doubled >> Display.`;
     try {
       const text = await callGeminiStream(
         [
-          "あなたはPopPop Playgroundに住む、親しみやすいロボット先生です。",
+          "あなたはPopCorn Playgroundに住む、親しみやすいロボット先生です。",
           "幼すぎない、短く自然な日本語で話します。1回の発言は原則80文字以内です。",
           "ユーザーの答えを奪わず、次の一歩が分かる言葉を選びます。",
           "正誤は与えられた実行環境の判定に必ず従い、自分で覆しません。",
@@ -2028,7 +2029,7 @@ doubled >> Display.`;
     try {
       const text = await callGeminiStream(
         [
-          "あなたはPopPop言語の練習問題を採点する先生です。",
+          "あなたはPopCorn言語の練習問題を採点する先生です。",
           "完成例との文字列一致ではなく、目標を達成しているかで判定してください。",
           "JSONだけを返してください。",
           '形式: {"passed":true,"message":"80文字以内の講評","mood":"happy"}',
@@ -2099,9 +2100,9 @@ doubled >> Display.`;
   async function generateOpenEndedLesson(repairNote = "", onCode = () => {}) {
     const text = await callGeminiStream(
         [
-          "あなたはPopPop言語のやさしい先生です。",
+          "あなたはPopCorn言語のやさしい先生です。",
           "基礎8問を終えた学習者向けの、少し発展的な練習問題を1つ作ってください。",
-          "PopPopは `>>` で値を流し、通常の文は `.`、ブロック全体は `..` で閉じます。",
+          "PopCornは `>>` で値を流し、通常の文は `.`、ブロック全体は `..` で閉じます。",
           "使えるもの: Display, Map(name):, Filter(name):, Reduce(name):, Check(name): is ... else:, Update(name):, Fork(name):, Range, Sum, Length, Random, Get。",
           "標準関数を `Range(1, 6)` や `Sum()` のような括弧付き関数呼び出しにしてはいけません。",
           "標準関数は `1 >> Range >> values.` や `values >> Sum >> total.` のように、パイプの段階として書いてください。",
@@ -2193,7 +2194,7 @@ doubled >> Display.`;
       return "Geminiの利用上限に達したようです。少し待ってから、もう一度試してね。";
     }
     if (/文法|構文|Display|形式|読み取れ/.test(message)) {
-      return "問題案は届いたけれど、PopPopの検査を通過できなかったよ。もう一度押すと別の案で試せるよ。";
+      return "問題案は届いたけれど、PopCornの検査を通過できなかったよ。もう一度押すと別の案で試せるよ。";
     }
     return "Geminiとの通信に失敗したよ。接続を確認して、もう一度試してね。";
   }
@@ -2356,10 +2357,10 @@ doubled >> Display.`;
     try {
       const text = await callGeminiStream(
         [
-          "あなたはPopPop Playgroundに住むロボット先生です。",
+          "あなたはPopCorn Playgroundに住むロボット先生です。",
           "短く自然な日本語で、質問に直接答えてください。",
           "完成コードを丸ごと渡さず、理解できる次の一手を示してください。",
-          "PopPopでは改行に構文上の意味はなく、通常の文は .、ブロック全体は .. で閉じます。",
+          "PopCornでは改行に構文上の意味はなく、通常の文は .、ブロック全体は .. で閉じます。",
           ">> は左の値を右へ流します。すべての標準関数は元の値を破壊しません。",
           "不確かな仕様を作らず、分からない場合は仕様書を確認するよう伝えてください。",
           "JSONだけを返してください。",
@@ -2453,7 +2454,7 @@ doubled >> Display.`;
   }
 
   function formatSource() {
-    const formatter = window.PopPopFormatter;
+    const formatter = window.PopCornFormatter;
     if (!formatter) {
       showToast("整形機能を読み込めませんでした");
       return;
@@ -2506,18 +2507,22 @@ doubled >> Display.`;
     showToast(`文字サイズ: ${next}px`);
   }
 
+  // コードの欄（エディター）だけ、暗い・明るいを切り替える。ページの全体は、白のまま
+  function applyEditorTheme(next) {
+    document.documentElement.dataset.editor = next;
+    if (editor) editor.setTheme(next === "light" ? "ace/theme/tomorrow" : "ace/theme/tomorrow_night_blue");
+    elements.themeButton.setAttribute("aria-label", next === "light" ? "コードの配色: 明るい（暗くする）" : "コードの配色: 暗い（明るくする）");
+    elements.themeButton.setAttribute("title", next === "light" ? "コードの欄を暗くする" : "コードの欄を明るくする");
+  }
+
   function updateAceTheme() {
-    if (!editor) return;
-    const light = document.documentElement.dataset.theme === "light";
-    editor.setTheme(light ? "ace/theme/github" : "ace/theme/monokai");
+    applyEditorTheme(document.documentElement.dataset.editor === "light" ? "light" : "dark");
   }
 
   function toggleTheme() {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem(STORAGE.theme, next);
-    elements.themeButton.setAttribute("aria-pressed", String(next === "light"));
-    updateAceTheme();
+    const next = document.documentElement.dataset.editor === "light" ? "dark" : "light";
+    localStorage.setItem(STORAGE.editorTheme, next);
+    applyEditorTheme(next);
     closeToolMenu();
   }
 
@@ -2696,16 +2701,14 @@ doubled >> Display.`;
     });
   }
 
-  document.documentElement.dataset.theme =
-    localStorage.getItem(STORAGE.theme) === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = "light";
+  document.documentElement.dataset.editor =
+    localStorage.getItem(STORAGE.editorTheme) === "light" ? "light" : "dark";
   setupEditor();
   bindEvents();
   applyWorkspaceSizes();
   updateMobileResultHeight(mobileResultHeight);
-  elements.themeButton.setAttribute(
-    "aria-pressed",
-    String(document.documentElement.dataset.theme === "light"),
-  );
+  updateAceTheme();
   setSidebarCollapsed(sidebarCollapsed, false);
   setResultCollapsed(resultCollapsed, false);
   setMobilePane("code");

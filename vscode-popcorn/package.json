@@ -1,9 +1,9 @@
 {
-  "name": "vscode-poppop",
-  "displayName": "PopPop Language Support Japanese — PopCorn",
-  "description": "PopPop 言語向けの日本語ホバー、データフロー表示、診断、実行コマンドを提供します。",
+  "name": "vscode-popcorn",
+  "displayName": "PopCorn Language Support Japanese — PopCorn",
+  "description": "PopCorn 言語向けの日本語ホバー、データフロー表示、診断、実行コマンドを提供します。",
   "version": "1.8.1",
-  "publisher": "poppop-dev",
+  "publisher": "popcorn-dev",
   "main": "./extension.js",
   "scripts": {
     "test": "node assignment-targets.test.js && node semantic-highlights.test.js && node language-features.test.js && node extension-flow.test.js"
@@ -16,75 +16,75 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:poppop",
-    "onCommand:poppop.runFile",
-    "onCommand:poppop.refreshFlowHighlights",
-    "onCommand:poppop.showResults"
-    ,"onCommand:poppop.showFlowVisualizer"
+    "onLanguage:popcorn",
+    "onCommand:popcorn.runFile",
+    "onCommand:popcorn.refreshFlowHighlights",
+    "onCommand:popcorn.showResults"
+    ,"onCommand:popcorn.showFlowVisualizer"
   ],
   "contributes": {
     "configuration": {
-      "title": "PopPop Japanese",
+      "title": "PopCorn Japanese",
       "properties": {
-        "poppop.highlightFinalAssignmentTargets": {
+        "popcorn.highlightFinalAssignmentTargets": {
           "type": "boolean",
           "default": true,
           "description": "パイプラインの最終代入先を太字・斜体で表示します。"
         },
-        "poppop.visualizePipelineFlow": {
+        "popcorn.visualizePipelineFlow": {
           "type": "boolean",
           "default": false,
-          "description": "各 PopPop パイプラインの下にガイドを表示します。既定ではオフです。"
+          "description": "各 PopCorn パイプラインの下にガイドを表示します。既定ではオフです。"
         },
-        "poppop.highlightVariableFlow": {
+        "popcorn.highlightVariableFlow": {
           "type": "boolean",
           "default": true,
           "description": "カーソルまたは選択中の変数の利用箇所を背景色で表示します。"
         },
-        "poppop.highlightImplicitVariableScopes": {
+        "popcorn.highlightImplicitVariableScopes": {
           "type": "boolean",
           "default": true,
-          "description": "PopPop ストリームブロック内で @ の有効範囲を表示します。"
+          "description": "PopCorn ストリームブロック内で @ の有効範囲を表示します。"
         },
-        "poppop.enableDiagnostics": {
+        "popcorn.enableDiagnostics": {
           "type": "boolean",
           "default": true,
           "description": "未定義変数、未使用代入、@ の誤用、パイプラインの書式・型に関する問題を表示します。"
         },
-        "poppop.runtimePath": {
+        "popcorn.runtimePath": {
           "type": "string",
           "default": "",
-          "description": "PopPop 実行器のパスです。通常は不要です。独自の実行器を使う場合だけ指定してください。"
+          "description": "PopCorn 実行器のパスです。通常は不要です。独自の実行器を使う場合だけ指定してください。"
         }
       }
     },
     "configurationDefaults": {
-      "[poppop]": {
+      "[popcorn]": {
         "editor.tokenColorCustomizations": {
           "textMateRules": [
             {
-              "scope": "entity.name.function.poppop",
+              "scope": "entity.name.function.popcorn",
               "settings": {
                 "foreground": "#DCDCAA",
                 "fontStyle": ""
               }
             },
             {
-              "scope": "support.function.builtin.poppop",
+              "scope": "support.function.builtin.popcorn",
               "settings": {
                 "foreground": "#DCDCAA",
                 "fontStyle": ""
               }
             },
             {
-              "scope": "keyword.control.flow.poppop",
+              "scope": "keyword.control.flow.popcorn",
               "settings": {
                 "foreground": "#C586C0",
                 "fontStyle": ""
               }
             },
             {
-              "scope": "variable.other.readwrite.poppop",
+              "scope": "variable.other.readwrite.popcorn",
               "settings": {
                 "foreground": "#9CDCFE"
               }
@@ -95,14 +95,14 @@
     },
     "languages": [
       {
-        "id": "poppop",
+        "id": "popcorn",
         "aliases": [
-          "PopPop",
+          "PopCorn",
           "pop"
         ],
         "extensions": [
           ".pop",
-          ".poppop"
+          ".popcorn"
         ],
         "icon": {
           "light": "./po.png",
@@ -113,49 +113,49 @@
     ],
     "grammars": [
       {
-        "language": "poppop",
-        "scopeName": "source.poppop",
-        "path": "./syntaxes/poppop.tmLanguage.json"
+        "language": "popcorn",
+        "scopeName": "source.popcorn",
+        "path": "./syntaxes/popcorn.tmLanguage.json"
       }
     ],
     "commands": [
       {
-        "command": "poppop.runFile",
-        "title": "PopPop: ファイルを実行",
+        "command": "popcorn.runFile",
+        "title": "PopCorn: ファイルを実行",
         "icon": "$(play)"
       },
       {
-        "command": "poppop.refreshFlowHighlights",
-        "title": "PopPop: データフロー表示を更新"
+        "command": "popcorn.refreshFlowHighlights",
+        "title": "PopCorn: データフロー表示を更新"
       },
       {
-        "command": "poppop.showResults",
-        "title": "PopPop: 実行結果を表示"
+        "command": "popcorn.showResults",
+        "title": "PopCorn: 実行結果を表示"
       },
       {
-        "command": "poppop.showFlowVisualizer",
-        "title": "PopPop: データフローを表示",
+        "command": "popcorn.showFlowVisualizer",
+        "title": "PopCorn: データフローを表示",
         "icon": "$(graph)"
       }
     ],
     "keybindings": [
       {
-        "command": "poppop.runFile",
+        "command": "popcorn.runFile",
         "key": "ctrl+f5",
         "mac": "cmd+f5",
-        "when": "editorTextFocus && resourceLangId == poppop"
+        "when": "editorTextFocus && resourceLangId == popcorn"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "poppop.runFile",
-          "when": "resourceLangId == poppop",
+          "command": "popcorn.runFile",
+          "when": "resourceLangId == popcorn",
           "group": "navigation@1"
         },
         {
-          "command": "poppop.showFlowVisualizer",
-          "when": "resourceLangId == poppop",
+          "command": "popcorn.showFlowVisualizer",
+          "when": "resourceLangId == popcorn",
           "group": "navigation@2"
         }
       ]

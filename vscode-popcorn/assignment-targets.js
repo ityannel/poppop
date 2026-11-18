@@ -97,7 +97,7 @@ function destructuringTargetOffsets(targetText) {
 }
 
 /**
- * Finds the final variable binding target in each completed PopPop pipeline.
+ * Finds the final variable binding target in each completed PopCorn pipeline.
  * The returned offsets are absolute offsets in `text`.
  */
 function findFinalAssignmentTargetOffsets(text) {

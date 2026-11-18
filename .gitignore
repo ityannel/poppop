@@ -13,7 +13,7 @@ venv/
 node_modules/
 
 # Local extension packaging output
-vscode-poppop/runtime/
-vscode-poppop/*.vsix
-.poppop-build-*/
+vscode-popcorn/runtime/
+vscode-popcorn/*.vsix
+.popcorn-build-*/
 .vsce-npm-cache/

@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "poppop-lang"
+name = "popcorn-lang"
 dynamic = ["version"]
 description = "An experimental left-to-right, pipeline-oriented programming language"
 readme = "README.md"
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [project.scripts]
-poppop = "poppop_lang.cli:main"
+popcorn = "popcorn_lang.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ityannel/poppop"
@@ -34,10 +34,10 @@ Repository = "https://github.com/ityannel/poppop"
 Issues = "https://github.com/ityannel/poppop/issues"
 
 [tool.setuptools.packages.find]
-include = ["poppop_lang*"]
+include = ["popcorn_lang*"]
 
 [tool.setuptools.dynamic]
-version = { attr = "poppop_lang.version.VERSION" }
+version = { attr = "popcorn_lang.version.VERSION" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

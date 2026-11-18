@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 def build_archive(output: Path) -> None:
     root = Path(__file__).resolve().parents[1]
-    package = root / "poppop_lang"
+    package = root / "popcorn_lang"
     sources = sorted(package.rglob("*.py"))
     if not sources:
         raise RuntimeError(f"No Python sources found below {package}")
@@ -26,7 +26,7 @@ def main() -> None:
         "output",
         nargs="?",
         type=Path,
-        default=Path("poppop-runtime.zip"),
+        default=Path("popcorn-runtime.zip"),
     )
     arguments = parser.parse_args()
     build_archive(arguments.output.resolve())

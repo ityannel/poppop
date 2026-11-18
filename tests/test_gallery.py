@@ -1,7 +1,7 @@
 import asyncio
 
-from poppop_lang.cli import evaluate, parse_source
-from poppop_lang.gallery import GALLERY, public_gallery
+from popcorn_lang.cli import evaluate, parse_source
+from popcorn_lang.gallery import GALLERY, public_gallery
 
 
 def test_gallery_names_are_unique_and_consistent():

@@ -6,7 +6,7 @@ import os
 class EvaluatorError(Exception):
     pass
 
-class PopPopError(EvaluatorError):
+class PopCornError(EvaluatorError):
     def __init__(self, err_type, message):
         self.err_type = err_type
         self.message = message
@@ -41,7 +41,7 @@ def _values_equal(left, right):
 class Evaluator:
     def __init__(self):
         self.global_env = Environment()
-        self.trace_path = os.environ.get('POPPOP_TRACE_FILE')
+        self.trace_path = os.environ.get('POPCORN_TRACE_FILE')
 
     def trace_pipeline_value(self, node, value, input_value=None, progress=None):
         """Emit optional, compact execution data for the VS Code flow view."""
@@ -294,7 +294,7 @@ class Evaluator:
         try:
             return env.get_var(node.name)
         except NameError:
-            raise PopPopError("NameError", f"Variable '{node.name}' is not defined.")
+            raise PopCornError("NameError", f"Variable '{node.name}' is not defined.")
 
     async def eval_ImplicitVariableNode(self, node: ImplicitVariableNode, env: Environment):
         if node.name != '@':
@@ -325,21 +325,21 @@ class Evaluator:
             if _is_number(left) and _is_number(right): return left + right
             if isinstance(left, str) and isinstance(right, str): return left + right
             if isinstance(left, list) and isinstance(right, list): return left + right
-            raise PopPopError("TypeError", "+ requires numbers, two Str values, or two List values")
+            raise PopCornError("TypeError", "+ requires numbers, two Str values, or two List values")
         if op == '-':
             if _is_number(left) and _is_number(right): return left - right
-            raise PopPopError("TypeError", "- requires numbers")
+            raise PopCornError("TypeError", "- requires numbers")
         if op == '*':
             if _is_number(left) and _is_number(right): return left * right
-            raise PopPopError("TypeError", "* requires numbers")
+            raise PopCornError("TypeError", "* requires numbers")
         if op == '/':
             if not (_is_number(left) and _is_number(right)):
-                raise PopPopError("TypeError", "/ requires numbers")
+                raise PopCornError("TypeError", "/ requires numbers")
             if right == 0: raise EvaluatorError("Division by zero")
             return left / right
         if op == '%':
             if not (_is_number(left) and _is_number(right)):
-                raise PopPopError("TypeError", "% requires numbers")
+                raise PopCornError("TypeError", "% requires numbers")
             if right == 0: raise EvaluatorError("Modulo by zero")
             return left % right
         if op in ('>', '<', '>=', '<='):
@@ -347,7 +347,7 @@ class Evaluator:
                 isinstance(left, str) and isinstance(right, str)
             )
             if not comparable:
-                raise PopPopError("TypeError", f"{op} requires two numbers or two Str values")
+                raise PopCornError("TypeError", f"{op} requires two numbers or two Str values")
             if op == '>': return left > right
             if op == '<': return left < right
             if op == '>=': return left >= right
@@ -379,7 +379,7 @@ class Evaluator:
                 new_env.set_var(func_def.params[0].name, current)
             elif len(func_def.params) > 1:
                 if not isinstance(current, list) or len(current) != len(func_def.params):
-                    raise PopPopError(
+                    raise PopCornError(
                         "TypeError",
                         f"Function '{name}' expects {len(func_def.params)} values"
                     )
@@ -406,7 +406,7 @@ class Evaluator:
             except Exception:
                 pass
 
-        raise PopPopError("NameError", f"Function '{name}' is not defined.")
+        raise PopCornError("NameError", f"Function '{name}' is not defined.")
 
     async def eval_ArgumentListNode(self, node: ArgumentListNode, env: Environment):
         res = []
@@ -422,9 +422,9 @@ class Evaluator:
         try:
             return target[idx]
         except KeyError:
-            raise PopPopError("KeyError", f"Key '{idx}' is not defined")
+            raise PopCornError("KeyError", f"Key '{idx}' is not defined")
         except (IndexError, TypeError) as e:
-            raise PopPopError("IndexError", f"Cannot access index/key '{idx}' on {target}: {e}")
+            raise PopCornError("IndexError", f"Cannot access index/key '{idx}' on {target}: {e}")
 
     async def eval_BindNode(self, node: BindNode, env: Environment):
         val = env.get_current()

@@ -1,45 +1,47 @@
 <!doctype html>
-<html lang="ja" data-theme="dark">
+<html lang="ja" data-theme="light" data-editor="dark">
 <head>
   <meta charset="utf-8">
   <script>
     if (
       window.location.hostname === "ityannel.github.io"
-      && window.location.pathname.startsWith("/poppop")
+      && window.location.pathname.startsWith("/popcorn")
     ) {
-      const destination = new URL("https://poppop-playground.vercel.app/");
+      const destination = new URL("https://popcorn-playground.vercel.app/");
       destination.search = window.location.search;
       destination.hash = window.location.hash;
       window.location.replace(destination.href);
     }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PopPop をブラウザで試せる公式 Playground">
+  <meta name="description" content="PopCorn をブラウザで試せる公式 Playground">
   <meta name="theme-color" content="#0b1730">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="PopPop">
-  <meta property="og:title" content="PopPop Playground">
+  <meta property="og:site_name" content="PopCorn">
+  <meta property="og:title" content="PopCorn Playground">
   <meta property="og:description" content="小さく、読みやすく、ポップする言語。ブラウザですぐに試せます。">
-  <meta property="og:url" content="https://poppop-playground.vercel.app/">
-  <meta property="og:image" content="https://poppop-playground.vercel.app/poppop-ogp.png">
+  <meta property="og:url" content="https://popcorn-playground.vercel.app/">
+  <meta property="og:image" content="https://popcorn-playground.vercel.app/popcorn-ogp.png">
   <meta property="og:image:width" content="2506">
   <meta property="og:image:height" content="1624">
-  <meta property="og:image:alt" content="PopPop PopCorn ver. 0.0.0.1">
+  <meta property="og:image:alt" content="PopCorn 1">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PopPop Playground">
+  <meta name="twitter:title" content="PopCorn Playground">
   <meta name="twitter:description" content="小さく、読みやすく、ポップする言語。ブラウザですぐに試せます。">
-  <meta name="twitter:image" content="https://poppop-playground.vercel.app/poppop-ogp.png">
-  <meta name="twitter:image:alt" content="PopPop PopCorn ver. 0.0.0.1">
-  <title>PopPop Playground</title>
-  <link rel="canonical" href="https://poppop-playground.vercel.app/">
+  <meta name="twitter:image" content="https://popcorn-playground.vercel.app/popcorn-ogp.png">
+  <meta name="twitter:image:alt" content="PopCorn 1">
+  <title>PopCorn Playground</title>
+  <link rel="canonical" href="https://popcorn-playground.vercel.app/">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Kosugi&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="playground.css">
-  <link rel="stylesheet" href="poppop-visual.css">
+  <link rel="stylesheet" href="popcorn-visual.css">
+  <link rel="stylesheet" href="itya-theme.css">
 </head>
 <body>
   <a class="skip-link" href="#editor">エディターへ移動</a>
@@ -47,12 +49,12 @@
 
   <header class="app-header">
     <div class="brand">
-      <img class="brand-logo" src="poppop-logo.png" alt="PopPop">
+      <img class="brand-logo" src="popcorn-logo.png" alt="PopCorn">
       <img class="popcorn-logo" src="popcorn-logo.png" alt="PopCorn">
-      <h1 class="sr-only">PopPop Playground</h1>
+      <h1 class="sr-only">PopCorn Playground</h1>
     </div>
     <div class="header-status">
-      <span id="runtimeStatus">v0.0.0.1 Playground</span>
+      <span id="runtimeStatus">PopCorn 1 Playground</span>
     </div>
   </header>
 
@@ -81,7 +83,7 @@
         <button id="copyCodeButton" class="button" type="button"><span aria-hidden="true">⧉</span> コピー</button>
         <button id="downloadButton" class="button" type="button"><span aria-hidden="true">↓</span> 保存</button>
         <button id="loadFileButton" class="button" type="button"><span aria-hidden="true">↑</span> 読み込む</button>
-        <input id="fileInput" class="sr-only" type="file" accept=".pop,.poppop,text/plain">
+        <input id="fileInput" class="sr-only" type="file" accept=".pop,.popcorn,text/plain">
         <button id="shareButton" class="button" type="button"><span aria-hidden="true">↗</span> 共有</button>
         <span class="tool-menu-rule" aria-hidden="true"></span>
         <span class="tool-menu-heading">画面レイアウト</span>
@@ -107,14 +109,14 @@
   <main class="workspace">
     <aside class="sidebar" aria-label="レッスン、サンプル、リファレンス">
       <div class="side-tabs" role="tablist">
-        <button id="examplesTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="examplesPanel" tabindex="0">例</button>
-        <button id="referenceTab" class="side-tab" role="tab" aria-selected="false" aria-controls="referencePanel" tabindex="-1">関数</button>
+        <button id="referenceTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="referencePanel" tabindex="0">仕様書</button>
+        <button id="examplesTab" class="side-tab" role="tab" aria-selected="false" aria-controls="examplesPanel" tabindex="-1">例</button>
         <button id="lessonTab" class="side-tab lesson-tab" role="tab" aria-selected="false" aria-controls="lessonPanel" tabindex="-1">
           ロボット君 <span id="lessonTabProgress" class="count">0/0</span>
         </button>
       </div>
 
-      <section id="examplesPanel" class="side-panel" role="tabpanel" aria-labelledby="examplesTab">
+      <section id="examplesPanel" class="side-panel" role="tabpanel" aria-labelledby="examplesTab" hidden>
         <label class="search-box">
           <span class="sr-only">コード例を検索</span>
           <input id="exampleSearch" type="search" placeholder="コード例を検索">
@@ -124,7 +126,7 @@
         </div>
       </section>
 
-      <section id="referencePanel" class="side-panel" role="tabpanel" aria-labelledby="referenceTab" hidden>
+      <section id="referencePanel" class="side-panel" role="tabpanel" aria-labelledby="referenceTab">
         <label class="search-box">
           <span class="sr-only">標準関数を検索</span>
           <input id="referenceSearch" type="search" placeholder="標準関数を検索">
@@ -153,7 +155,7 @@
           <span class="welcome-spark spark-one" aria-hidden="true">✦</span>
           <span class="welcome-spark spark-two" aria-hidden="true">●</span>
           <div id="welcomeIntro" class="welcome-intro">
-            <h2 id="tutorWelcomeTitle">いっしょに<br>PopPopしよう。</h2>
+            <h2 id="tutorWelcomeTitle">いっしょに<br>PopCornしよう。</h2>
             <p>コードを書いて、動かして、困ったらすぐ聞けるよ。</p>
             <button id="welcomeTutorButton" type="button">
               ロボット君と始める <span aria-hidden="true">→</span>
@@ -308,13 +310,13 @@
         <span>main.pop</span>
         <span id="saveStatus" class="muted">自動保存</span>
       </div>
-      <div id="editor" aria-label="PopPop コード"></div>
-      <textarea id="editorFallback" aria-label="PopPop コード" spellcheck="false"></textarea>
+      <div id="editor" aria-label="PopCorn コード"></div>
+      <textarea id="editorFallback" aria-label="PopCorn コード" spellcheck="false"></textarea>
       <div class="editor-statusbar">
         <span id="cursorStatus">行 1, 列 1</span>
         <span id="characterStatus">0 文字</span>
         <span>UTF-8</span>
-        <span>PopPop</span>
+        <span>PopCorn</span>
       </div>
     </section>
 
@@ -381,8 +383,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict/ace.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict/ext-language_tools.js"></script>
-  <script src="poppop-formatter.js"></script>
-  <script src="poppop-localization.js"></script>
+  <script src="popcorn-formatter.js"></script>
+  <script src="popcorn-localization.js"></script>
   <script src="playground.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-# PopPop Language Core
-"""PopPop language interpreter."""
+# PopCorn Language Core
+"""PopCorn language interpreter."""
 
 from .cli import evaluate, get_ast_json, parse_source
 from .version import DISPLAY_VERSION, RELEASE_NAME, VERSION

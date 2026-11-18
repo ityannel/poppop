@@ -1,0 +1,83 @@
+/* itya.site に合わせた見た目（白地・点々・丸みのあるボタン）。元の CSS の後に読み込んで、上書きする */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f5f5f3;
+  --panel-pop: #ffffff;
+  --line: #d9d9d6;
+  --text: #111111;
+  --muted: #6b6b68;
+  --accent: #111111;
+  --accent-2: #ff526f;
+  --accent-3: #08a7c9;
+  --accent-soft: #111111;
+  --accent-text: #ffffff;
+  --danger: #d83451;
+  --good: #07845a;
+  --shadow: 0 6px 18px rgb(0 0 0 / 8%);
+  --pop-shadow: 0 0 0 #111111;
+}
+
+html, body {
+  background: #ffffff radial-gradient(rgba(0, 0, 0, 0.12) 1.8px, transparent 2.1px) 0 0 / 30px 30px;
+}
+
+/* ロゴは、PopCorn だけに統一（PopCorn のロゴは出さない） */
+.app-header .brand-logo { display: none; }
+.app-header { background: transparent; border-bottom: 1px solid var(--line); }
+.popcorn-logo { filter: none; }
+
+/* ボタンは、サイトと同じ、白地に黒い縁の丸いボタン */
+.button,
+.format-button,
+.toolbar button {
+  background: #ffffff;
+  color: #111111;
+  border: 2px solid #111111;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.button.primary,
+.toolbar-primary .primary {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+.button:hover,
+.format-button:hover {
+  background: #111111;
+  color: #ffffff;
+}
+
+/* 文字は、読みやすい黒（コントラストを上げる） */
+body, .app-header, .toolbar, .side-panel, .result-column, .editor-column {
+  color: var(--text);
+}
+
+/* フォント: 英字は Fredoka、日本語は Kosugi に統一。コードの欄は、今のまま等幅 */
+:root {
+  --ui-font: "Fredoka", "Kosugi", ui-sans-serif, system-ui, sans-serif;
+  --head-font: "Fredoka", "Kosugi", sans-serif;
+}
+html, body, button, input, select, textarea {
+  font-family: var(--ui-font);
+}
+h1, h2, h3, h4, .button, .format-button, .toolbar button, .side-panel-tab, [role="tab"] {
+  font-family: var(--head-font);
+}
+
+/* コードの欄（暗い配色）: ページは白のまま、エディターの周りだけ、濃い紺にする */
+html[data-editor="dark"] .editor-column {
+  --panel: #0b1831;
+  --panel-2: #112243;
+  --panel-pop: #172d55;
+  --line: #24426d;
+  --text: #f7fbff;
+  --muted: #9db1d2;
+  background: #0b1831;
+  color: #f7fbff;
+}
+html[data-editor="light"] .editor-column {
+  --line: #d9d9d6;
+}

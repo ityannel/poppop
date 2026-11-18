@@ -1,25 +1,25 @@
-# PopPop 言語仕様
+# PopCorn 言語仕様
 
 (AI生成のため、間違いがある可能性があります！お知らせください。)
-v0.0.0.1 - PopCorn
+PopCorn 1
 
-この文書は PopPop の公開仕様である。処理名、型名、演算子名およびコード例は
+この文書は PopCorn の公開仕様である。処理名、型名、演算子名およびコード例は
 識別子として英語表記を用いるが、説明文はすべて日本語で記述する。
 
 この文書で「返す」は処理結果を次のパイプ段階へ渡すことを表し、「エラー」はその時点で
-通常の評価を終了して PopPop エラーを報告することを表す。コード例は、特に注記がない限り
+通常の評価を終了して PopCorn エラーを報告することを表す。コード例は、特に注記がない限り
 そのまま実行できるプログラムである。
 
 ## 1. 基本方針
 
-PopPop は、値を `>>` で次の処理へ渡すデータフロー言語である。
+PopCorn は、値を `>>` で次の処理へ渡すデータフロー言語である。
 値の加工は非破壊的であり、元のリストや辞書を変更しない。外部へ作用する処理は、
 値の加工とは区別して扱う。
 
 改行は構文上の意味を持たない。空白、改行、インデントは読みやすさのために使える。
 通常の文は `.` で終え、ブロックは `..` で閉じる。
 
-```poppop
+```popcorn
 42 >> answer.
 answer >> Display.
 ```
@@ -85,7 +85,7 @@ is  else  new  true  false  null  and  or  not
 
 ## 3. 値と型
 
-PopPop の値は次の型からなる。
+PopCorn の値は次の型からなる。
 
 | 型 | 表記例 |
 | --- | --- |
@@ -93,9 +93,9 @@ PopPop の値は次の型からなる。
 | Boolean | `true`、`false` |
 | Int | `42` |
 | Num | `3.14` |
-| Str | `"PopPop"`、`'PopPop'` |
+| Str | `"PopCorn"`、`'PopCorn'` |
 | List | `[1, 2, 3]` |
-| Dict | `{"name": "PopPop"}` |
+| Dict | `{"name": "PopCorn"}` |
 | 値リスト | `(first, second)` |
 
 `(first, second)` は実行時には通常の List である。複数の値をまとめるときは値リストを使う。
@@ -120,7 +120,7 @@ ValueList      = "(" Expression "," Expression
 
 負の数は、数値リテラルへ単項演算子 `-` を適用した式として評価する。
 
-```poppop
+```popcorn
 -42 >> negative.
 [1, 2, 3] >> numbers.
 {"name": "Ada", "active": true} >> user.
@@ -153,7 +153,7 @@ Null  Bool  Int  Num  Str  List  Dict
 | `Str` | 値を文字列へ変換する |
 | `List` | 値が List であることを確認して返す |
 | `Dict` | 値が Dict であることを確認して返す |
-| `Type` | PopPop の型名を返す |
+| `Type` | PopCorn の型名を返す |
 | `Bool` | 下記の厳格な規則で Boolean へ変換する |
 
 `Int` は Int をそのまま返し、Num は小数部分を 0 の方向へ切り捨て、10進整数を表す Str は
@@ -163,7 +163,7 @@ Null  Bool  Int  Num  Str  List  Dict
 `Bool` は `true`、`false`、数値の `1`、数値の `0` だけを受け付ける。
 `1` は `true`、`0` は `false` になる。それ以外の値は型エラーである。
 
-```poppop
+```popcorn
 1 >> Bool.        // true
 0 >> Bool.        // false
 ```
@@ -175,7 +175,7 @@ Null  Bool  Int  Num  Str  List  Dict
 標準関数は、現在のパイプ値を一つ受け取り、結果を次の段階へ渡す。
 複数の入力が必要な関数には、通常の値リストを渡す。
 
-```poppop
+```popcorn
 ([1, 2, 3], ",") >> Join >> text.
 ```
 
@@ -185,7 +185,7 @@ Null  Bool  Int  Num  Str  List  Dict
 
 | 分類 | 処理 | 入力 | 結果と規則 |
 | --- | --- | --- | --- |
-| 型 | `Type` | 任意の値 | PopPop の型名を返す。 |
+| 型 | `Type` | 任意の値 | PopCorn の型名を返す。 |
 | 型 | `Int` | 整数へ変換可能な値 | Int を返す。変換不能なら型エラー。 |
 | 型 | `Num` | 数値へ変換可能な値 | Int または Num を返す。変換不能なら型エラー。 |
 | 型 | `Str` | 任意の値 | 値の文字列表現を返す。 |
@@ -227,7 +227,7 @@ Null  Bool  Int  Num  Str  List  Dict
 | コレクション | `Array` | 非負 Int の `size` またはサイズの List | 指定した各次元を `0` で埋めた新しい List を返す。 |
 | コレクション | `Zip` | 空でない List 群 | 各位置の値を List にまとめた List を返す。最短の入力で停止する。 |
 | JSON | `ToJson` | JSON 化可能な値 | JSON 文字列を返す。 |
-| JSON | `FromJson` | JSON 文字列 | JSON を PopPop の値へ変換する。無効な JSON はエラー。 |
+| JSON | `FromJson` | JSON 文字列 | JSON を PopCorn の値へ変換する。無効な JSON はエラー。 |
 | 時間 | `Now` | 任意の値 | 現在日時を `year`、`month`、`day`、`hour`、`minute`、`second` を持つ Dict として返す。外部効果を持つ。 |
 | 時間 | `Sleep` | 秒数を表す Num | 指定時間だけ待機し、入力値をそのまま返す。外部効果を持つ。 |
 | 入出力 | `Display` | 任意の値 | 値を表示し、同じ値を返す。外部効果を持つ。 |
@@ -238,21 +238,21 @@ Null  Bool  Int  Num  Str  List  Dict
 | 入出力 | `WriteFile` | `(content, path)` | 内容をファイルへ書き込み、`content` を返す。ファイルの外部効果を持つ。 |
 | 制御 | `Return` | 任意の値 | 最も内側の `new` 関数を終了し、入力値を関数結果にする。関数外ではエラー。 |
 | 制御 | `Break` | 任意の値 | 最も内側の `Loop` を終了し、入力値を Loop 結果にする。Loop 外ではエラー。 |
-| エラー | `Throw` | 任意の値 | 入力値をメッセージとする PopPop エラーを発生させる。 |
+| エラー | `Throw` | 任意の値 | 入力値をメッセージとする PopCorn エラーを発生させる。 |
 
 ## 4. パイプラインと束縛
 
 `>>` は左の値を右の処理へ渡す基本演算子である。文の最後に小文字の名前を置くと、
 現在値をその名前へ束縛する。
 
-```poppop
+```popcorn
 [1, 2, 3] >> Max >> largest.
 largest >> Display.
 ```
 
 複数の値を受け渡すときは、値リストを使う。
 
-```poppop
+```popcorn
 (10, 20) >> values.
 ```
 
@@ -294,7 +294,7 @@ ValueList          = "(" Expression "," Expression
 パイプラインの最初の式を評価し、その結果を現在値とする。続く各段階は現在値を入力として
 一度ずつ評価し、その結果で現在値を置き換える。最後の現在値がパイプライン全体の結果である。
 
-```poppop
+```popcorn
 -5 >> Abs >> result.
 ```
 
@@ -305,7 +305,7 @@ ValueList          = "(" Expression "," Expression
 複数入力を取る標準関数は、関数名の直後に引数を書かない。先に値リストを作り、
 その値を関数へ渡す。
 
-```poppop
+```popcorn
 ("a,b", ",") >> Split >> parts.
 (["a", "b"], ",") >> Join >> text.
 ({"name": "Ada"}, "name") >> Get >> name.
@@ -320,7 +320,7 @@ ValueList          = "(" Expression "," Expression
 
 ブロック処理には、現在値全体に対する別名を一つ付けられる。
 
-```poppop
+```popcorn
 [1, 2, 3] >> Map(value):
     value * 2.
 .. >> doubled.
@@ -333,7 +333,7 @@ ValueList          = "(" Expression "," Expression
 
 リスト要素は `value[index]` で参照する。辞書フィールドは `value::field` で参照する。
 
-```poppop
+```popcorn
 [10, 20] >> values.
 {"name": "Ada"} >> user.
 values[0] >> first.
@@ -386,7 +386,7 @@ and  or
 条件、`Filter` の結果、`Check` の述語、`and`、`or`、`not` は Boolean だけを受け付ける。
 数値、文字列、リスト、辞書、`null` を条件として暗黙に真偽化してはならない。
 
-```poppop
+```popcorn
 5 >> value.
 value > 0 and value < 10 >> valid.
 value == [] >> empty.
@@ -413,15 +413,15 @@ Str リテラルは、対応する単引用符または二重引用符で囲む�
 単引用符・二重引用符文字列では、`{式}` を評価して埋め込む。補間式は、その文字列が
 評価された位置の現在値と字句スコープを使う。補間結果は `Str` に変換して連結する。
 
-```poppop
+```popcorn
 "Ada" >> person.
 "Hello, {person}!" >> greeting.
 ```
 
 文字どおりの `{` は `{{`、文字どおりの `}` は `}}` と書く。補間式の構文エラー、
-未定義名、評価エラーは PopPop エラーである。
+未定義名、評価エラーは PopCorn エラーである。
 
-```poppop
+```popcorn
 "Ada" >> name.
 "{{user}} = {name}\n" >> line.
 ```
@@ -442,7 +442,7 @@ StreamName [ "(" alias ")" ] ":" Block ".."
 
 `Map` は List の各要素を入力順に変換し、同じ要素数の新しい List を返す。
 
-```poppop
+```popcorn
 [1, 2, 3] >> Map(value):
     value * 2.
 .. >> doubled.
@@ -452,7 +452,7 @@ StreamName [ "(" alias ")" ] ":" Block ".."
 
 `Filter` は、ブロックが Boolean の `true` を返した要素だけを残す。
 
-```poppop
+```popcorn
 [1, 2, 3, 4] >> Filter(value):
     value % 2 == 0.
 .. >> evens.
@@ -464,7 +464,7 @@ StreamName [ "(" alias ")" ] ":" Block ".."
 `[accumulator, item]` である。最初の要素が初期 accumulator になり、空の List は
 評価エラーである。
 
-```poppop
+```popcorn
 [1, 2, 3, 4] >> Reduce(state):
     state[0] + state[1].
 .. >> total.
@@ -475,7 +475,7 @@ StreamName [ "(" alias ")" ] ":" Block ".."
 `Sort` はブロックが返すキーで安定に並べ替える。既定は昇順である。キー式の先頭に
 `-` を付けると降順になる。比較できないキーは評価エラーである。
 
-```poppop
+```popcorn
 [
     {"name": "A", "score": 20},
     {"name": "B", "score": 10}
@@ -491,7 +491,7 @@ users >> Sort(user):
 `Group` はブロックが返す Str をキーとして値を Dict へ分類する。各グループ内の
 要素順と、キーが最初に現れた順序を保つ。
 
-```poppop
+```popcorn
 [
     {"team": "red", "name": "A"},
     {"team": "blue", "name": "B"},
@@ -506,7 +506,7 @@ users >> Sort(user):
 `Fork` は同じ入力に対して複数のパイプを評価し、宣言順の結果を List として返す。
 各分岐は同じ入力から始まり、いずれかの分岐が失敗すれば `Fork` 全体が失敗する。
 
-```poppop
+```popcorn
 [1, 2, 3] >> Fork(values):
     values >> Sum.
     values >> Max.
@@ -519,7 +519,7 @@ users >> Sort(user):
 `value >> target` の方向でフィールドを更新する。トップレベルのフィールド追加・置換だけを許可する。
 更新文は記述順に適用し、後の更新文からは、それより前に更新されたフィールドを参照できる。
 
-```poppop
+```popcorn
 {"name": "Ada", "score": 10} >> Update(user):
     15 >> user::score.
     true >> user::active.
@@ -533,7 +533,7 @@ users >> Sort(user):
 `Zip` は空でない List 群を値リストとして受け取り、各位置の値を List として返す。
 最短の入力に達した時点で停止する。
 
-```poppop
+```popcorn
 ([1, 2], [10, 20]) >> Zip >> rows.
 // rows は [[1, 10], [2, 20]]
 ```
@@ -551,7 +551,7 @@ CandidateList   = Expression { "or" Expression } .
 ElseBranch      = "else" ":" Block .
 ```
 
-```poppop
+```popcorn
 2 >> Check(value):
     is 0:
         "zero".
@@ -589,7 +589,7 @@ ElseBranch      = "else" ":" Block .
 `Break` は最も内側の `Loop` を終了し、現在のパイプ値を `Loop` の結果にする。
 `Loop` の外で `Break` を使うと評価エラーである。
 
-```poppop
+```popcorn
 0 >> Loop(state):
     state >> Check(value):
         is value >= 10:
@@ -615,7 +615,7 @@ FunctionDefinition = [ ParameterList ">>" ] "new" ProcessName ":"
 ParameterList      = "(" VariableName { "," VariableName } ")" .
 ```
 
-```poppop
+```popcorn
 (left, right) >> new AddTwo:
     left + right.
 ..
@@ -633,7 +633,7 @@ ParameterList      = "(" VariableName { "," VariableName } ")" .
 `Return` は早期終了のための標準パイプ処理である。最も内側の `new` 関数を直ちに終了し、
 現在のパイプ値を関数の結果にする。関数の外で使うと評価エラーである。
 
-```poppop
+```popcorn
 (value) >> new Clamp:
     value >> Check:
         is @ < 0:
@@ -654,7 +654,7 @@ ParameterList      = "(" VariableName { "," VariableName } ")" .
 List、Dict、文字列を加工する標準処理は入力値を変更せず、新しい値を返す。
 元の名前へ結果を戻したい場合は、通常の束縛を使う。
 
-```poppop
+```popcorn
 [1, 2, 3] >> value.
 value >> Reverse >> value.
 ```
@@ -668,7 +668,7 @@ value >> Reverse >> value.
 
 ## 14. エラー
 
-構文、名前、型、評価の失敗は PopPop エラーとして報告する。エラーには、分類、説明、
+構文、名前、型、評価の失敗は PopCorn エラーとして報告する。エラーには、分類、説明、
 判定可能な場合は行番号と列番号を含める。
 
 | 分類 | 発生例 |
@@ -702,7 +702,7 @@ Loop 外の `Break`、関数外の `Return` は評価エラーである。
 ## 16. 参考にした仕様書の構成
 
 本仕様の構成と記法は、次の公式資料に見られる、字句要素、構文記法、式の評価順序、
-スコープ、エラーを分けて定義する方法を参考にしている。PopPop の規則はこの文書だけで
+スコープ、エラーを分けて定義する方法を参考にしている。PopCorn の規則はこの文書だけで
 完結し、参照先の言語規則を取り込まない。
 
 - [Python 言語リファレンス: 字句解析](https://docs.python.org/3/reference/lexical_analysis.html)

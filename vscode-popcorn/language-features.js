@@ -10,7 +10,7 @@ const RESERVED_WORDS = new Set([
     "and", "else", "false", "is", "new", "null", "not", "or", "true"
 ]);
 
-// PopPop 本体に実装されている標準関数と、エディター上での説明です。
+// PopCorn 本体に実装されている標準関数と、エディター上での説明です。
 // `output` は型フロー表示で使う、おおまかな戻り値の型です。
 const STANDARD_FUNCTIONS = Object.freeze({
     Display: { description: "値を表示し、そのまま次の処理へ渡します。", output: "same" },
@@ -52,7 +52,7 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Now: { description: "現在時刻を取得します。", output: "文字列" },
     Random: { description: "乱数を生成します。", output: "数値" },
     ToJson: { description: "値を JSON 文字列に変換します。", output: "文字列" },
-    FromJson: { description: "JSON 文字列を PopPop の値へ変換します。", output: "式" },
+    FromJson: { description: "JSON 文字列を PopCorn の値へ変換します。", output: "式" },
     Range: { description: "連続した数値の配列を作成します。", output: "配列" },
     Return: { description: "現在の関数から値を返します。", output: "式" },
     Break: { description: "現在の繰り返し処理を終了します。", output: "式" },
@@ -748,7 +748,7 @@ function isDiagnosticIgnoredAtOffset(text, diagnostic, offset) {
     const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
     const lineEnd = text.indexOf("\n", offset);
     const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd);
-    const directive = /\/\/\s*poppop-ignore\s*:\s*([a-z0-9_-]+|all)\b/i.exec(line);
+    const directive = /\/\/\s*popcorn-ignore\s*:\s*([a-z0-9_-]+|all)\b/i.exec(line);
     return Boolean(directive && (directive[1] === "all" || directive[1] === diagnostic.kind));
 }
 

@@ -1,4 +1,4 @@
-"""Command-line interface for the PopPop interpreter."""
+"""Command-line interface for the PopCorn interpreter."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from .evaluator import Evaluator, EvaluatorError, PopPopError
+from .evaluator import Evaluator, EvaluatorError, PopCornError
 from .lexer import Lexer, LexerError
 from .parser import ParseError, Parser
 from .version import DISPLAY_VERSION, VERSION
@@ -32,7 +32,7 @@ async def evaluate(source: str, evaluator: Evaluator | None = None):
 def format_error(exc: Exception) -> str:
     if isinstance(exc, (LexerError, ParseError)):
         return f"SyntaxError: {exc}"
-    if isinstance(exc, PopPopError):
+    if isinstance(exc, PopCornError):
         return f"{exc.err_type}: {exc.message}"
     if isinstance(exc, EvaluatorError):
         return f"RuntimeError: {exc}"
@@ -42,7 +42,7 @@ def format_error(exc: Exception) -> str:
 
 
 async def repl() -> int:
-    print(f"PopPop REPL {DISPLAY_VERSION}")
+    print(f"REPL {DISPLAY_VERSION}")
     print("Type :quit to exit.")
     evaluator = Evaluator()
     buffer: list[str] = []
@@ -71,13 +71,13 @@ async def repl() -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="poppop",
-        description="Run a PopPop source file or start the interactive REPL.",
+        prog="popcorn",
+        description="Run a PopCorn source file or start the interactive REPL.",
     )
-    parser.add_argument("file", nargs="?", type=Path, help="a .pop or .poppop file")
+    parser.add_argument("file", nargs="?", type=Path, help="a .pop or .popcorn file")
     parser.add_argument("--ast", action="store_true", help="print the parsed AST as JSON")
     parser.add_argument(
-        "--version", action="version", version=f"PopPop {DISPLAY_VERSION}"
+        "--version", action="version", version=DISPLAY_VERSION
     )
     return parser
 
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             asyncio.run(evaluate(source))
         return 0
-    except (OSError, LexerError, ParseError, PopPopError, EvaluatorError) as exc:
+    except (OSError, LexerError, ParseError, PopCornError, EvaluatorError) as exc:
         print(format_error(exc))
         return 1
 

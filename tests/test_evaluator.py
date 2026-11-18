@@ -1,8 +1,8 @@
 import asyncio
-from poppop_lang.lexer import Lexer
-from poppop_lang.parser import Parser
-from poppop_lang.evaluator import Evaluator, EvaluatorError
-from poppop_lang.environment import Environment
+from popcorn_lang.lexer import Lexer
+from popcorn_lang.parser import Parser
+from popcorn_lang.evaluator import Evaluator, EvaluatorError
+from popcorn_lang.environment import Environment
 
 def run_code(code):
     lexer = Lexer(code)
@@ -246,8 +246,8 @@ def test_update_rejects_field_deletion():
 
 
 def test_dictionary_access():
-    res = run_code('{"name": "PopPop"} >> project. project::name.')
-    assert res == "PopPop"
+    res = run_code('{"name": "PopCorn"} >> project. project::name.')
+    assert res == "PopCorn"
 
 
 def test_parenthesized_function_arguments():
@@ -297,7 +297,7 @@ def test_interpolation_undefined_name_is_an_error():
         run_code('"Hello, {missing}.".')
     except EvaluatorError:
         return
-    assert False, "undefined interpolation names must raise a PopPop NameError"
+    assert False, "undefined interpolation names must raise a PopCorn NameError"
 
 
 def test_word_logical_operators():
@@ -309,16 +309,16 @@ def test_initial_implicit_value_is_null():
     assert run_code("@.") is None
 
 
-def test_display_uses_poppop_value_spellings(capsys):
+def test_display_uses_popcorn_value_spellings(capsys):
     assert run_code("@ >> Display.") is None
     assert capsys.readouterr().out == "null\n"
 
-    assert run_code('[null, true, {"name": "PopPop"}] >> Display.') == [
+    assert run_code('[null, true, {"name": "PopCorn"}] >> Display.') == [
         None,
         True,
-        {"name": "PopPop"},
+        {"name": "PopCorn"},
     ]
-    assert capsys.readouterr().out == '[null, true, {"name": "PopPop"}]\n'
+    assert capsys.readouterr().out == '[null, true, {"name": "PopCorn"}]\n'
 
 
 def test_boolean_operators_are_strict_and_short_circuit():
@@ -350,7 +350,7 @@ def test_check_candidates_and_predicates_are_distinct():
     assert run_code('3 >> Check: is @ > 2: "yes". else: "no". ..') == "yes"
 
 
-def test_type_returns_poppop_type_names():
+def test_type_returns_popcorn_type_names():
     cases = {
         'null >> Type.': 'Null',
         'true >> Type.': 'Bool',

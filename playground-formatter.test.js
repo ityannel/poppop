@@ -4,9 +4,9 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { formatDocument: formatInExtension } = require("./vscode-poppop/language-features");
-await import("./poppop-formatter.js");
-const { formatDocument: formatInPlayground } = globalThis.PopPopFormatter;
+const { formatDocument: formatInExtension } = require("./vscode-popcorn/language-features");
+await import("./popcorn-formatter.js");
+const { formatDocument: formatInPlayground } = globalThis.PopCornFormatter;
 
 const cases = [
   "1>>value.\n[1]>>Map(item):\nitem>>Display.\n..",

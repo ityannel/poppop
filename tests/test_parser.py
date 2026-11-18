@@ -1,6 +1,6 @@
-﻿from poppop_lang.lexer import Lexer
-from poppop_lang.parser import ParseError, Parser
-from poppop_lang.ast_nodes import *
+﻿from popcorn_lang.lexer import Lexer
+from popcorn_lang.parser import ParseError, Parser
+from popcorn_lang.ast_nodes import *
 
 def parse_code(code):
     lexer = Lexer(code)

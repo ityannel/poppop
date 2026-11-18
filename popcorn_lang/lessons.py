@@ -1,4 +1,4 @@
-"""Interactive lessons shipped with the PopPop runtime.
+"""Interactive lessons shipped with the PopCorn runtime.
 
 Keeping these definitions beside the interpreter lets the browser tutor use
 the same release archive as the language itself.
@@ -14,7 +14,7 @@ LESSONS = (
         "id": "pipeline",
         "title": "はじめての表示",
         "badge": "01",
-        "intro": "まずは短い文字を画面に出して、PopPopの流れを見てみよう。",
+        "intro": "まずは短い文字を画面に出して、PopCornの流れを見てみよう。",
         "goal": '表示する文字を "Hello, World!" に変えてください。',
         "starter": '"Hello" >> Display.',
         "solution": '"Hello, World!" >> Display.',
@@ -24,7 +24,7 @@ LESSONS = (
         ),
         "expected": "Hello, World!",
         "required": (">>", "Display", '"Hello, World!"'),
-        "success": "できました！ PopPopの最初のプログラムが動きました。",
+        "success": "できました！ PopCornの最初のプログラムが動きました。",
     },
     {
         "id": "map",

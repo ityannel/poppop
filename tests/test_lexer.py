@@ -1,4 +1,4 @@
-from poppop_lang.lexer import Lexer, LexerError
+from popcorn_lang.lexer import Lexer, LexerError
 
 def test_lexer_numbers():
     lexer = Lexer("42 3.14")

@@ -1,7 +1,7 @@
 import asyncio
 
-from poppop_lang.cli import evaluate
-from poppop_lang.lessons import LESSONS, public_lessons, validate_lesson
+from popcorn_lang.cli import evaluate
+from popcorn_lang.lessons import LESSONS, public_lessons, validate_lesson
 
 
 def test_all_lesson_solutions_run_and_pass():

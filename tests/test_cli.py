@@ -1,12 +1,12 @@
 import asyncio
 import json
 
-from poppop_lang.cli import DISPLAY_VERSION, VERSION, evaluate, get_ast_json, main
+from popcorn_lang.cli import DISPLAY_VERSION, VERSION, evaluate, get_ast_json, main
 
 
 def test_version():
-    assert VERSION == "0.0.0.1"
-    assert DISPLAY_VERSION == "v0.0.0.1 - PopCorn"
+    assert VERSION == "1"
+    assert DISPLAY_VERSION == "PopCorn 1"
 
 
 def test_ast_json():

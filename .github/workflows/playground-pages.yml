@@ -6,19 +6,19 @@ on:
     paths:
       - "index.html"
       - "playground.css"
-      - "poppop-visual.css"
+      - "popcorn-visual.css"
       - "playground.js"
       - "playground-worker.js"
-      - "poppop-formatter.js"
+      - "popcorn-formatter.js"
       - "playground-formatter.test.js"
       - "playground-localization.test.js"
-      - "poppop-localization.js"
-      - "poppop-logo.png"
+      - "popcorn-localization.js"
+      - "popcorn-logo.png"
       - "popcorn-logo.png"
       - "favicon.png"
-      - "poppop-ogp.png"
-      - "poppop_specification.md"
-      - "poppop_lang/**"
+      - "popcorn-ogp.png"
+      - "popcorn_specification.md"
+      - "popcorn_lang/**"
       - "tools/build_playground_runtime.py"
       - ".github/workflows/playground-pages.yml"
   workflow_dispatch:
@@ -41,10 +41,10 @@ jobs:
       - name: Assemble the current Playground
         run: |
           mkdir _site
-          cp index.html playground.css poppop-visual.css playground.js playground-worker.js poppop-formatter.js poppop-localization.js poppop-logo.png popcorn-logo.png favicon.png poppop-ogp.png _site/
-          cp poppop_specification.md _site/
+          cp index.html playground.css popcorn-visual.css playground.js playground-worker.js popcorn-formatter.js popcorn-localization.js popcorn-logo.png popcorn-logo.png favicon.png popcorn-ogp.png _site/
+          cp popcorn_specification.md _site/
           touch _site/.nojekyll
-          python tools/build_playground_runtime.py _site/poppop-runtime.zip
+          python tools/build_playground_runtime.py _site/popcorn-runtime.zip
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -2,8 +2,8 @@
 
 import assert from "node:assert/strict";
 
-await import("./poppop-localization.js");
-const { errorLine, localizeError } = globalThis.PopPopLocalization;
+await import("./popcorn-localization.js");
+const { errorLine, localizeError } = globalThis.PopCornLocalization;
 
 assert.equal(
   localizeError("NameError: Variable 'missing' is not defined."),

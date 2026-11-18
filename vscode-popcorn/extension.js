@@ -45,16 +45,16 @@ let resultsChannel;
 const flowPanels = new Map();
 let bundledRuntimePath = "";
 
-function isPopPopEditor(editor) {
-    return editor && editor.document.languageId === 'poppop';
+function isPopCornEditor(editor) {
+    return editor && editor.document.languageId === 'popcorn';
 }
 
 function refreshFinalAssignmentTargetDecorations(editor) {
-    if (!isPopPopEditor(editor)) {
+    if (!isPopCornEditor(editor)) {
         return;
     }
 
-    const enabled = vscode.workspace.getConfiguration('poppop', editor.document.uri)
+    const enabled = vscode.workspace.getConfiguration('popcorn', editor.document.uri)
         .get('highlightFinalAssignmentTargets', true);
     if (!enabled) {
         editor.setDecorations(finalAssignmentTargetDecoration, []);
@@ -187,7 +187,7 @@ function flowHtmlLegacy(nodes) {
         .node{min-width:118px;max-width:220px;padding:10px;border:1px solid var(--vscode-panel-border);border-radius:8px;background:var(--vscode-editor-inactiveSelectionBackground);transition:.25s}
         .node.input{border-color:#569cd6}.node.target{border-color:#4ec9b0}.line{display:block;opacity:.7;font-size:11px}.label{display:block;font-weight:600;word-break:break-word}.value{display:block;margin-top:6px;font-family:var(--vscode-editor-font-family);font-size:11px;opacity:.8;word-break:break-all}
         .node.active{background:#a3be8c55;border-color:#a3be8c;box-shadow:0 0 16px #a3be8c66}.node.done{background:#4ec9b033}.node.error{background:#f4877133;border-color:#f48771}.arrow{font-size:20px;opacity:.6}.status{padding:7px 10px;border-radius:5px;background:var(--vscode-textBlockQuote-background);margin-bottom:14px}
-    </style></head><body><h2>PopPop データフロー</h2><div id="status" class="status">実行ボタンを押すと、実際の値の変化を表示します。</div><div class="hint">ノードはパイプラインの入力・処理・代入先です。</div><div class="flow">${cards || '表示できるパイプラインがありません。'}</div><script>
+    </style></head><body><h2>PopCorn データフロー</h2><div id="status" class="status">実行ボタンを押すと、実際の値の変化を表示します。</div><div class="hint">ノードはパイプラインの入力・処理・代入先です。</div><div class="flow">${cards || '表示できるパイプラインがありません。'}</div><script>
         const status=document.getElementById('status');
         window.addEventListener('message', event=>{const data=event.data;if(data.type==='start'){status.textContent='実行中… 値の変化を受信しています。';document.querySelectorAll('.node').forEach(n=>n.classList.remove('active','done','error'))}if(data.type==='trace'){const nodes=[...document.querySelectorAll('.node[data-line="'+data.line+'"]')];document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));nodes.forEach(n=>{n.classList.add('active');n.querySelector('.value').textContent=data.value})}if(data.type==='finish'){document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));status.textContent=data.ok?'実行完了':'実行はエラーで終了しました';}});
     </script></body></html>`;
@@ -201,7 +201,7 @@ function flowHtml(model) {
         : `<div class="vertical">${sequence(model.nodes)}</div>`;
     return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>
         body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);padding:18px}.title{margin:0 0 12px;font-size:20px}.status{padding:7px 10px;border-radius:5px;background:var(--vscode-textBlockQuote-background);margin-bottom:14px}.status:empty{display:none}.vertical{display:flex;flex-direction:column;align-items:center;gap:8px}.node{width:min(380px,92%);padding:13px;border:2px solid var(--vscode-panel-border);border-radius:10px;transition:.25s}.node.variable{background:#007acc88;border-color:#4fc1ff}.node.function{background:#b5890088;border-color:#ffd866}.node.system{background:#a05ab788;border-color:#e8a6ff}.node.property{background:#d1696988;border-color:#ffb3a7}.node.object{background:#3c9d9b88;border-color:#79e6e0}.line{display:block;opacity:.86;font-size:12px}.label{display:block;margin-top:2px;font-size:19px;font-weight:650;word-break:break-word}.value{display:block;margin-top:7px;font-family:var(--vscode-editor-font-family);font-size:12px;opacity:.95;white-space:pre-wrap;word-break:break-all}.arrow{font-size:22px;line-height:20px;opacity:.85}.update-frame{width:min(980px,98%);padding:16px;border:3px solid #e8a6ff;border-radius:14px;background:#a05ab733}.update-frame h3{margin:0 0 14px;color:#e8a6ff;font-size:19px}.branches{display:flex;align-items:flex-start;justify-content:center;gap:14px;overflow-x:auto}.branch{min-width:165px;display:flex;flex-direction:column;align-items:center;gap:8px}.branch .node{width:140px}.node.active{background:#65c466cc;border-color:#c8ffca;box-shadow:0 0 18px #65c466aa}.node.done{filter:saturate(.75);opacity:.88}.node.error{background:#e0525288;border-color:#ffaaa8}
-    </style></head><body><h2 class="title">PopPop データフロー</h2><div id="status" class="status"></div>${content}<script>const status=document.getElementById('status');window.addEventListener('message',event=>{const d=event.data;if(d.type==='start'){status.textContent='実行中';document.querySelectorAll('.node').forEach(n=>n.classList.remove('active','done','error'))}if(d.type==='trace'){document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));const nodes=[...document.querySelectorAll('.node[data-line="'+d.line+'"]')];nodes.forEach(n=>{n.classList.add('active');n.querySelector('.value').textContent=d.before&&d.after?d.before+' → '+d.after:(d.after||d.value||'処理中')});if(d.progress)status.textContent=d.progress}if(d.type==='finish'){document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));status.textContent=d.ok?'完了':'エラー'}});</script></body></html>`;
+    </style></head><body><h2 class="title">PopCorn データフロー</h2><div id="status" class="status"></div>${content}<script>const status=document.getElementById('status');window.addEventListener('message',event=>{const d=event.data;if(d.type==='start'){status.textContent='実行中';document.querySelectorAll('.node').forEach(n=>n.classList.remove('active','done','error'))}if(d.type==='trace'){document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));const nodes=[...document.querySelectorAll('.node[data-line="'+d.line+'"]')];nodes.forEach(n=>{n.classList.add('active');n.querySelector('.value').textContent=d.before&&d.after?d.before+' → '+d.after:(d.after||d.value||'処理中')});if(d.progress)status.textContent=d.progress}if(d.type==='finish'){document.querySelectorAll('.node.active').forEach(n=>n.classList.replace('active','done'));status.textContent=d.ok?'完了':'エラー'}});</script></body></html>`;
 }
 
 function selectedOriginFlow(editor) {
@@ -215,7 +215,7 @@ function selectedOriginFlow(editor) {
 }
 
 function showFlowVisualizer(editor) {
-    if (!isPopPopEditor(editor)) return;
+    if (!isPopCornEditor(editor)) return;
     const selected = selectedOriginFlow(editor);
     if (!selected) {
         vscode.window.showInformationMessage('パイプラインの起点（最初の >> より前）をクリックしてから表示してください。');
@@ -229,7 +229,7 @@ function showFlowVisualizer(editor) {
         previous.panel.webview.html = html;
         return;
     }
-    const panel = vscode.window.createWebviewPanel('poppopFlow', 'PopPop データフロー', vscode.ViewColumn.Beside, { enableScripts: true });
+    const panel = vscode.window.createWebviewPanel('popcornFlow', 'PopCorn データフロー', vscode.ViewColumn.Beside, { enableScripts: true });
     panel.webview.html = html;
     flowPanels.set(key, { panel });
     panel.onDidDispose(() => flowPanels.delete(key));
@@ -240,10 +240,10 @@ function postFlow(filePath, message) {
 }
 
 function refreshDiagnostics(document) {
-    if (!document || document.languageId !== 'poppop') {
+    if (!document || document.languageId !== 'popcorn') {
         return;
     }
-    const enabled = vscode.workspace.getConfiguration('poppop', document.uri).get('enableDiagnostics', true);
+    const enabled = vscode.workspace.getConfiguration('popcorn', document.uri).get('enableDiagnostics', true);
     if (!enabled) {
         diagnostics.delete(document.uri);
         return;
@@ -257,7 +257,7 @@ function refreshDiagnostics(document) {
     const items = analyzeDocument(document.getText()).map(item => {
         const range = new vscode.Range(document.positionAt(item.start), document.positionAt(item.start + item.length));
         const diagnostic = new vscode.Diagnostic(range, item.message, severity[item.severity]);
-        diagnostic.source = 'PopPop';
+        diagnostic.source = 'PopCorn';
         diagnostic.code = item.kind;
         return diagnostic;
     });
@@ -265,13 +265,13 @@ function refreshDiagnostics(document) {
 }
 
 function refreshStaticSemanticDecorations(editor) {
-    if (!isPopPopEditor(editor)) {
+    if (!isPopCornEditor(editor)) {
         return;
     }
 
     const document = editor.document;
     const text = document.getText();
-    const settings = vscode.workspace.getConfiguration('poppop', document.uri);
+    const settings = vscode.workspace.getConfiguration('popcorn', document.uri);
 
     editor.setDecorations(
         pipelineGuideDecoration,
@@ -292,12 +292,12 @@ function refreshStaticSemanticDecorations(editor) {
 }
 
 function refreshVariableFlowDecorations(editor) {
-    if (!isPopPopEditor(editor)) {
+    if (!isPopCornEditor(editor)) {
         return;
     }
 
     const document = editor.document;
-    const settings = vscode.workspace.getConfiguration('poppop', document.uri);
+    const settings = vscode.workspace.getConfiguration('popcorn', document.uri);
     const text = document.getText();
     if (!settings.get('highlightVariableFlow', true)) {
         editor.setDecorations(variableReferenceDecoration, []);
@@ -314,7 +314,7 @@ function refreshVariableFlowDecorations(editor) {
     editor.setDecorations(variableReferenceDecoration, toRanges(document, references));
 }
 
-function refreshVisiblePopPopEditors() {
+function refreshVisiblePopCornEditors() {
     for (const editor of vscode.window.visibleTextEditors) {
         refreshFinalAssignmentTargetDecorations(editor);
         refreshStaticSemanticDecorations(editor);
@@ -324,23 +324,23 @@ function refreshVisiblePopPopEditors() {
 }
 
 function runtimeCommandFor(filePath) {
-    const configuredPath = vscode.workspace.getConfiguration('poppop').get('runtimePath', '').trim();
+    const configuredPath = vscode.workspace.getConfiguration('popcorn').get('runtimePath', '').trim();
     if (configuredPath && fs.existsSync(configuredPath)) {
         return { command: configuredPath, args: [filePath] };
     }
     if (process.platform === 'win32' && bundledRuntimePath && fs.existsSync(bundledRuntimePath)) {
         return { command: bundledRuntimePath, args: [filePath] };
     }
-    return { command: 'poppop', args: [filePath] };
+    return { command: 'popcorn', args: [filePath] };
 }
 
-function runPopPopFile(filePath) {
+function runPopCornFile(filePath) {
     const runtime = runtimeCommandFor(filePath);
     const startedAt = Date.now();
     resultsChannel.clear();
-    resultsChannel.appendLine(`▶ PopPop 実行: ${path.basename(filePath)}`);
+    resultsChannel.appendLine(`▶ PopCorn 実行: ${path.basename(filePath)}`);
     resultsChannel.show(true);
-    const tracePath = path.join(os.tmpdir(), `poppop-flow-${Date.now()}-${Math.random().toString(16).slice(2)}.jsonl`);
+    const tracePath = path.join(os.tmpdir(), `popcorn-flow-${Date.now()}-${Math.random().toString(16).slice(2)}.jsonl`);
     let consumedTraceLines = 0;
     postFlow(filePath, { type: 'start' });
     const onTraceChange = () => {
@@ -358,13 +358,13 @@ function runPopPopFile(filePath) {
     const child = spawn(runtime.command, runtime.args, {
         cwd: path.dirname(filePath),
         windowsHide: true,
-        env: { ...process.env, POPPOP_TRACE_FILE: tracePath }
+        env: { ...process.env, POPCORN_TRACE_FILE: tracePath }
     });
     child.stdout.on('data', data => resultsChannel.append(data.toString()));
     child.stderr.on('data', data => resultsChannel.append(data.toString()));
     child.on('error', error => {
         resultsChannel.appendLine(`\n✗ 実行を開始できませんでした: ${error.message}`);
-        resultsChannel.appendLine('PopPop をインストールするか、poppop.runtimePath を設定してください。');
+        resultsChannel.appendLine('PopCorn をインストールするか、popcorn.runtimePath を設定してください。');
         postFlow(filePath, { type: 'finish', ok: false });
     });
     child.on('close', code => {
@@ -385,10 +385,10 @@ function runPopPopFile(filePath) {
 
 function activate(context) {
     bundledRuntimePath = context.extensionPath
-        ? path.join(context.extensionPath, 'runtime', 'poppop.exe')
+        ? path.join(context.extensionPath, 'runtime', 'popcorn.exe')
         : '';
-    diagnostics = vscode.languages.createDiagnosticCollection('poppop');
-    resultsChannel = vscode.window.createOutputChannel('PopPop 実行結果');
+    diagnostics = vscode.languages.createDiagnosticCollection('popcorn');
+    resultsChannel = vscode.window.createOutputChannel('PopCorn 実行結果');
     finalAssignmentTargetDecoration = vscode.window.createTextEditorDecorationType({
         fontWeight: 'bold',
         fontStyle: 'italic',
@@ -427,26 +427,26 @@ function activate(context) {
         borderWidth: '0 0 1px 0'
     });
 
-    let disposable = vscode.commands.registerCommand('poppop.runFile', function () {
+    let disposable = vscode.commands.registerCommand('popcorn.runFile', function () {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            vscode.window.showErrorMessage('実行する PopPop ファイルを開いてください。');
+            vscode.window.showErrorMessage('実行する PopCorn ファイルを開いてください。');
             return;
         }
 
         const filePath = editor.document.fileName;
-        editor.document.save().then(() => runPopPopFile(filePath));
+        editor.document.save().then(() => runPopCornFile(filePath));
     });
     const refreshHighlightsDisposable = vscode.commands.registerCommand(
-        'poppop.refreshFlowHighlights',
-        refreshVisiblePopPopEditors
+        'popcorn.refreshFlowHighlights',
+        refreshVisiblePopCornEditors
     );
-    const showResultsDisposable = vscode.commands.registerCommand('poppop.showResults', () => resultsChannel.show(true));
-    const showFlowDisposable = vscode.commands.registerCommand('poppop.showFlowVisualizer', () => {
+    const showResultsDisposable = vscode.commands.registerCommand('popcorn.showResults', () => resultsChannel.show(true));
+    const showFlowDisposable = vscode.commands.registerCommand('popcorn.showFlowVisualizer', () => {
         showFlowVisualizer(vscode.window.activeTextEditor);
     });
 
-    const selector = { language: 'poppop' };
+    const selector = { language: 'popcorn' };
     const definitionProvider = vscode.languages.registerDefinitionProvider(selector, {
         provideDefinition(document, position) {
             const text = document.getText();
@@ -545,7 +545,7 @@ function activate(context) {
             if (pipeline) {
                 const markdown = new vscode.MarkdownString();
                 markdown.appendMarkdown(`パイプライン（第 ${pipeline.stageNumber} 段階）  \n`);
-                markdown.appendCodeblock(`${pipeline.operator} ${pipeline.stage || '(終端)'}`, 'poppop');
+                markdown.appendCodeblock(`${pipeline.operator} ${pipeline.stage || '(終端)'}`, 'popcorn');
                 markdown.appendMarkdown(`入力の推定型: ${pipeline.inputType}  \n`);
                 markdown.appendMarkdown(`この段階の出力型: ${pipeline.outputType}  \n`);
                 markdown.appendMarkdown(`型の流れ: ${typeFlowSummary(pipeline.typeFlow)}`);
@@ -644,7 +644,7 @@ function activate(context) {
                     action.diagnostics = [diagnostic];
                     const edit = new vscode.WorkspaceEdit();
                     const lineEnd = document.lineAt(diagnostic.range.end.line).range.end;
-                    edit.insert(document.uri, lineEnd, ` // poppop-ignore: ${diagnostic.code}`);
+                    edit.insert(document.uri, lineEnd, ` // popcorn-ignore: ${diagnostic.code}`);
                     action.edit = edit;
                     return action;
                 });
@@ -719,15 +719,15 @@ function activate(context) {
                 flowPanel.panel.webview.html = flowHtml(buildFlowModel(selected.text, selected.firstLine));
             }
         }),
-        vscode.window.onDidChangeVisibleTextEditors(refreshVisiblePopPopEditors),
+        vscode.window.onDidChangeVisibleTextEditors(refreshVisiblePopCornEditors),
         vscode.workspace.onDidChangeConfiguration(event => {
-            if (event.affectsConfiguration('poppop')) {
-                refreshVisiblePopPopEditors();
+            if (event.affectsConfiguration('popcorn')) {
+                refreshVisiblePopCornEditors();
             }
         })
     );
 
-    refreshVisiblePopPopEditors();
+    refreshVisiblePopCornEditors();
 }
 
 function deactivate() {}

@@ -1,8 +1,8 @@
 # Security
 
-PopPop is an experimental interpreter and is not a sandbox.
+PopCorn is an experimental interpreter and is not a sandbox.
 
-PopPop programs can read files and URLs with `Fetch`, send HTTP requests with
+PopCorn programs can read files and URLs with `Fetch`, send HTTP requests with
 `PostFetch`, and write files with `WriteFile`. Run only code that you trust and
 use an operating-system sandbox when evaluating third-party programs.
 

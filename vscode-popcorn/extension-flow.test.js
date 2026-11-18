@@ -47,7 +47,7 @@ function offsetAt(position) {
 }
 
 const document = {
-    languageId: "poppop",
+    languageId: "popcorn",
     uri: {},
     getText: range => range ? text.slice(offsetAt(range.start), offsetAt(range.end)) : text,
     positionAt,

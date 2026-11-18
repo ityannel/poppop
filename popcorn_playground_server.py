@@ -173,7 +173,7 @@ class PlaygroundHandler(SimpleHTTPRequestHandler):
 def main() -> None:
     port = int(os.environ.get("PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), PlaygroundHandler)
-    print(f"PopPop Playground: http://127.0.0.1:{port}")
+    print(f"PopCorn Playground: http://127.0.0.1:{port}")
     if not os.environ.get("GEMINI_API_KEY"):
         print("GEMINI_API_KEY is not set. Gemini tutor replies will use fallbacks.")
     server.serve_forever()

@@ -1,13 +1,13 @@
-# PopPop
+# PopCorn
 
 > Experimental alpha — the syntax and runtime may change.
 
-Current release: **v0.0.0.1 - PopCorn**
+Current release: **PopCorn 1**
 
-PopPop is a small, pipeline-oriented programming language. Values move from
+PopCorn is a small, pipeline-oriented programming language. Values move from
 left to right through `>>`, and each statement ends with `.`.
 
-```poppop
+```popcorn
 [1, 2, 3] >> Map:
     @ * 2.
 .. >> doubled.
@@ -15,16 +15,16 @@ left to right through `>>`, and each statement ends with `.`.
 doubled >> Display.
 ```
 
-The current interpreter is implemented in Python. PopPop is a language
+The current interpreter is implemented in Python. PopCorn is a language
 experiment, not a production runtime or security sandbox.
 
 ## Install
 
-PopPop requires Python 3.10 or newer.
+PopCorn requires Python 3.10 or newer.
 
 ```bash
 python -m pip install .
-poppop --version
+popcorn --version
 ```
 
 For development:
@@ -37,19 +37,19 @@ python -m pytest
 ## Run
 
 ```bash
-poppop program.pop
+popcorn program.pop
 ```
 
-Start the REPL by running `poppop` without a file. Use `:quit` to exit.
+Start the REPL by running `popcorn` without a file. Use `:quit` to exit.
 
-From a source checkout, `python poppop.py program.pop` is also supported.
+From a source checkout, `python popcorn.py program.pop` is also supported.
 
 ## Playground
 
 The browser Playground runs the same Python lexer, parser, evaluator, and
 built-ins as the command-line interpreter through Pyodide. Its examples and
 function reference are loaded from the current
-`poppop_specification.md`, rather than maintained as a separate language copy.
+`popcorn_specification.md`, rather than maintained as a separate language copy.
 The **ロボット君** tab provides eight interactive Japanese lessons. Exercises
 are evaluated by the real interpreter, with conversational feedback, hints,
 answers, error guidance, and progress saved in the browser.
@@ -74,14 +74,14 @@ API key stays on the server.
 Local AI tutor testing is also available with the bundled Playground server:
 
 ```bash
-GEMINI_API_KEY=your-key python poppop_playground_server.py
+GEMINI_API_KEY=your-key python popcorn_playground_server.py
 ```
 
 On Windows PowerShell:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
-python poppop_playground_server.py
+python popcorn_playground_server.py
 ```
 
 Then open `http://127.0.0.1:8765`. The browser calls `/api/gemini`; the API key
@@ -99,21 +99,21 @@ GEMINI_API_KEY=your-key
 problems and advice.
 
 GitHub Pages is rebuilt automatically after relevant files are pushed to
-`main` or `master`. The deployment packages every current `poppop_lang`
+`main` or `master`. The deployment packages every current `popcorn_lang`
 Python module, so newly added interpreter modules are included without editing
 the Playground loader.
 
 ## Language status
 
 The language is documented in
-[poppop_specification.md](poppop_specification.md).
+[popcorn_specification.md](popcorn_specification.md).
 
 The repository also contains the optional Japanese VS Code extension in
-`vscode-poppop`.
+`vscode-popcorn`.
 
 ## Safety
 
-PopPop code can access the file system and network through built-ins such as
+PopCorn code can access the file system and network through built-ins such as
 `Fetch`, `PostFetch`, and `WriteFile`. Only run programs you trust. See
 [SECURITY.md](SECURITY.md).
 

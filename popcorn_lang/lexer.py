@@ -22,7 +22,7 @@ class Lexer:
     # Regex patterns for tokens
     TOKEN_SPECIFICATION = [
         ('STREAM_OP',    r'>>'),
-        ('POPPOP',       r'\.\.'),
+        ('POPCORN',       r'\.\.'),
         ('DOT',          r'\.'),
         ('DOUBLE_COLON', r'::'),
         ('COLON',        r':'),
@@ -82,7 +82,7 @@ class Lexer:
                 else:
                     kind = 'VARIABLE'
                 self.tokens.append(Token(kind, value, line_num, column))
-            elif kind == 'POPPOP':
+            elif kind == 'POPCORN':
                 self.tokens.append(Token('END', '..', line_num, column))
             elif kind == 'NEWLINE':
                 line_start = mo.end()

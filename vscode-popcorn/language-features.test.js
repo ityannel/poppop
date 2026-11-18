@@ -137,7 +137,7 @@ const ignoredUpdateTypoDiagnostics = analyzeDocument([
     '[{"name": "alice"}] >> users.',
     'users >> Map(user):',
     '    user >> Update:',
-    '        "ALICE" >> @::neme. // poppop-ignore: likely-update-key-typo',
+    '        "ALICE" >> @::neme. // popcorn-ignore: likely-update-key-typo',
     '    ..',
     '.. >> Display.'
 ].join("\n"));

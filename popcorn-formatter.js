@@ -1,11 +1,11 @@
 ((root, factory) => {
   const formatter = factory();
   if (typeof module === "object" && module.exports) module.exports = formatter;
-  else root.PopPopFormatter = formatter;
+  else root.PopCornFormatter = formatter;
 })(typeof globalThis !== "undefined" ? globalThis : this, () => {
   "use strict";
 
-  // vscode-poppop/language-features.js の formatDocument と同じ規則です。
+  // vscode-popcorn/language-features.js の formatDocument と同じ規則です。
   function maskNonCode(line) {
     const characters = line.split("");
 

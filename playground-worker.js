@@ -1,4 +1,4 @@
-/* PopPop's browser runtime.
+/* PopCorn's browser runtime.
  *
  * The worker deliberately loads the repository's Python sources instead of
  * carrying a JavaScript copy of the language. A fresh worker also gives the
@@ -33,13 +33,13 @@ self.waitForTerminalInput = (prompt) => new Promise((resolve) => {
 });
 
 function sourceUrl(file) {
-  const url = new URL(`poppop_lang/${file}`, self.location.href);
+  const url = new URL(`popcorn_lang/${file}`, self.location.href);
   url.searchParams.set("runtime", String(Date.now()));
   return url;
 }
 
 async function installCurrentSources(runtime) {
-  const archiveUrl = new URL("poppop-runtime.zip", self.location.href);
+  const archiveUrl = new URL("popcorn-runtime.zip", self.location.href);
   archiveUrl.searchParams.set("runtime", String(Date.now()));
   const archiveResponse = await fetch(archiveUrl, { cache: "no-store" });
   if (archiveResponse.ok) {
@@ -60,14 +60,14 @@ importlib.invalidate_caches()
 
   // A source checkout normally has no generated archive. Load the known core
   // modules directly so `python -m http.server` works without a build step.
-  runtime.FS.mkdirTree("/home/pyodide/poppop_lang");
+  runtime.FS.mkdirTree("/home/pyodide/popcorn_lang");
   await Promise.all(SOURCE_FILES.map(async (file) => {
     const response = await fetch(sourceUrl(file), { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`${file} を取得できませんでした (${response.status})`);
     }
     runtime.FS.writeFile(
-      `/home/pyodide/poppop_lang/${file}`,
+      `/home/pyodide/popcorn_lang/${file}`,
       await response.text(),
       { encoding: "utf8" },
     );
@@ -90,11 +90,11 @@ async function boot() {
 
     const metadata = JSON.parse(pyodide.runPython(`
 import json
-from poppop_lang.language_meta import KEYWORDS, SPECIAL_FORMS
-from poppop_lang.gallery import public_gallery
-from poppop_lang.lessons import public_lessons
-from poppop_lang.pop_builtins import BUILTIN_REGISTRY
-from poppop_lang.version import DISPLAY_VERSION
+from popcorn_lang.language_meta import KEYWORDS, SPECIAL_FORMS
+from popcorn_lang.gallery import public_gallery
+from popcorn_lang.lessons import public_lessons
+from popcorn_lang.pop_builtins import BUILTIN_REGISTRY
+from popcorn_lang.version import DISPLAY_VERSION
 json.dumps({
     "displayVersion": DISPLAY_VERSION,
     "builtins": sorted(BUILTIN_REGISTRY.keys()),
@@ -125,32 +125,32 @@ async function runProgram(source, lessonId = null) {
   runtime.setStderr({
     batched: (text) => self.postMessage({ type: "stream", channel: "stderr", text }),
   });
-  runtime.globals.set("__poppop_source", source);
-  runtime.globals.set("__poppop_lesson_id", lessonId);
+  runtime.globals.set("__popcorn_source", source);
+  runtime.globals.set("__popcorn_lesson_id", lessonId);
 
   const payload = await runtime.runPythonAsync(`
 import json
 import time
-from poppop_lang.cli import evaluate, format_error, get_ast_json
-from poppop_lang.lessons import validate_lesson
+from popcorn_lang.cli import evaluate, format_error, get_ast_json
+from popcorn_lang.lessons import validate_lesson
 
 __started = time.perf_counter()
 try:
-    __result = await evaluate(__poppop_source)
+    __result = await evaluate(__popcorn_source)
     __payload = {
         "ok": True,
         "result": __result,
-        "ast": json.loads(get_ast_json(__poppop_source)),
+        "ast": json.loads(get_ast_json(__popcorn_source)),
     }
-    if __poppop_lesson_id:
+    if __popcorn_lesson_id:
         __payload["lesson"] = validate_lesson(
-            __poppop_lesson_id, __poppop_source, __result
+            __popcorn_lesson_id, __popcorn_source, __result
         )
 except Exception as __error:
     __payload = {
         "ok": False,
         "error": format_error(__error),
-        "ast": json.loads(get_ast_json(__poppop_source)),
+        "ast": json.loads(get_ast_json(__popcorn_source)),
     }
 __payload["elapsedMs"] = round((time.perf_counter() - __started) * 1000, 2)
 json.dumps(__payload, ensure_ascii=False, default=str)
@@ -160,11 +160,11 @@ json.dumps(__payload, ensure_ascii=False, default=str)
 
 async function analyzeProgram(source, requestId) {
   const runtime = await boot();
-  runtime.globals.set("__poppop_source", source);
+  runtime.globals.set("__popcorn_source", source);
   const payload = JSON.parse(runtime.runPython(`
 import json
-from poppop_lang.cli import get_ast_json
-get_ast_json(__poppop_source)
+from popcorn_lang.cli import get_ast_json
+get_ast_json(__popcorn_source)
 `));
   if (payload.error) {
     self.postMessage({
@@ -185,11 +185,11 @@ get_ast_json(__poppop_source)
 
 async function validateSource(source, requestId) {
   const runtime = await boot();
-  runtime.globals.set("__poppop_source", source);
+  runtime.globals.set("__popcorn_source", source);
   const payload = JSON.parse(runtime.runPython(`
 import json
-from poppop_lang.cli import get_ast_json
-__ast = json.loads(get_ast_json(__poppop_source))
+from popcorn_lang.cli import get_ast_json
+__ast = json.loads(get_ast_json(__popcorn_source))
 json.dumps({
     "ok": not bool(__ast.get("error")),
     "error": __ast.get("error"),
@@ -207,12 +207,12 @@ async function preflightProgram(source, requestId) {
   const output = [];
   runtime.setStdout({ batched: (text) => output.push(String(text)) });
   runtime.setStderr({ batched: () => {} });
-  runtime.globals.set("__poppop_source", source);
+  runtime.globals.set("__popcorn_source", source);
   const payload = await runtime.runPythonAsync(`
 import json
-from poppop_lang.cli import evaluate, format_error
+from popcorn_lang.cli import evaluate, format_error
 try:
-    __result = await evaluate(__poppop_source)
+    __result = await evaluate(__popcorn_source)
     __payload = {"ok": True, "result": __result}
 except Exception as __error:
     __payload = {"ok": False, "error": format_error(__error), "result": None}

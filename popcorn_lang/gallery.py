@@ -231,7 +231,7 @@ GALLERY = (
         "interactive": False,
         "code": (
             '["朝ごはん", "散歩"] >> plan.\n'
-            '(plan, "PopPopを書く") >> Append >> today.\n\n'
+            '(plan, "PopCornを書く") >> Append >> today.\n\n'
             "today >> Display."
         ),
     },
@@ -270,7 +270,7 @@ GALLERY = (
         "description": "Updateで辞書を非破壊的に更新します。",
         "interactive": False,
         "code": (
-            '{"name": "PopPop", "level": 1} >> profile.\n'
+            '{"name": "PopCorn", "level": 1} >> profile.\n'
             "profile >> Update(user):\n"
             "    user::level + 1 >> user::level.\n"
             '    "PopCorn" >> user::release.\n'

@@ -21,7 +21,7 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: python -m pytest
       - run: python -m build
-      - run: poppop --version
+      - run: popcorn --version
 
   vscode:
     runs-on: ubuntu-latest
@@ -31,6 +31,6 @@ jobs:
         with:
           node-version: "20"
       - run: npm test
-        working-directory: vscode-poppop
+        working-directory: vscode-popcorn
       - run: node playground-formatter.test.js
       - run: node playground-localization.test.js
