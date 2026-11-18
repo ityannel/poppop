@@ -1134,6 +1134,10 @@ doubled >> Display.`;
     `).join("") : '<p class="muted">一致する標準関数がありません。</p>';
   }
 
+  function activeSidePanel() {
+    return elements.referenceTab.getAttribute("aria-selected") === "true" ? "reference" : "examples";
+  }
+
   function switchSidePanel(panel) {
     currentSidePanel = panel;
     const panels = {
@@ -2650,6 +2654,19 @@ doubled >> Display.`;
       copyText(getSource(), "コードをコピーしました"));
     elements.downloadButton.addEventListener("click", downloadSource);
     elements.newFileButton.addEventListener("click", newFile);
+    document.getElementById("actExplorer").addEventListener("click", (event) => {
+      const hidden = document.body.classList.toggle("explorer-hidden");
+      event.currentTarget.setAttribute("aria-pressed", String(!hidden));
+      event.currentTarget.classList.toggle("active", !hidden);
+    });
+    document.getElementById("actSearch").addEventListener("click", () => {
+      const search = document.getElementById(activeSidePanel() === "reference" ? "referenceSearch" : "exampleSearch");
+      if (search) search.focus();
+    });
+    document.getElementById("actRun").addEventListener("click", () => elements.runButton.click());
+    document.getElementById("actMore").addEventListener("click", () => {
+      elements.moreTools.open = !elements.moreTools.open;
+    });
     elements.uploadFileButton.addEventListener("click", () => elements.uploadInput.click());
     elements.uploadInput.addEventListener("change", () => {
       uploadFiles(elements.uploadInput.files);
