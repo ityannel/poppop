@@ -341,8 +341,12 @@ html, body {
 /* ひとつのタブバー（左の列の一番上）: ツール・タブ・操作を、一列にまとめる。出力は右のまま */
 .activity-bar { display: none !important; }
 @media (min-width: 901px) {
-  .workspace { grid-template-columns: minmax(190px, 240px) minmax(360px, 1.25fr) minmax(300px, .9fr); }
-  body.lesson-open .workspace { grid-template-columns: minmax(300px, 340px) minmax(360px, 1.2fr) minmax(300px, .85fr); }
+  .workspace, body.lesson-open .workspace {
+    grid-template-columns: minmax(230px, var(--workspace-sidebar-width, 290px)) minmax(360px, 1fr) minmax(280px, var(--workspace-result-width, 350px));
+  }
+  body.sidebar-collapsed .workspace { grid-template-columns: 0 minmax(360px, 1fr) minmax(280px, var(--workspace-result-width, 350px)); }
+  body.result-collapsed .workspace { grid-template-columns: minmax(230px, var(--workspace-sidebar-width, 290px)) minmax(360px, 1fr) 0; }
+  body.sidebar-collapsed.result-collapsed .workspace { grid-template-columns: 0 minmax(360px, 1fr) 0; }
   .workspace > .sidebar { grid-column: 1; grid-row: 1; }
   .workspace > .editor-column { grid-column: 2; grid-row: 1; }
   .workspace > .result-column { grid-column: 3; grid-row: 1; }
@@ -366,6 +370,18 @@ html, body {
 .left-bar .left-tools .toolbar-primary { display: flex; gap: 4px; align-items: center; }
 .left-bar .left-tools .tool-menu { position: relative; }
 .explorer .file-list { max-height: 240px; }
+/* 仕様書の全文（Markdown のまま）。折り返して、読みやすく */
+.spec-doc {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 13px/1.7 "Kosugi", "Zen Kaku Gothic New", monospace;
+  color: var(--text, inherit);
+  background: var(--panel, transparent);
+  border: 1px solid var(--line, #ccc);
+  border-radius: 6px;
+}
 
 /* 左の列: 上から、一つのバー → エクスプローラー → 他のパネル、の順に積む */
 .sidebar {
@@ -400,3 +416,82 @@ html, body {
   overflow: auto;
 }
 .sidebar > .explorer { flex: 0 0 auto; max-height: 45%; }
+
+/* エディタの上の、右はし: アイコンだけの整形・実行・停止 */
+.editor-top { display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); }
+.editor-top .editor-tabs { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.editor-actions { display: flex; align-items: center; gap: 2px; padding: 0 8px; flex: none; }
+.icon-btn {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { background: var(--select); color: var(--text); }
+.icon-btn:disabled { opacity: .4; cursor: default; }
+.icon-btn.run { color: #3fb950; }
+.icon-btn.danger { color: #f85149; }
+.icon-btn:focus-visible { outline: 1px solid var(--accent-3, #007acc); outline-offset: 1px; }
+body.is-running #runButton { display: none; }
+body:not(.is-running) #stopButton { display: none; }
+/* エクスプローラーの display:flex が hidden を打ち消していた → 他のタブのときは、ちゃんと隠す */
+.explorer[hidden] { display: none; }
+
+/* アイコン（Codicons）: 文字と同じ大きさ・色で */
+.ci { display: inline-grid; place-items: center; width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; }
+.ci-svg { width: 100%; height: 100%; display: block; }
+.vs-icon, .icon-btn, .side-tab { line-height: 0; }
+.vs-icon .ci, .icon-btn .ci { width: 16px; height: 16px; }
+.side-tab .ci { width: 18px; height: 18px; }
+.etab-close { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.etab-close .ci-svg { width: 14px; height: 14px; }
+.etab-close:hover { background: var(--select); color: var(--text); }
+.file-item .ci { margin-right: 4px; }
+/* 左のバーは一行に収める（タブの左右の余白を少し詰める） */
+.left-bar .side-tab { padding: 8px 7px; }
+.left-bar #explorerTab { padding: 8px 8px; }
+
+/* ---- 仕様書（整形した Markdown の表示） ---- */
+#editor[hidden], .md-view[hidden] { display: none !important; }
+.md-view {
+  flex: 1 1 auto; min-height: 0; overflow: auto;
+  padding: 20px 32px 48px; background: var(--bg); color: var(--text);
+  font: 15px/1.85 "Kosugi", "Zen Kaku Gothic New", sans-serif;
+}
+.md-view > * { max-width: 860px; }
+.md-view h1 { margin: 0 0 14px; font-size: 26px; line-height: 1.4; }
+.md-view h2 { margin: 36px 0 12px; padding-bottom: 6px; font-size: 20px; border-bottom: 1px solid var(--line); }
+.md-view h3 { margin: 26px 0 8px; font-size: 16px; color: var(--accent-3, #4fc1ff); }
+.md-view p { margin: 0 0 12px; }
+.md-view ul, .md-view ol { margin: 0 0 12px; padding-left: 1.6em; }
+.md-view li { margin: 3px 0; }
+.md-view code { padding: 1px 5px; border-radius: 4px; background: var(--panel); font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.md-view pre { margin: 0 0 14px; padding: 12px 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.md-view pre code { padding: 0; background: none; font-size: 13px; line-height: 1.7; }
+.md-view .md-table { margin: 0 0 16px; overflow-x: auto; }
+.md-view table { border-collapse: collapse; font-size: 13.5px; line-height: 1.6; }
+.md-view th, .md-view td { padding: 6px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.md-view th { background: var(--panel); font-weight: 700; white-space: nowrap; }
+
+/* ---- 上のタブの列: 左と真ん中で、下の線の高さをそろえる。「その他」は、アイコンだけで、整形の左隣 ---- */
+.left-bar { flex-wrap: nowrap; height: 35px; box-sizing: border-box; border-bottom: 1px solid var(--line); overflow: hidden; }
+.left-bar .left-tools { display: none; }
+.editor-top { height: 35px; box-sizing: border-box; }
+.editor-top .editor-tabs { min-height: 0; }
+.editor-actions .tool-menu { position: relative; margin: 0; }
+.editor-actions .tool-menu > summary {
+  display: grid; place-items: center; width: 28px; height: 28px; min-height: 0; padding: 0; gap: 0;
+  border: 0; border-radius: 4px; background: transparent; box-shadow: none; color: var(--muted); cursor: pointer;
+}
+.editor-actions .tool-menu > summary:hover, .editor-actions .tool-menu[open] > summary { background: var(--select); color: var(--text); box-shadow: none; }
+.editor-actions .tool-menu > summary .ci { width: 16px; height: 16px; }
+.editor-actions .tool-menu-popover { right: 0; left: auto; }
+/* 三つのタブ列（ファイル・エディタ・出力）の下辺を、同じ高さにそろえる */
+.workspace .left-bar, .workspace .editor-top { height: 39px !important; min-height: 0 !important; box-sizing: border-box; }
+.workspace .left-bar > .side-tab { height: 100%; }
+.workspace .editor-top .etab { height: 100%; }
+/* 仕様書が長くても、上のタブ列や表題が潰れない（縮むのは、仕様書の表示欄だけ） */
+.workspace .editor-top, .editor-column > .pane-title, .editor-column > .editor-statusbar { flex: 0 0 auto; }
+.md-view { flex: 1 1 0; }
+
+/* エディタのタブ列の、横スクロールバーは見せない（はみ出したら、ホイールで動かせる） */
+.editor-tabs { scrollbar-width: none; }
+.editor-tabs::-webkit-scrollbar { display: none; }

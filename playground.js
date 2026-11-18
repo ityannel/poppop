@@ -38,12 +38,12 @@ doubled >> Display.`;
       "runFeedback",
       "formatButton", "copyCodeButton", "downloadButton", "fileInput",
       "loadFileButton", "shareButton", "decreaseFontButton", "increaseFontButton",
-      "themeButton", "newFileButton", "newFolderButton", "renameButton", "deleteButton", "uploadFileButton", "downloadFileButton", "uploadInput", "fileList", "editorTabs", "activeName", "toggleSidebarButton", "toggleResultButton", "moreTools",
+      "themeButton", "newFileButton", "newFolderButton", "renameButton", "deleteButton", "uploadFileButton", "downloadFileButton", "uploadInput", "fileList", "editorTabs", "mdView", "activeName", "moreTools",
       "sidebarResizer", "resultResizer", "resultDrawerHandle",
       "closeResultDrawerButton",
-      "examplesTab", "referenceTab", "lessonTab", "lessonTabProgress",
-      "examplesPanel", "referencePanel", "lessonPanel", "explorerTab", "explorerPanel",
-      "exampleSearch", "referenceSearch", "exampleList", "referenceList",
+      "examplesTab", "lessonTab", "lessonTabProgress",
+      "examplesPanel", "lessonPanel", "explorerTab", "explorerPanel",
+      "exampleSearch", "exampleList",
       "lessonProgressText", "lessonProgressBar", "previousLessonButton",
       "lessonTitleButton", "nextLessonButton", "lessonBadge", "lessonTitle",
       "lessonGoal", "lessonChat", "robotAvatar", "tutorStatus",
@@ -74,7 +74,6 @@ doubled >> Display.`;
   let toastTimer = null;
   let examples = [];
   let galleryLoaded = false;
-  let referenceRows = [];
   let runtimeNames = [];
   let currentResultTab = "output";
   let currentSidePanel = "examples";
@@ -380,8 +379,8 @@ doubled >> Display.`;
   function setSidebarCollapsed(collapsed, persist = true) {
     sidebarCollapsed = Boolean(collapsed);
     document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
-    elements.toggleSidebarButton.setAttribute("aria-pressed", String(sidebarCollapsed));
-    elements.toggleSidebarButton.setAttribute(
+    elements.toggleSidebarButton?.setAttribute("aria-pressed", String(sidebarCollapsed));
+    elements.toggleSidebarButton?.setAttribute(
       "aria-label",
       sidebarCollapsed ? "サンプル棚を開く" : "サンプル棚を閉じる",
     );
@@ -398,8 +397,8 @@ doubled >> Display.`;
   function setResultCollapsed(collapsed, persist = true) {
     resultCollapsed = Boolean(collapsed);
     document.body.classList.toggle("result-collapsed", resultCollapsed);
-    elements.toggleResultButton.setAttribute("aria-pressed", String(resultCollapsed));
-    elements.toggleResultButton.setAttribute(
+    elements.toggleResultButton?.setAttribute("aria-pressed", String(resultCollapsed));
+    elements.toggleResultButton?.setAttribute(
       "aria-label",
       resultCollapsed ? "結果棚を開く" : "結果棚を閉じる",
     );
@@ -649,7 +648,7 @@ doubled >> Display.`;
 
   function scheduleAnalysis() {
     clearTimeout(analysisTimer);
-    if (!runtimeReady || running) return;
+    if (!runtimeReady || running || activeFile === SPEC_FILE) return;
     analysisTimer = setTimeout(() => {
       const requestId = ++analysisSequence;
       latestAnalysis = requestId;
@@ -693,6 +692,7 @@ doubled >> Display.`;
       if (message.gallery?.length) {
         galleryLoaded = true;
         examples = message.gallery;
+        seedSamples();
         renderExamples();
       }
       lessonIndex = Math.min(Math.max(0, lessonIndex), Math.max(0, lessons.length - 1));
@@ -700,7 +700,6 @@ doubled >> Display.`;
         [...completedLessons].filter((id) => lessons.some((lesson) => lesson.id === id)),
       );
       installCompleter(runtimeNames);
-      renderReferences();
       renderLesson();
       scheduleAnalysis();
       return;
@@ -810,6 +809,7 @@ doubled >> Display.`;
 
   function startRun() {
     if (!runtimeReady || running) return;
+    if (activeFile === SPEC_FILE) { showToast("仕様書は、実行できません"); return; }
     running = true;
     document.body.classList.add("is-running");
     sourceChanged = false;
@@ -1034,19 +1034,21 @@ doubled >> Display.`;
     return { examples: foundExamples, references: foundReferences };
   }
 
+  let specText = "";
+
   async function loadSpecification() {
     try {
       const url = new URL("popcorn_specification.md", location.href);
       url.searchParams.set("spec", String(Date.now()));
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const parsed = parseSpecification(await response.text());
-      referenceRows = parsed.references;
+      specText = await response.text();
+      const parsed = parseSpecification(specText);
       if (!galleryLoaded) {
         examples = friendlySpecificationExamples(parsed.examples);
+        seedSamples();
         renderExamples();
       }
-      renderReferences();
     } catch (error) {
       if (!galleryLoaded) {
         examples = [{
@@ -1057,10 +1059,9 @@ doubled >> Display.`;
           interactive: false,
           code: FALLBACK_SOURCE,
         }];
+        seedSamples();
         renderExamples();
       }
-      elements.referenceList.innerHTML =
-        `<p class="muted">仕様書を読み込めませんでした: ${escapeHtml(error.message)}</p>`;
     }
   }
 
@@ -1109,7 +1110,7 @@ doubled >> Display.`;
       button.addEventListener("click", () => {
         const item = examples[Number(button.dataset.exampleIndex)];
         setMobilePane("code");
-        setSource(item.code);
+        openSample(item);
         showToast(item.interactive
           ? `「${item.title}」を読み込みました。実行すると入力欄が開きます`
           : `「${item.title}」を読み込みました`);
@@ -1117,33 +1118,11 @@ doubled >> Display.`;
     });
   }
 
-  function renderReferences() {
-    if (!runtimeNames.length || !referenceRows.length) return;
-    const implemented = new Set(runtimeNames);
-    const query = elements.referenceSearch.value.trim().toLowerCase();
-    const visible = referenceRows.filter((item) =>
-      implemented.has(item.name) &&
-      `${item.category} ${item.name} ${item.input} ${item.description}`.toLowerCase().includes(query));
-    elements.referenceList.innerHTML = visible.length ? visible.map((item) => `
-      <article class="reference-card">
-        <span class="category">${escapeHtml(item.category)}</span>
-        <strong>${escapeHtml(item.name)}</strong>
-        <p>入力: ${escapeHtml(item.input)}</p>
-        <p>${escapeHtml(item.description)}</p>
-      </article>
-    `).join("") : '<p class="muted">一致する標準関数がありません。</p>';
-  }
-
-  function activeSidePanel() {
-    return elements.referenceTab.getAttribute("aria-selected") === "true" ? "reference" : "examples";
-  }
-
   function switchSidePanel(panel) {
     currentSidePanel = panel;
     const panels = {
       explorer: [elements.explorerTab, elements.explorerPanel],
       examples: [elements.examplesTab, elements.examplesPanel],
-      reference: [elements.referenceTab, elements.referencePanel],
       lesson: [elements.lessonTab, elements.lessonPanel],
     };
     Object.entries(panels).forEach(([name, [tab, content]]) => {
@@ -2459,6 +2438,7 @@ doubled >> Display.`;
   }
 
   function formatSource() {
+    if (activeFile === SPEC_FILE) { showToast("仕様書は、整形できません"); return; }
     const formatter = window.PopCornFormatter;
     if (!formatter) {
       showToast("整形機能を読み込めませんでした");
@@ -2505,6 +2485,53 @@ doubled >> Display.`;
     return allFolders().includes(path) && files[path] === undefined;
   }
 
+  // ===== サンプル: 例は、samples フォルダーのファイルとして格納する。「例」のタブは、それを開くだけ =====
+  const SAMPLES_DIR = "samples";
+  const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v1";
+
+  function sampleFileName(title) {
+    const name = String(title).split("｜").at(-1).trim().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+    return name || "sample";
+  }
+
+  // 例ごとに、samples/<名前>.pop を決める（同じ名前なら、-2、-3…）
+  function assignSamplePaths() {
+    const used = new Set();
+    examples.forEach((item) => {
+      const name = sampleFileName(item.title);
+      let path = joinPath(SAMPLES_DIR, `${name}.pop`);
+      for (let n = 2; used.has(path); n += 1) path = joinPath(SAMPLES_DIR, `${name}-${n}.pop`);
+      used.add(path);
+      item.samplePath = path;
+    });
+  }
+
+  // はじめて見た例だけ、ファイルを作る（消したファイルが、読み込みのたびに戻ってこないように）
+  function seedSamples() {
+    assignSamplePaths();
+    let seeded = [];
+    try { seeded = JSON.parse(localStorage.getItem(SAMPLES_SEEDED_KEY) || "[]"); } catch {}
+    let changed = false;
+    examples.forEach((item) => {
+      if (seeded.includes(item.samplePath)) return;
+      seeded.push(item.samplePath);
+      if (files[item.samplePath] === undefined) files[item.samplePath] = item.code;
+      changed = true;
+    });
+    if (!changed) return;
+    try { localStorage.setItem(SAMPLES_SEEDED_KEY, JSON.stringify(seeded)); } catch {}
+    persistFiles();
+    renderExplorer();
+  }
+
+  function openSample(item) {
+    if (!item.samplePath) assignSamplePaths();
+    const path = item.samplePath;
+    if (files[path] === undefined) files[path] = item.code; // 消してあっても、例を押せば、元の例が戻る
+    if (!expanded.includes(SAMPLES_DIR)) expanded.push(SAMPLES_DIR);
+    openFile(path);
+  }
+
   function persistFiles() {
     if (files[activeFile] !== undefined && (editor || elements.editorFallback)) files[activeFile] = getSource();
     localStorage.setItem(FS_KEY, JSON.stringify({ files, folders, openTabs, expanded, selected, active: activeFile }));
@@ -2535,7 +2562,7 @@ doubled >> Display.`;
   function renderTabs() {
     elements.editorTabs.innerHTML = openTabs.map((path) => {
       const on = path === activeFile;
-      return `<div class="etab${on ? " active" : ""}" role="tab" aria-selected="${on}" data-tab="${escapeHtml(path)}"><span>${escapeHtml(baseOf(path))}</span><button type="button" class="etab-close" data-close="${escapeHtml(path)}" aria-label="閉じる">×</button></div>`;
+      return `<div class="etab${on ? " active" : ""}" role="tab" aria-selected="${on}" data-tab="${escapeHtml(path)}"><span>${escapeHtml(baseOf(path))}</span><button type="button" class="etab-close" data-close="${escapeHtml(path)}" aria-label="閉じる">${PopIcons.icon("close")}</button></div>`;
     }).join("");
     elements.activeName.textContent = activeFile;
   }
@@ -2558,11 +2585,11 @@ doubled >> Display.`;
       const indent = 12 + row.depth * 12;
       const sel = row.path === selected ? " selected" : "";
       const act = row.kind === "file" && row.path === activeFile ? " active" : "";
-      const icon = row.kind === "folder" ? (row.open ? "▾" : "▸") : "▤";
-      return `<li><button type="button" class="file-item${sel}${act}" style="padding-left:${indent}px" data-path="${escapeHtml(row.path)}" data-kind="${row.kind}"><span aria-hidden="true">${icon}</span> ${escapeHtml(baseOf(row.path))}</button></li>`;
+      const icon = PopIcons.icon(row.kind === "folder" ? (row.open ? "folder-opened" : "folder") : "file");
+      return `<li><button type="button" class="file-item${sel}${act}" style="padding-left:${indent}px" data-path="${escapeHtml(row.path)}" data-kind="${row.kind}"><span class="ci" aria-hidden="true">${icon}</span> ${escapeHtml(baseOf(row.path))}</button></li>`;
     });
     html.push(`<li class="file-sep" aria-hidden="true"></li>`);
-    html.push(`<li><button type="button" class="file-item virtual" data-spec="1"><span aria-hidden="true">◧</span> ${SPEC_FILE}</button></li>`);
+    html.push(`<li><button type="button" class="file-item virtual${activeFile === SPEC_FILE ? " active" : ""}${selected === SPEC_FILE ? " selected" : ""}" data-spec="1"><span class="ci" aria-hidden="true">${PopIcons.icon("markdown")}</span> ${SPEC_FILE}</button></li>`);
     elements.fileList.innerHTML = html.join("");
     renderTabs();
   }
@@ -2584,12 +2611,84 @@ doubled >> Display.`;
     return joinPath(folder, `${stem}-${n}${ext}`);
   }
 
+  // Markdown を、読みやすい形に整える（見出し・段落・箇条書き・表・コード・`コード`）
+  function renderMarkdown(md) {
+    const inline = (t) => escapeHtml(t).replace(/`([^`]+)`/g, "<code>$1</code>");
+    const lines = md.replace(/\r\n/g, "\n").split("\n");
+    const html = [];
+    let i = 0;
+    const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+    const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
+    while (i < lines.length) {
+      const line = lines[i];
+      if (!line.trim()) { i += 1; continue; }
+      if (line.startsWith("```")) {
+        const buf = [];
+        i += 1;
+        while (i < lines.length && !lines[i].startsWith("```")) { buf.push(lines[i]); i += 1; }
+        i += 1;
+        html.push(`<pre><code>${escapeHtml(buf.join("\n"))}</code></pre>`);
+        continue;
+      }
+      const h = /^(#{1,3}) (.+)$/.exec(line);
+      if (h) { html.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i += 1; continue; }
+      if (isTableRow(line) && i + 1 < lines.length && /^\s*\|[\s|:-]+\|\s*$/.test(lines[i + 1])) {
+        const head = cells(line);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && isTableRow(lines[i])) { rows.push(cells(lines[i])); i += 1; }
+        html.push(`<div class="md-table"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${
+          rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")
+        }</tbody></table></div>`);
+        continue;
+      }
+      const list = /^(- |\d+\. )/.exec(line);
+      if (list) {
+        const ordered = !list[1].startsWith("-");
+        const items = [];
+        while (i < lines.length && (ordered ? /^\d+\. /.test(lines[i]) : lines[i].startsWith("- "))) {
+          items.push(lines[i].replace(/^(- |\d+\. )/, ""));
+          i += 1;
+        }
+        const tag = ordered ? "ol" : "ul";
+        html.push(`<${tag}>${items.map((t) => `<li>${inline(t)}</li>`).join("")}</${tag}>`);
+        continue;
+      }
+      const para = [];
+      while (i < lines.length && lines[i].trim() && !lines[i].startsWith("```") && !/^#{1,3} /.test(lines[i])
+        && !isTableRow(lines[i]) && !/^(- |\d+\. )/.test(lines[i])) { para.push(lines[i]); i += 1; }
+      html.push(`<p>${inline(para.join(" "))}</p>`);
+    }
+    return html.join("\n");
+  }
+
+  // エディタに、ファイルを表示する。仕様書（specification.md）は、整形した Markdown を読み取り専用で見せる
+  function showFile(path) {
+    const isSpec = path === SPEC_FILE;
+    elements.mdView.hidden = !isSpec;
+    if (editor) elements.editor.hidden = isSpec;
+    else elements.editorFallback.style.display = isSpec ? "none" : "block";
+    if (isSpec) {
+      elements.mdView.innerHTML = renderMarkdown(specText);
+      elements.mdView.scrollTop = 0;
+      return;
+    }
+    setSource(files[path] ?? "", { markChanged: false });
+    resizeEditor();
+  }
+
+  async function openSpec() {
+    if (!specText) await loadSpecification();
+    if (!specText) { showToast("仕様書を読み込めませんでした"); return; }
+    openFile(SPEC_FILE);
+  }
+
   function openFile(path) {
-    if (files[path] === undefined) return;
+    if (path !== SPEC_FILE && files[path] === undefined) return;
     if (path !== activeFile) {
-      files[activeFile] = getSource();
+      if (files[activeFile] !== undefined) files[activeFile] = getSource();
       activeFile = path;
-      setSource(files[path], { markChanged: false });
+      showFile(path);
     }
     if (!openTabs.includes(path)) openTabs.push(path);
     selected = path;
@@ -2606,7 +2705,7 @@ doubled >> Display.`;
       if (!next) return;
       if (!openTabs.includes(next)) openTabs.push(next);
       activeFile = next;
-      setSource(files[next], { markChanged: false });
+      showFile(next);
       selected = next;
     }
     persistFiles();
@@ -2668,8 +2767,8 @@ doubled >> Display.`;
     openTabs = openTabs.filter((path) => !doomed(path));
     if (!Object.keys(files).length) files["main.pop"] = "";
     if (!openTabs.length) openTabs.push(Object.keys(files)[0]);
-    if (doomed(activeFile) || files[activeFile] === undefined) activeFile = openTabs[0];
-    setSource(files[activeFile] ?? "", { markChanged: false });
+    if (doomed(activeFile) || (activeFile !== SPEC_FILE && files[activeFile] === undefined)) activeFile = openTabs[0];
+    showFile(activeFile);
     selected = activeFile;
     persistFiles();
     renderExplorer();
@@ -2688,7 +2787,7 @@ doubled >> Display.`;
   }
 
   function downloadFile(path = activeFile) {
-    const content = path === activeFile ? getSource() : files[path];
+    const content = path === SPEC_FILE ? specText : path === activeFile ? getSource() : files[path];
     const blob = new Blob([content ?? ""], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -2710,7 +2809,7 @@ doubled >> Display.`;
     });
     elements.downloadFileButton.addEventListener("click", () => downloadFile(activeFile));
     elements.fileList.addEventListener("click", (event) => {
-      if (event.target.closest("[data-spec]")) { switchSidePanel("reference"); return; }
+      if (event.target.closest("[data-spec]")) { openSpec(); return; }
       const button = event.target.closest("[data-path]");
       if (!button) return;
       const path = button.dataset.path;
@@ -2825,21 +2924,15 @@ doubled >> Display.`;
       elements.uploadInput.value = "";
     });
     elements.downloadFileButton.addEventListener("click", () => downloadFile(activeFile));
-    elements.fileList.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-file]");
-      if (!button) return;
-      if (button.dataset.file === SPEC_FILE) { switchSidePanel("reference"); return; }
-      openFile(button.dataset.file);
-    });
     elements.loadFileButton.addEventListener("click", () => elements.fileInput.click());
     elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files[0]));
     elements.shareButton.addEventListener("click", shareSource);
     elements.decreaseFontButton.addEventListener("click", () => changeFont(-1));
     elements.increaseFontButton.addEventListener("click", () => changeFont(1));
     elements.themeButton.addEventListener("click", toggleTheme);
-    elements.toggleSidebarButton.addEventListener("click", () =>
+    elements.toggleSidebarButton?.addEventListener("click", () =>
       setSidebarCollapsed(!sidebarCollapsed));
-    elements.toggleResultButton.addEventListener("click", () =>
+    elements.toggleResultButton?.addEventListener("click", () =>
       setResultCollapsed(!resultCollapsed));
     document.querySelectorAll("[data-layout-preset]").forEach((button) => {
       button.addEventListener("click", () =>
@@ -2893,7 +2986,6 @@ doubled >> Display.`;
       }
     });
     elements.examplesTab.addEventListener("click", () => switchSidePanel("examples"));
-    elements.referenceTab.addEventListener("click", () => switchSidePanel("reference"));
     elements.lessonTab.addEventListener("click", () => switchSidePanel("lesson"));
     elements.previousLessonButton.addEventListener("click", previousLesson);
     elements.nextLessonButton.addEventListener("click", () =>
@@ -2916,7 +3008,6 @@ doubled >> Display.`;
       answerLessonQuestion(question);
     });
     elements.exampleSearch.addEventListener("input", renderExamples);
-    elements.referenceSearch.addEventListener("input", renderReferences);
     document.querySelectorAll(".result-tab").forEach((button) => {
       button.addEventListener("click", () => selectResultTab(button.dataset.resultTab));
     });
@@ -2945,7 +3036,6 @@ doubled >> Display.`;
       ".side-tab",
       (tab) => {
         if (tab === elements.examplesTab) switchSidePanel("examples");
-        if (tab === elements.referenceTab) switchSidePanel("reference");
         if (tab === elements.lessonTab) switchSidePanel("lesson");
       },
     );
