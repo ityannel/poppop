@@ -1,34 +1,121 @@
-﻿from .ast_nodes import *
-from .environment import Environment
+﻿import inspect
 import json
+import math
 import os
+from typing import Any
+
+from .ast_nodes import *
+from .environment import Environment
+
+INT64_MIN = -(1 << 63)
+INT64_MAX = (1 << 63) - 1
+
 
 class EvaluatorError(Exception):
     pass
 
+
 class PopCornError(EvaluatorError):
-    def __init__(self, err_type, message):
+    def __init__(self, err_type: str, message: str, line: int | None = None, column: int | None = None):
         self.err_type = err_type
         self.message = message
+        self.line = line
+        self.column = column
         super().__init__(f"{err_type}: {message}")
 
+
 class ReturnException(BaseException):
-    def __init__(self, value):
+    def __init__(self, value: Any):
         self.value = value
+
 
 class BreakException(BaseException):
-    def __init__(self, value):
+    def __init__(self, value: Any):
         self.value = value
 
-def _is_number(value):
+
+def _is_int(value: Any) -> bool:
+    return type(value) is int
+
+
+def _is_number(value: Any) -> bool:
     return type(value) in (int, float)
 
-def _values_equal(left, right):
+
+def _check_int64(value: int) -> int:
+    if value < INT64_MIN or value > INT64_MAX:
+        raise PopCornError("RuntimeError", f"Integer overflow: {value}")
+    return value
+
+
+def _check_finite(value: float) -> float:
+    if math.isnan(value) or math.isinf(value):
+        raise PopCornError("RuntimeError", "Numeric result is NaN or Infinity")
+    return value
+
+
+def _check_number_result(value: Any) -> Any:
+    if type(value) is int:
+        return _check_int64(value)
+    if type(value) is float:
+        return _check_finite(value)
+    return value
+
+
+def popcorn_type_name(value: Any) -> str:
+    if value is None:
+        return "Null"
+    if isinstance(value, bool):
+        return "Bool"
+    if type(value) is int:
+        return "Int"
+    if type(value) is float:
+        return "Num"
+    if isinstance(value, str):
+        return "Str"
+    if isinstance(value, list):
+        return "List"
+    if isinstance(value, dict):
+        return "Dict"
+    if isinstance(value, tuple):
+        return "Tuple"
+    raise PopCornError("TypeError", f"Unsupported runtime value: {type(value).__name__}")
+
+
+def format_popcorn_str(value: Any, *, nested: bool = False) -> str:
+    """Format a PopCorn value according to Section 3 Str conversion rules."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if type(value) is int:
+        return str(value)
+    if type(value) is float:
+        _check_finite(value)
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False) if nested else value
+    if isinstance(value, list):
+        inner = ", ".join(format_popcorn_str(item, nested=True) for item in value)
+        return f"[{inner}]"
+    if isinstance(value, dict):
+        inner = ", ".join(
+            f"{json.dumps(k, ensure_ascii=False)}: {format_popcorn_str(v, nested=True)}"
+            for k, v in value.items()
+        )
+        return "{" + inner + "}"
+    if isinstance(value, tuple):
+        inner = ", ".join(format_popcorn_str(item, nested=True) for item in value)
+        return f"({inner})"
+    raise PopCornError("TypeError", f"Cannot format unsupported value: {type(value).__name__}")
+
+
+def _values_equal(left: Any, right: Any) -> bool:
     if _is_number(left) and _is_number(right):
         return left == right
     if type(left) is not type(right):
         return False
-    if isinstance(left, list):
+    if isinstance(left, (list, tuple)):
         return len(left) == len(right) and all(
             _values_equal(a, b) for a, b in zip(left, right)
         )
@@ -38,10 +125,56 @@ def _values_equal(left, right):
         )
     return left == right
 
+
+def _contains_value(target: Any, item: Any) -> bool:
+    if isinstance(target, list):
+        return any(_values_equal(element, item) for element in target)
+    if isinstance(target, dict):
+        if not isinstance(item, str):
+            raise PopCornError("TypeError", "Dict key for Contains/in must be Str")
+        return item in target
+    if isinstance(target, str):
+        if not isinstance(item, str):
+            raise PopCornError("TypeError", "Substring for Contains/in must be Str")
+        return item in target
+    raise PopCornError("TypeError", "Contains/in requires List, Dict, or Str")
+
+
+def _bind_aliases(env: Environment, alias_names: list[str], value: Any) -> None:
+    if not alias_names:
+        return
+    if len(alias_names) == 1:
+        env.set_var(alias_names[0], value)
+        return
+    if not isinstance(value, (tuple, list)):
+        raise PopCornError("TypeError", "Destructuring alias requires a Tuple or List")
+    if len(value) != len(alias_names):
+        raise PopCornError(
+            "RuntimeError",
+            f"Destructuring alias expects {len(alias_names)} values, got {len(value)}",
+        )
+    for name, item in zip(alias_names, value):
+        env.set_var(name, item)
+
+
+def _validate_sort_keys(keys: list[Any]) -> None:
+    if not keys:
+        return
+    first = keys[0]
+    if _is_number(first):
+        if not all(_is_number(k) for k in keys):
+            raise PopCornError("RuntimeError", "Sort keys are not mutually comparable")
+    elif isinstance(first, str):
+        if not all(isinstance(k, str) for k in keys):
+            raise PopCornError("RuntimeError", "Sort keys are not mutually comparable")
+    else:
+        raise PopCornError("RuntimeError", "Sort keys must be numbers or Str values")
+
+
 class Evaluator:
     def __init__(self):
         self.global_env = Environment()
-        self.trace_path = os.environ.get('POPCORN_TRACE_FILE')
+        self.trace_path = os.environ.get("POPCORN_TRACE_FILE")
 
     def trace_pipeline_value(self, node, value, input_value=None, progress=None):
         """Emit optional, compact execution data for the VS Code flow view."""
@@ -49,246 +182,284 @@ class Evaluator:
             return
         try:
             def display(current):
-                preview = json.dumps(current, ensure_ascii=False, default=str)
+                preview = format_popcorn_str(current, nested=True)
                 if len(preview) > 180:
                     preview = preview[:177] + "..."
-                type_names = {str: "Str", int: "Num", float: "Num", bool: "Bool", list: "List", dict: "Dict", type(None): "Null"}
-                return f"{preview} ({type_names.get(type(current), type(current).__name__)})"
+                return f"{preview} ({popcorn_type_name(current)})"
+
             event = {
                 "line": getattr(node, "line", 0),
-                "stage": getattr(node, "name", getattr(node, "stream_type", type(node).__name__)),
-                "after": display(value)
+                "stage": getattr(
+                    node, "name", getattr(node, "stream_type", type(node).__name__)
+                ),
+                "after": display(value),
             }
             if input_value is not None:
                 event["before"] = display(input_value)
             if progress:
                 event["progress"] = progress
-            with open(self.trace_path, 'a', encoding='utf-8') as trace_file:
+            with open(self.trace_path, "a", encoding="utf-8") as trace_file:
                 trace_file.write(json.dumps(event, ensure_ascii=False) + "\n")
         except Exception:
             pass
 
     async def eval(self, node: ASTNode, env: Environment) -> Any:
-        method_name = f'eval_{type(node).__name__}'
+        method_name = f"eval_{type(node).__name__}"
         visitor = getattr(self, method_name, self.generic_eval)
         return await visitor(node, env)
 
     async def generic_eval(self, node: ASTNode, env: Environment):
-        raise EvaluatorError(f"No eval method for {type(node).__name__}")
+        raise PopCornError("RuntimeError", f"No eval method for {type(node).__name__}")
 
     async def eval_Program(self, node: Program, env: Environment):
+        # Pass 1: hoist all top-level function definitions for mutual recursion
+        # and order-independent calls.
+        for stmt in node.statements:
+            if isinstance(stmt, FunctionDefNode):
+                env.set_function(stmt.name, (stmt, None, env))
+
         result = None
         for stmt in node.statements:
             if isinstance(stmt, FunctionDefNode):
-                # Store the defining environment for lexical (not dynamic)
-                # scope.
-                env.set_function(stmt.name, (stmt, env))
+                # Capture outer variables by value at definition time.
+                env.set_function(stmt.name, (stmt, dict(env.variables), env))
             else:
+                env.set_current(None)
                 result = await self.eval(stmt, env)
+
+        env.set_current(result)
         return result
 
-    async def eval_Pipeline(self, node: Pipeline, env: Environment):
-        i = 1
+    async def eval_GroupedPipelineNode(self, node: GroupedPipelineNode, env: Environment):
+        prev_item = env.current_item
+        prev_has = env.has_current_item
         try:
-            val = await self.eval(node.nodes[0], env)
-        except Exception as e:
-            catch_idx = -1
-            for j in range(1, len(node.nodes)):
-                op_j = node.ops[j-1] if hasattr(node, 'ops') and j-1 < len(node.ops) else '>>'
-            raise e
+            return await self.eval_Pipeline(node.pipeline, env)
+        finally:
+            env.current_item = prev_item
+            env.has_current_item = prev_has
 
+    async def eval_Pipeline(self, node: Pipeline, env: Environment):
+        val = await self.eval(node.nodes[0], env)
         env.set_current(val)
         self.trace_pipeline_value(node.nodes[0], val)
 
-        while i < len(node.nodes):
+        for i in range(1, len(node.nodes)):
             n = node.nodes[i]
-            op = node.ops[i-1] if hasattr(node, 'ops') and i-1 < len(node.ops) else '>>'
+            op = node.ops[i - 1] if i - 1 < len(node.ops) else ">>"
+            if op != ">>":
+                raise PopCornError("RuntimeError", "Only >> is a valid pipeline operator")
 
-            try:
-                input_value = val
-                if op != '>>':
-                    raise EvaluatorError("Only >> is a valid pipeline operator")
-                if isinstance(n, StreamBlockNode):
-                    if n.stream_type == 'Map':
-                        if not isinstance(val, list): raise EvaluatorError("Map stream requires a list")
-                        mapped = []
-                        for item_index, item in enumerate(val, start=1):
-                            self.trace_pipeline_value(n, item, progress=f"{item_index} / {len(val)}")
-                            item_env = Environment(parent=env)
-                            item_env.set_current(item)
-                            var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                            if var_name: item_env.set_var(var_name, item)
-                            try:
-                                mapped.append(await self.eval(n.block, item_env))
-                            except ReturnException as e:
-                                mapped.append(e.value)
-                            except BreakException as e:
-                                mapped.append(e.value)
-                                break
-                        val = mapped
-                    elif n.stream_type == 'Filter':
-                        if not isinstance(val, list): raise EvaluatorError("Filter stream requires a list")
-                        filtered = []
-                        for item in val:
-                            item_env = Environment(parent=env)
-                            item_env.set_current(item)
-                            var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                            if var_name: item_env.set_var(var_name, item)
-                            try:
-                                res = await self.eval(n.block, item_env)
-                            except ReturnException as e:
-                                res = e.value
-                            except BreakException as e:
-                                res = e.value
-                            if not isinstance(res, bool):
-                                raise EvaluatorError("Filter block must return Bool")
-                            if res: filtered.append(item)
-                        val = filtered
-                    elif n.stream_type == 'Reduce':
-                        if not isinstance(val, list) or len(val) == 0: raise EvaluatorError("Reduce stream requires non-empty list")
-                        res = val[0]
-                        for item in val[1:]:
-                            item_env = Environment(parent=env)
-                            current = [res, item]
-                            item_env.set_current(current)
-                            var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                            if var_name: item_env.set_var(var_name, current)
-                            try:
-                                res = await self.eval(n.block, item_env)
-                            except ReturnException as e:
-                                res = e.value
-                        val = res
-                    elif n.stream_type == 'Sort':
-                        if not isinstance(val, list): raise EvaluatorError("Sort stream requires a list")
-                        import copy
-                        key_block = n.block
-                        descending = False
-                        if key_block.pipelines:
-                            last_pipeline = key_block.pipelines[-1]
-                            if last_pipeline.nodes and isinstance(last_pipeline.nodes[-1], UnaryOpNode) and last_pipeline.nodes[-1].operator == '-':
-                                descending = True
-                                key_block = copy.deepcopy(n.block)
-                                key_block.pipelines[-1].nodes[-1] = key_block.pipelines[-1].nodes[-1].right
-                        decorated = []
-                        for item in val:
-                            item_env = Environment(parent=env)
-                            item_env.set_current(item)
-                            var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                            if var_name: item_env.set_var(var_name, item)
-                            try:
-                                key = await self.eval(key_block, item_env)
-                                decorated.append((key, item))
-                            except ReturnException as e:
-                                decorated.append((e.value, item))
-                        try:
-                            decorated.sort(key=lambda x: x[0], reverse=descending)
-                        except TypeError as exc:
-                            raise EvaluatorError(f"Sort keys are not mutually comparable: {exc}")
-                        val = [item for key, item in decorated]
-                    elif n.stream_type == 'Group':
-                        if not isinstance(val, list): raise EvaluatorError("Group stream requires a list")
-                        grouped = {}
-                        for item in val:
-                            item_env = Environment(parent=env)
-                            item_env.set_current(item)
-                            var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                            if var_name: item_env.set_var(var_name, item)
-                            try:
-                                key = await self.eval(n.block, item_env)
-                            except ReturnException as e:
-                                key = e.value
-                            if not isinstance(key, str):
-                                raise EvaluatorError("Group block must return Str")
-                            if key not in grouped: grouped[key] = []
-                            grouped[key].append(item)
-                        val = grouped
-                    elif n.stream_type == 'Fork':
-                        results = []
-                        var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                        for pipeline in n.block.pipelines:
-                            fork_env = Environment(parent=env)
-                            fork_env.set_current(val)
-                            if var_name:
-                                fork_env.set_var(var_name, val)
-                            results.append(await self.eval(pipeline, fork_env))
-                        val = results
-                    elif n.stream_type == 'Update':
-                        if not isinstance(val, dict): raise EvaluatorError("Update stream requires a dictionary")
-                        new_dict = dict(val)
-                        var_name = n.var_names[0].lstrip('@') if n.var_names else ''
-                        for statement in n.block.pipelines:
-                            if not isinstance(statement, Pipeline) or len(statement.nodes) < 2:
-                                raise EvaluatorError("Update statement must be 'value >> @::field'")
+            input_value = val
+            if isinstance(n, StreamBlockNode):
+                val = await self._eval_stream_block(n, val, env)
+            else:
+                val = await self.eval(n, env)
 
-                            target_node = statement.nodes[-1]
-                            if isinstance(target_node, BindNode):
-                                target_node = target_node.target
-                            is_field_target = isinstance(target_node, IndexAccessNode)
-                            is_implicit_target = is_field_target and isinstance(target_node.target, ImplicitVariableNode)
-                            is_named_target = is_field_target and isinstance(target_node.target, VariableNode) and target_node.target.name == var_name
-                            if not (
-                                is_field_target
-                                and (is_implicit_target or is_named_target)
-                                and isinstance(target_node.index, LiteralNode)
-                                and isinstance(target_node.index.value, str)
-                            ):
-                                raise EvaluatorError("Update target must be @::field or the block value name followed by ::field")
-
-                            value_pipeline = Pipeline(
-                                statement.line,
-                                statement.column,
-                                statement.nodes[:-1],
-                                statement.ops[:-1],
-                            )
-                            update_env = Environment(parent=env)
-                            update_env.set_current(new_dict)
-                            if var_name:
-                                update_env.set_var(var_name, new_dict)
-                            res = await self.eval(value_pipeline, update_env)
-                            key = target_node.index.value
-                            new_dict[key] = res
-                        val = new_dict
-                    else:
-                        raise EvaluatorError(f"Unknown stream block type {n.stream_type}")
-                else:
-                    val = await self.eval(n, env)
-
-                env.set_current(val)
-                self.trace_pipeline_value(n, val, input_value)
-                i += 1
-            except Exception as e:
-                raise e
-
-        return val
-    async def eval_BlockNode(self, node: BlockNode, env: Environment):
-        val = env.get_current()
-        for pipeline in node.pipelines:
-            val = await self.eval(pipeline, env)
             env.set_current(val)
+            self.trace_pipeline_value(n, val, input_value)
+
         return val
+
+    async def _eval_stream_block(self, n: StreamBlockNode, val: Any, env: Environment) -> Any:
+        if n.stream_type == "Map":
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", "Map stream requires a list")
+            mapped = []
+            for item_index, item in enumerate(val, start=1):
+                self.trace_pipeline_value(n, item, progress=f"{item_index} / {len(val)}")
+                item_env = Environment(parent=env)
+                item_env.set_current(item)
+                _bind_aliases(item_env, n.var_names, item)
+                mapped.append(await self.eval(n.block, item_env))
+            return mapped
+
+        if n.stream_type == "Filter":
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", "Filter stream requires a list")
+            filtered = []
+            for item in val:
+                item_env = Environment(parent=env)
+                item_env.set_current(item)
+                _bind_aliases(item_env, n.var_names, item)
+                res = await self.eval(n.block, item_env)
+                if not isinstance(res, bool):
+                    raise PopCornError("TypeError", "Filter block must return Bool")
+                if res:
+                    filtered.append(item)
+            return filtered
+
+        if n.stream_type == "Reduce":
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", "Reduce stream requires a list")
+            if n.init_expr is not None:
+                init_env = Environment(parent=env)
+                init_env.set_current(val)
+                acc = await self.eval(n.init_expr, init_env)
+                items = val
+            else:
+                if len(val) == 0:
+                    raise PopCornError("RuntimeError", "Reduce stream requires non-empty list")
+                acc = val[0]
+                items = val[1:]
+            for item in items:
+                item_env = Environment(parent=env)
+                pair = (acc, item)
+                item_env.set_current(pair)
+                _bind_aliases(item_env, n.var_names, pair)
+                acc = await self.eval(n.block, item_env)
+            return acc
+
+        if n.stream_type in ("Sort", "SortDesc"):
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", f"{n.stream_type} stream requires a list")
+            descending = n.stream_type == "SortDesc"
+            decorated = []
+            keys = []
+            for item in val:
+                item_env = Environment(parent=env)
+                item_env.set_current(item)
+                _bind_aliases(item_env, n.var_names, item)
+                key = await self.eval(n.block, item_env)
+                keys.append(key)
+                decorated.append((key, item))
+            _validate_sort_keys(keys)
+            decorated.sort(key=lambda x: x[0], reverse=descending)
+            return [item for _, item in decorated]
+
+        if n.stream_type == "Group":
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", "Group stream requires a list")
+            grouped = {}
+            for item in val:
+                item_env = Environment(parent=env)
+                item_env.set_current(item)
+                _bind_aliases(item_env, n.var_names, item)
+                key = await self.eval(n.block, item_env)
+                if not isinstance(key, str):
+                    raise PopCornError("TypeError", "Group block must return Str")
+                if key not in grouped:
+                    grouped[key] = []
+                grouped[key].append(item)
+            return grouped
+
+        if n.stream_type == "Fork":
+            if n.labeled_entries is not None:
+                labeled_results = {}
+                for entry in n.labeled_entries:
+                    fork_env = Environment(parent=env)
+                    fork_env.set_current(val)
+                    _bind_aliases(fork_env, n.var_names, val)
+                    labeled_results[entry.label] = await self.eval(entry.statement, fork_env)
+                return labeled_results
+            results = []
+            for pipeline in n.block.pipelines:
+                fork_env = Environment(parent=env)
+                fork_env.set_current(val)
+                _bind_aliases(fork_env, n.var_names, val)
+                results.append(await self.eval(pipeline, fork_env))
+            return results
+
+        if n.stream_type == "Update":
+            if not isinstance(val, dict):
+                raise PopCornError("TypeError", "Update stream requires a dictionary")
+            if len(n.var_names) > 1:
+                raise PopCornError("TypeError", "Update alias cannot destructure a Dict")
+            new_dict = dict(val)
+            var_name = n.var_names[0] if n.var_names else ""
+            for statement in n.block.pipelines:
+                if not isinstance(statement, Pipeline) or len(statement.nodes) < 2:
+                    raise PopCornError(
+                        "RuntimeError", "Update statement must be 'value >> @::field'"
+                    )
+
+                target_node = statement.nodes[-1]
+                if isinstance(target_node, BindNode):
+                    target_node = target_node.target
+                is_field_target = isinstance(target_node, IndexAccessNode)
+                is_implicit_target = is_field_target and isinstance(
+                    target_node.target, ImplicitVariableNode
+                )
+                is_named_target = (
+                    is_field_target
+                    and isinstance(target_node.target, VariableNode)
+                    and bool(var_name)
+                    and target_node.target.name == var_name
+                )
+                if not (
+                    is_field_target
+                    and (is_implicit_target or is_named_target)
+                    and isinstance(target_node.index, LiteralNode)
+                    and isinstance(target_node.index.value, str)
+                ):
+                    raise PopCornError(
+                        "RuntimeError",
+                        "Update target must be @::field or the block value name followed by ::field",
+                    )
+
+                value_pipeline = Pipeline(
+                    statement.line,
+                    statement.column,
+                    statement.nodes[:-1],
+                    statement.ops[:-1],
+                )
+                update_env = Environment(parent=env)
+                update_env.set_current(new_dict)
+                if var_name:
+                    update_env.set_var(var_name, new_dict)
+                res = await self.eval(value_pipeline, update_env)
+                new_dict[target_node.index.value] = res
+            return new_dict
+
+        raise PopCornError("RuntimeError", f"Unknown stream block type {n.stream_type}")
+
+    async def eval_BlockNode(self, node: BlockNode, env: Environment):
+        block_input = env.get_current()
+        result = block_input
+        for pipeline in node.pipelines:
+            env.set_current(block_input)
+            result = await self.eval(pipeline, env)
+        env.set_current(result)
+        return result
 
     async def eval_DictNode(self, node: DictNode, env: Environment):
         result = {}
+        saved_current = env.get_current()
         for k, v in zip(node.keys, node.values):
+            env.set_current(saved_current)
             result[k] = await self.eval(v, env)
         return result
 
     async def eval_LiteralNode(self, node: LiteralNode, env: Environment):
         if isinstance(node.value, list):
-            return [await self.eval(item, env) if isinstance(item, ASTNode) else item for item in node.value]
+            saved_current = env.get_current()
+            items = []
+            for item in node.value:
+                env.set_current(saved_current)
+                items.append(await self.eval(item, env) if isinstance(item, ASTNode) else item)
+            return items
+        if type(node.value) is int:
+            return _check_int64(node.value)
+        if type(node.value) is float:
+            return _check_finite(node.value)
         return node.value
 
     async def eval_UnaryOpNode(self, node: UnaryOpNode, env: Environment):
-        right = await self.eval(node.right, env)
-        if node.operator == '-':
+        if node.operator == "-":
+            if isinstance(node.right, LiteralNode) and type(node.right.value) is int:
+                return _check_int64(-node.right.value)
+            right = await self.eval(node.right, env)
             if _is_number(right):
-                return -right
-            raise EvaluatorError(f"Cannot negate non-number: {type(right)}")
-        elif node.operator == 'not':
+                return _check_number_result(-right)
+            raise PopCornError(
+                "TypeError", f"Cannot negate non-number: {popcorn_type_name(right)}"
+            )
+        if node.operator == "not":
+            right = await self.eval(node.right, env)
             if not isinstance(right, bool):
-                raise EvaluatorError("not requires Bool")
+                raise PopCornError("TypeError", "not requires Bool")
             return not right
-        raise EvaluatorError(f"Unknown unary operator: {node.operator}")
+        raise PopCornError("RuntimeError", f"Unknown unary operator: {node.operator}")
 
     async def eval_VariableNode(self, node: VariableNode, env: Environment):
         try:
@@ -297,174 +468,217 @@ class Evaluator:
             raise PopCornError("NameError", f"Variable '{node.name}' is not defined.")
 
     async def eval_ImplicitVariableNode(self, node: ImplicitVariableNode, env: Environment):
-        if node.name != '@':
-            var_name = node.name.lstrip('@')
-            try:
-                return env.get_var(var_name)
-            except Exception:
-                pass
         return env.get_current()
 
     async def eval_ExpressionNode(self, node: ExpressionNode, env: Environment):
         left = await self.eval(node.left, env)
         op = node.operator
-        if op == 'and':
-            if not isinstance(left, bool): raise EvaluatorError("and requires Bool operands")
-            if not left: return False
+        if op == "and":
+            if not isinstance(left, bool):
+                raise PopCornError("TypeError", "and requires Bool operands")
+            if not left:
+                return False
             right = await self.eval(node.right, env)
-            if not isinstance(right, bool): raise EvaluatorError("and requires Bool operands")
+            if not isinstance(right, bool):
+                raise PopCornError("TypeError", "and requires Bool operands")
             return right
-        if op == 'or':
-            if not isinstance(left, bool): raise EvaluatorError("or requires Bool operands")
-            if left: return True
+        if op == "or":
+            if not isinstance(left, bool):
+                raise PopCornError("TypeError", "or requires Bool operands")
+            if left:
+                return True
             right = await self.eval(node.right, env)
-            if not isinstance(right, bool): raise EvaluatorError("or requires Bool operands")
+            if not isinstance(right, bool):
+                raise PopCornError("TypeError", "or requires Bool operands")
             return right
+
         right = await self.eval(node.right, env)
-        if op == '+':
-            if _is_number(left) and _is_number(right): return left + right
-            if isinstance(left, str) and isinstance(right, str): return left + right
-            if isinstance(left, list) and isinstance(right, list): return left + right
-            raise PopCornError("TypeError", "+ requires numbers, two Str values, or two List values")
-        if op == '-':
-            if _is_number(left) and _is_number(right): return left - right
+        if op == "+":
+            if _is_number(left) and _is_number(right):
+                return _check_number_result(left + right)
+            if isinstance(left, str) and isinstance(right, str):
+                return left + right
+            if isinstance(left, list) and isinstance(right, list):
+                return left + right
+            raise PopCornError(
+                "TypeError", "+ requires numbers, two Str values, or two List values"
+            )
+        if op == "-":
+            if _is_number(left) and _is_number(right):
+                return _check_number_result(left - right)
             raise PopCornError("TypeError", "- requires numbers")
-        if op == '*':
-            if _is_number(left) and _is_number(right): return left * right
+        if op == "*":
+            if _is_number(left) and _is_number(right):
+                return _check_number_result(left * right)
             raise PopCornError("TypeError", "* requires numbers")
-        if op == '/':
+        if op == "/":
             if not (_is_number(left) and _is_number(right)):
                 raise PopCornError("TypeError", "/ requires numbers")
-            if right == 0: raise EvaluatorError("Division by zero")
-            return left / right
-        if op == '%':
+            if right == 0:
+                raise PopCornError("RuntimeError", "Division by zero")
+            return _check_finite(float(left) / float(right))
+        if op == "%":
             if not (_is_number(left) and _is_number(right)):
                 raise PopCornError("TypeError", "% requires numbers")
-            if right == 0: raise EvaluatorError("Modulo by zero")
-            return left % right
-        if op in ('>', '<', '>=', '<='):
+            if right == 0:
+                raise PopCornError("RuntimeError", "Modulo by zero")
+            return _check_number_result(left % right)
+        if op in (">", "<", ">=", "<="):
             comparable = (_is_number(left) and _is_number(right)) or (
                 isinstance(left, str) and isinstance(right, str)
             )
             if not comparable:
                 raise PopCornError("TypeError", f"{op} requires two numbers or two Str values")
-            if op == '>': return left > right
-            if op == '<': return left < right
-            if op == '>=': return left >= right
+            if op == ">":
+                return left > right
+            if op == "<":
+                return left < right
+            if op == ">=":
+                return left >= right
             return left <= right
-        if op == '==': return _values_equal(left, right)
-        if op == '!=': return not _values_equal(left, right)
-        raise EvaluatorError(f"Unknown operator {op}")
+        if op == "==":
+            return _values_equal(left, right)
+        if op == "!=":
+            return not _values_equal(left, right)
+        if op == "in":
+            return _contains_value(right, left)
+        raise PopCornError("RuntimeError", f"Unknown operator {op}")
 
     async def eval_FunctionCallNode(self, node: FunctionCallNode, env: Environment):
         name = node.name
-        if hasattr(node, 'args') and node.args:
-            if len(node.args) == 1:
-                current = await self.eval(node.args[0], env)
-            else:
-                arg_vals = []
-                for a in node.args:
-                    arg_vals.append(await self.eval(a, env))
-                current = arg_vals
+        left_val = env.get_current()
+
+        if node.args:
+            extra_vals = []
+            for arg_node in node.args:
+                arg_env = Environment(parent=env)
+                arg_env.set_current(left_val)
+                extra_vals.append(await self.eval(arg_node, arg_env))
+            current: Any = (left_val, *extra_vals)
         else:
-            current = env.get_current()
+            current = left_val
 
         # 1. User-defined functions
         function_entry = env.get_function(name)
         if function_entry:
-            func_def, defining_env = function_entry
-            new_env = Environment(parent=defining_env)
-            new_env.function_scope = True
-            if len(func_def.params) == 1:
-                new_env.set_var(func_def.params[0].name, current)
-            elif len(func_def.params) > 1:
-                if not isinstance(current, list) or len(current) != len(func_def.params):
+            func_def, captured_vars, owner_env = function_entry
+            closure_env = Environment()
+            closure_env.variables = (
+                dict(captured_vars)
+                if captured_vars is not None
+                else dict(owner_env.variables)
+            )
+            closure_env.functions = owner_env.functions
+
+            call_env = Environment(parent=closure_env)
+            call_env.function_scope = True
+            call_env.set_current(current)
+
+            n_params = len(func_def.params)
+            if n_params == 1:
+                if isinstance(current, tuple):
                     raise PopCornError(
-                        "TypeError",
-                        f"Function '{name}' expects {len(func_def.params)} values"
+                        "RuntimeError",
+                        f"Function '{name}' expects 1 value, got {len(current)}",
                     )
-                for i, param in enumerate(func_def.params):
-                    new_env.set_var(param.name, current[i])
+                call_env.set_var(func_def.params[0].name, current)
+            elif n_params > 1:
+                if not isinstance(current, tuple):
+                    raise PopCornError(
+                        "RuntimeError",
+                        f"Function '{name}' expects {n_params} values, got 1",
+                    )
+                if len(current) != n_params:
+                    raise PopCornError(
+                        "RuntimeError",
+                        f"Function '{name}' expects {n_params} values, got {len(current)}",
+                    )
+                for param, arg_val in zip(func_def.params, current):
+                    call_env.set_var(param.name, arg_val)
+
             try:
-                return await self.eval_BlockNode(func_def.block, new_env)
+                return await self.eval_BlockNode(func_def.block, call_env)
             except ReturnException as exc:
                 return exc.value
 
         # 2. Built-in functions
         from .pop_builtins import BUILTIN_REGISTRY
+
         if name in BUILTIN_REGISTRY:
-            import inspect
             res = BUILTIN_REGISTRY[name](current, env, self)
             if inspect.iscoroutine(res):
                 res = await res
             return res
 
-        # Fallback for capitalized variables (parsed as FunctionCallNode with no args)
-        if not hasattr(node, 'args') or not node.args:
-            try:
-                return env.get_var(name)
-            except Exception:
-                pass
-
         raise PopCornError("NameError", f"Function '{name}' is not defined.")
 
     async def eval_ArgumentListNode(self, node: ArgumentListNode, env: Environment):
         res = []
+        saved_current = env.get_current()
         for item in node.items:
             item_env = Environment(parent=env)
-            item_env.set_current(env.get_current())
+            item_env.set_current(saved_current)
             res.append(await self.eval(item, item_env))
-        return res
+        return tuple(res)
 
     async def eval_IndexAccessNode(self, node: IndexAccessNode, env: Environment):
         target = await self.eval(node.target, env)
         idx = await self.eval(node.index, env)
-        try:
+
+        if isinstance(target, (list, tuple)):
+            if not _is_int(idx):
+                raise PopCornError("TypeError", "List indices must be Int")
+            if idx < 0 or idx >= len(target):
+                raise PopCornError("IndexError", f"Index {idx} out of bounds")
             return target[idx]
-        except KeyError:
-            raise PopCornError("KeyError", f"Key '{idx}' is not defined")
-        except (IndexError, TypeError) as e:
-            raise PopCornError("IndexError", f"Cannot access index/key '{idx}' on {target}: {e}")
+
+        if isinstance(target, dict):
+            if not isinstance(idx, str):
+                raise PopCornError("TypeError", "Dict keys must be Str")
+            if idx not in target:
+                raise PopCornError("KeyError", f"Key '{idx}' is not defined")
+            return target[idx]
+
+        raise PopCornError(
+            "TypeError",
+            f"Cannot access index/key '{idx}' on {popcorn_type_name(target)}",
+        )
 
     async def eval_BindNode(self, node: BindNode, env: Environment):
         val = env.get_current()
         if isinstance(node.target, IndexAccessNode):
-            raise EvaluatorError("Collection assignment is not supported; use Set or Update")
-        elif isinstance(node.target, VariableNode):
+            raise PopCornError(
+                "RuntimeError", "Collection assignment is not supported; use Set or Update"
+            )
+        if isinstance(node.target, VariableNode):
             env.set_var(node.target.name, val)
             return val
-        else:
-            raise EvaluatorError(f"Invalid bind target {node.target}")
+        raise PopCornError("RuntimeError", f"Invalid bind target {node.target}")
 
     async def eval_CheckBlock(self, node: CheckBlock, env: Environment):
         val = env.get_current()
+        aliases = node.alias_names or ([node.alias] if node.alias else [])
         for branch in node.branches:
-            if branch.condition is None: # else branch
-                branch_env = Environment(parent=env)
-                branch_env.set_current(val)
-                if node.alias: branch_env.set_var(node.alias, val)
-                return await self.eval(branch.block, branch_env)
             branch_env = Environment(parent=env)
             branch_env.set_current(val)
-            if node.alias: branch_env.set_var(node.alias, val)
-            cond_result = await self.eval(branch.condition, branch_env)
-            if branch.mode == 'candidates':
-                is_match = any(_values_equal(val, candidate) for candidate in cond_result)
-            else:
-                if not isinstance(cond_result, bool):
-                    raise EvaluatorError("Check predicate must return Bool")
-                is_match = cond_result
-            if is_match:
+            _bind_aliases(branch_env, aliases, val)
+            if branch.condition is None:
                 return await self.eval(branch.block, branch_env)
-        raise EvaluatorError("Check requires an else branch")
+            cond_result = await self.eval(branch.condition, branch_env)
+            if not isinstance(cond_result, bool):
+                raise PopCornError("TypeError", "Check predicate must return Bool")
+            if cond_result:
+                return await self.eval(branch.block, branch_env)
+        raise PopCornError("RuntimeError", "Check requires an else branch")
 
     async def eval_LoopBlock(self, node: LoopBlock, env: Environment):
         val = env.get_current()
+        aliases = node.alias_names or ([node.alias] if node.alias else [])
         while True:
             loop_env = Environment(parent=env)
             loop_env.loop_scope = True
             loop_env.set_current(val)
-            if node.alias: loop_env.set_var(node.alias, val)
+            _bind_aliases(loop_env, aliases, val)
             try:
                 val = await self.eval(node.block, loop_env)
             except BreakException as e:
@@ -472,15 +686,32 @@ class Evaluator:
                 break
         return val
 
+    async def eval_TryCatchBlock(self, node: TryCatchBlock, env: Environment):
+        val = env.get_current()
+        try_env = Environment(parent=env)
+        try_env.set_current(val)
+        _bind_aliases(try_env, node.try_alias_names, val)
+        try:
+            return await self.eval(node.try_block, try_env)
+        except PopCornError as exc:
+            err_dict = {"type": exc.err_type, "message": exc.message}
+        except EvaluatorError as exc:
+            err_dict = {"type": "RuntimeError", "message": str(exc)}
+        except OSError as exc:
+            err_dict = {"type": "IOError", "message": str(exc)}
+
+        catch_env = Environment(parent=env)
+        catch_env.set_current(err_dict)
+        _bind_aliases(catch_env, node.catch_alias_names, err_dict)
+        return await self.eval(node.catch_block, catch_env)
+
     async def eval_BreakNode(self, node: BreakNode, env: Environment):
         scope = env
         while scope:
             if scope.loop_scope:
                 raise BreakException(env.get_current())
             scope = scope.parent
-        raise EvaluatorError("Break can only be used inside Loop")
-
-
+        raise PopCornError("RuntimeError", "Break can only be used inside Loop")
 
     async def eval_ReturnNode(self, node: ReturnNode, env: Environment):
         scope = env
@@ -489,30 +720,33 @@ class Evaluator:
                 break
             scope = scope.parent
         if not scope:
-            raise EvaluatorError("Return can only be used inside a new function")
-        val = env.get_current()
-        raise ReturnException(val)
+            raise PopCornError("RuntimeError", "Return can only be used inside a new function")
+        raise ReturnException(env.get_current())
 
     async def eval_DestructuringBindNode(self, node: DestructuringBindNode, env: Environment):
         val = env.get_current()
-        if not isinstance(val, list):
-            raise EvaluatorError("Destructuring bind requires a parenthesized value list")
+        if not isinstance(val, (tuple, list)):
+            raise PopCornError("TypeError", "Destructuring bind requires a Tuple or List")
         if len(val) != len(node.targets):
-            raise EvaluatorError(
-                f"Destructuring bind expects {len(node.targets)} values, got {len(val)}"
+            raise PopCornError(
+                "RuntimeError",
+                f"Destructuring bind expects {len(node.targets)} values, got {len(val)}",
             )
-        for i, target in enumerate(node.targets):
-            env.set_var(target, val[i])
+        for target, item in zip(node.targets, val):
+            env.set_var(target, item)
         return val
 
-    async def eval_InterpolatedStringNode(self, node: InterpolatedStringNode, env: Environment):
-        res = ""
+    async def eval_InterpolatedStringNode(
+        self, node: InterpolatedStringNode, env: Environment
+    ):
+        res = []
         saved_current = env.get_current()
         for part in node.parts:
             if isinstance(part, str):
-                res += part
+                res.append(part)
             else:
                 interp_env = Environment(parent=env)
                 interp_env.set_current(saved_current)
-                res += str(await self.eval(part, interp_env))
-        return res
+                evaluated = await self.eval(part, interp_env)
+                res.append(format_popcorn_str(evaluated))
+        return "".join(res)

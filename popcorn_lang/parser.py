@@ -1,10 +1,15 @@
 ﻿from typing import List, Optional
-from .lexer import Token, Lexer
-from .language_meta import STREAM_BLOCKS
+from .lexer import Lexer, Token
+from .language_meta import KEYWORDS
 from .ast_nodes import *
+
+_KEYWORD_TOKEN_TYPES = {kw.upper() for kw in KEYWORDS}
+_SIMPLE_STREAM_NAMES = {"Map", "Filter", "Sort", "SortDesc", "Group"}
+
 
 class ParseError(Exception):
     pass
+
 
 class Parser:
     def __init__(self, tokens: List[Token]):
@@ -16,9 +21,9 @@ class Parser:
             return self.tokens[self.pos]
         return None
 
-    def peek(self) -> Optional[Token]:
-        if self.pos + 1 < len(self.tokens):
-            return self.tokens[self.pos + 1]
+    def peek(self, offset: int = 1) -> Optional[Token]:
+        if self.pos + offset < len(self.tokens):
+            return self.tokens[self.pos + offset]
         return None
 
     def advance(self):
@@ -36,484 +41,624 @@ class Parser:
         if curr and curr.type == token_type:
             self.advance()
             return curr
-        raise ParseError(f"Expected {token_type}, but got {curr.type if curr else 'EOF'} at line {curr.line if curr else 'EOF'}")
+        loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
+        raise ParseError(
+            f"Expected {token_type}, but got {curr.type if curr else 'EOF'} {loc}"
+        )
 
     def parse(self) -> Program:
         statements = []
         while self.current():
-            statements.append(self.parse_statement())
+            statements.append(self.parse_top_level_statement())
         line = statements[0].line if statements else 1
-        col = statements[0].column if statements else 0
+        col = statements[0].column if statements else 1
         return Program(line, col, statements)
 
     def _is_function_def(self) -> bool:
         curr = self.current()
-        if not curr: return False
-        if curr.type == 'NEW':
+        if not curr:
+            return False
+        if curr.type == "NEW":
             return True
-        if curr.type == 'LPAREN':
+        if curr.type == "LPAREN":
             p = self.pos + 1
             paren_depth = 1
             while p < len(self.tokens):
                 tok = self.tokens[p]
-                if tok.type == 'LPAREN':
+                if tok.type == "LPAREN":
                     paren_depth += 1
-                elif tok.type == 'RPAREN':
+                elif tok.type == "RPAREN":
                     paren_depth -= 1
                     if paren_depth == 0:
-                        if p + 2 < len(self.tokens):
-                            if self.tokens[p+1].type == 'STREAM_OP' and self.tokens[p+2].type == 'NEW':
-                                return True
+                        if (
+                            p + 2 < len(self.tokens)
+                            and self.tokens[p + 1].type == "STREAM_OP"
+                            and self.tokens[p + 2].type == "NEW"
+                        ):
+                            return True
                         return False
                 p += 1
         return False
 
-    def _is_implicit_target(self, node):
-        """Check if the root target of an IndexAccessNode is an ImplicitVariableNode."""
-        if isinstance(node, ImplicitVariableNode):
-            return True
-        if isinstance(node, IndexAccessNode):
-            return self._is_implicit_target(node.target)
-        return False
-
-    def _expect_dot_or_block_end(self, pipeline: Pipeline):
-        if self.current() and self.current().type == 'DOT':
+    def _expect_dot_or_block_end(self, pipeline: Pipeline) -> bool:
+        if self.current() and self.current().type == "DOT":
             self.advance()
             return True
 
-        if hasattr(pipeline, 'nodes') and len(pipeline.nodes) > 0:
+        if pipeline.nodes:
             last_node = pipeline.nodes[-1]
-            if isinstance(last_node, (CheckBlock, LoopBlock, StreamBlockNode, FunctionDefNode)):
+            if isinstance(
+                last_node,
+                (CheckBlock, LoopBlock, StreamBlockNode, TryCatchBlock, FunctionDefNode),
+            ):
                 return True
-                
+
         return False
 
-    def parse_statement(self) -> ASTNode:
+    def parse_top_level_statement(self) -> ASTNode:
         if self._is_function_def():
             return self.parse_function_def()
-        
-        # Otherwise, it's a pipeline
+        return self.parse_statement()
+
+    def parse_statement(self) -> Pipeline:
+        if self._is_function_def():
+            curr = self.current()
+            raise ParseError(
+                f"Function definitions are only allowed at top level at line {curr.line}, column {curr.column}"
+            )
         pipeline = self.parse_pipeline()
         if not self._expect_dot_or_block_end(pipeline):
-            self.expect('DOT')
+            self.expect("DOT")
         return pipeline
 
     def parse_block(self, end_tokens) -> BlockNode:
         pipelines = []
         curr = self.current()
         line = curr.line if curr else 1
-        col = curr.column if curr else 0
+        col = curr.column if curr else 1
         while self.current() and self.current().type not in end_tokens:
-            pipeline = self.parse_pipeline()
-            if not self._expect_dot_or_block_end(pipeline):
-                self.expect('DOT')
-            pipelines.append(pipeline)
+            pipelines.append(self.parse_statement())
         return BlockNode(line, col, pipelines)
+
+    def _parse_optional_alias_clause(self) -> List[str]:
+        if not self.match("AS"):
+            return []
+        curr = self.current()
+        if not curr:
+            raise ParseError("Expected alias name after 'as' at EOF")
+        if curr.type == "VARIABLE":
+            self.advance()
+            return [curr.value]
+        if curr.type == "LPAREN":
+            self.advance()
+            names: List[str] = []
+            first = self.current()
+            if not first or first.type != "VARIABLE":
+                loc = f"at line {first.line}, column {first.column}" if first else "at EOF"
+                raise ParseError(f"Expected lowercase variable name in alias {loc}")
+            names.append(first.value)
+            self.advance()
+            if not self.match("COMMA"):
+                nxt = self.current()
+                loc = f"at line {nxt.line}, column {nxt.column}" if nxt else "at EOF"
+                raise ParseError(
+                    f"Destructuring alias requires at least two variable names {loc}"
+                )
+            while True:
+                tok = self.current()
+                if not tok or tok.type != "VARIABLE":
+                    loc = f"at line {tok.line}, column {tok.column}" if tok else "at EOF"
+                    raise ParseError(f"Expected lowercase variable name in alias {loc}")
+                names.append(tok.value)
+                self.advance()
+                if not self.match("COMMA"):
+                    break
+            self.expect("RPAREN")
+            return names
+        raise ParseError(
+            f"Expected alias variable name or '(a, b)' after 'as', got {curr.type} at line {curr.line}, column {curr.column}"
+        )
+
+    def _parse_stream_block_or_call(self) -> ASTNode:
+        curr = self.current()
+        line, col = curr.line, curr.column
+        name = curr.value
+
+        # SimpleStreamBlock: Map | Filter | Sort | SortDesc | Group
+        if name in _SIMPLE_STREAM_NAMES:
+            self.advance()
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            return StreamBlockNode(line, col, name, alias_names, block)
+
+        if name == "Loop":
+            self.advance()
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            single_alias = alias_names[0] if len(alias_names) == 1 else None
+            return LoopBlock(line, col, block, single_alias, alias_names)
+
+        if name == "Reduce":
+            self.advance()
+            init_expr = None
+            if self.match("LPAREN"):
+                init_expr = self.parse_expression()
+                self.expect("RPAREN")
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            return StreamBlockNode(line, col, "Reduce", alias_names, block, init_expr=init_expr)
+
+        if name == "Fork":
+            self.advance()
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            if self.current() and self.current().type == "BLOCK_CLOSE":
+                raise ParseError(
+                    f"Fork requires at least one branch at line {line}, column {col}"
+                )
+            is_labeled = (
+                self.current() is not None
+                and self.current().type == "VARIABLE"
+                and self.peek() is not None
+                and self.peek().type == "COLON"
+            )
+            if is_labeled:
+                entries: List[ForkEntryNode] = []
+                while self.current() and self.current().type != "BLOCK_CLOSE":
+                    tok = self.current()
+                    if not (
+                        tok.type == "VARIABLE"
+                        and self.peek() is not None
+                        and self.peek().type == "COLON"
+                    ):
+                        raise ParseError(
+                            f"Cannot mix labeled and unlabeled branches in Fork at line {tok.line}, column {tok.column}"
+                        )
+                    label = tok.value
+                    entry_line, entry_col = tok.line, tok.column
+                    self.advance()  # label
+                    self.advance()  # ':'
+                    stmt = self.parse_statement()
+                    entries.append(ForkEntryNode(entry_line, entry_col, label, stmt))
+                self.expect("BLOCK_CLOSE")
+                return StreamBlockNode(
+                    line,
+                    col,
+                    "Fork",
+                    alias_names,
+                    BlockNode(line, col, []),
+                    labeled_entries=entries,
+                )
+            else:
+                pipelines: List[Pipeline] = []
+                while self.current() and self.current().type != "BLOCK_CLOSE":
+                    tok = self.current()
+                    if (
+                        tok.type == "VARIABLE"
+                        and self.peek() is not None
+                        and self.peek().type == "COLON"
+                    ):
+                        raise ParseError(
+                            f"Cannot mix labeled and unlabeled branches in Fork at line {tok.line}, column {tok.column}"
+                        )
+                    pipelines.append(self.parse_statement())
+                self.expect("BLOCK_CLOSE")
+                return StreamBlockNode(
+                    line, col, "Fork", alias_names, BlockNode(line, col, pipelines)
+                )
+
+        if name == "Update":
+            self.advance()
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            return StreamBlockNode(line, col, "Update", alias_names, block)
+
+        if name == "Check":
+            self.advance()
+            alias_names = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            branches: List[Branch] = []
+            while self.current() and self.current().type == "WHEN":
+                w_tok = self.current()
+                self.advance()
+                cond = self.parse_expression()
+                self.expect("COLON")
+                block = self.parse_block({"WHEN", "ELSE", "BLOCK_CLOSE"})
+                branches.append(Branch(w_tok.line, w_tok.column, cond, block, "predicate"))
+            if not branches:
+                raise ParseError(
+                    f"Check requires at least one 'when' branch at line {line}, column {col}"
+                )
+            if not self.current() or self.current().type != "ELSE":
+                raise ParseError(
+                    f"Check requires a final else branch at line {line}, column {col}"
+                )
+            e_tok = self.current()
+            self.advance()
+            self.expect("COLON")
+            else_block = self.parse_block({"BLOCK_CLOSE"})
+            branches.append(Branch(e_tok.line, e_tok.column, None, else_block, "else"))
+            self.expect("BLOCK_CLOSE")
+            single_alias = alias_names[0] if len(alias_names) == 1 else None
+            return CheckBlock(line, col, branches, single_alias, alias_names)
+
+        if name == "Try":
+            self.advance()
+            try_aliases = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            try_block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            catch_tok = self.current()
+            if not catch_tok or catch_tok.type != "VERB" or catch_tok.value != "Catch":
+                loc = (
+                    f"at line {catch_tok.line}, column {catch_tok.column}"
+                    if catch_tok
+                    else "at EOF"
+                )
+                raise ParseError(f"Try requires a matching Catch block {loc}")
+            self.advance()
+            catch_aliases = self._parse_optional_alias_clause()
+            self.expect("BLOCK_OPEN")
+            catch_block = self.parse_block({"BLOCK_CLOSE"})
+            self.expect("BLOCK_CLOSE")
+            return TryCatchBlock(
+                line, col, try_block, catch_block, try_aliases, catch_aliases
+            )
+
+        if name == "Catch":
+            raise ParseError(
+                f"Catch must immediately follow a Try block at line {line}, column {col}"
+            )
+
+        if name == "Return":
+            self.advance()
+            if self.current() and self.current().type == "LPAREN":
+                raise ParseError(
+                    f"Return does not accept extra arguments at line {line}, column {col}"
+                )
+            return ReturnNode(line, col)
+
+        if name == "Break":
+            self.advance()
+            if self.current() and self.current().type == "LPAREN":
+                raise ParseError(
+                    f"Break does not accept extra arguments at line {line}, column {col}"
+                )
+            return BreakNode(line, col)
+
+        # ProcessCall = ProcessName [ "(" ArgumentList ")" ]
+        self.advance()
+        extra_args = None
+        if self.match("LPAREN"):
+            if self.current() and self.current().type == "RPAREN":
+                raise ParseError(
+                    f"Argument list cannot be empty at line {line}, column {col}"
+                )
+            extra_args = []
+            while True:
+                extra_args.append(self.parse_expression())
+                if self.match("RPAREN"):
+                    break
+                self.expect("COMMA")
+                if self.match("RPAREN"):
+                    break
+        return FunctionCallNode(line, col, name, extra_args)
 
     def parse_pipeline(self) -> Pipeline:
         curr = self.current()
+        if not curr:
+            raise ParseError("Unexpected end of input")
         line, col = curr.line, curr.column
-        
-        nodes = [self.parse_node()]
+
+        nodes = [self.parse_expression()]
         ops = []
-        
-        while self.current() and self.current().type == 'STREAM_OP':
+
+        while self.current() and self.current().type == "STREAM_OP":
             op = self.current().value
             ops.append(op)
             self.advance()
-            
-            # Check for Keyword Block (e.g. >> map:)
+
             curr = self.current()
-            if curr and curr.type == 'VERB' and curr.value in STREAM_BLOCKS:
-                # A stream block is either unnamed (`Map:`) or gives its
-                # single current value a name (`Map(value):`).
-                p = 1
-                if self.pos + p < len(self.tokens) and self.tokens[self.pos + p].type == 'LPAREN':
-                    p += 1
-                    if self.pos + p < len(self.tokens) and self.tokens[self.pos + p].type in ('VARIABLE', 'IDENTIFIER'):
-                        p += 1
-                    if self.pos + p < len(self.tokens) and self.tokens[self.pos + p].type == 'RPAREN':
-                        p += 1
+            if not curr:
+                raise ParseError("Expected pipeline stage after '>>' at EOF")
 
-                if self.pos + p < len(self.tokens) and self.tokens[self.pos + p].type == 'COLON':
-                    kw_type = curr.value
-                    kw_line, kw_col = curr.line, curr.column
-                    self.advance()
-
-                    var_names = []
-                    if self.current() and self.current().type == 'LPAREN':
-                        self.advance() # consume LPAREN
-                        if not self.current() or self.current().type not in ('VARIABLE', 'IDENTIFIER'):
-                            raise ParseError("A stream block name must be a variable")
-                        var_names.append(self.current().value)
-                        self.advance()
-                        self.expect('RPAREN')
-
-                    if not var_names:
-                        var_names = ['@']
-                    self.expect('COLON')
-                    block = self.parse_block({'END'})
-                    self.expect('END')
-                    step = StreamBlockNode(kw_line, kw_col, kw_type, var_names, block)
-                else:
-                    step = self.parse_node()
-                    if op == '>>':
-                        if isinstance(step, VariableNode):
-                            step = BindNode(step.line, step.column, step, None)
-                        elif isinstance(step, IndexAccessNode) and not self._is_implicit_target(step):
-                            step = BindNode(step.line, step.column, step, None)
-                        elif isinstance(step, ArgumentListNode) and all(isinstance(i, VariableNode) for i in step.items):
-                            step = DestructuringBindNode(step.line, step.column, [i.name for i in step.items])
+            if curr.type == "VERB":
+                step = self._parse_stream_block_or_call()
             else:
-                step = self.parse_node()
-                if op == '>>':
-                    if isinstance(step, VariableNode):
-                        step = BindNode(step.line, step.column, step, None)
-                    elif isinstance(step, IndexAccessNode) and not self._is_implicit_target(step):
-                        step = BindNode(step.line, step.column, step, None)
-                    elif isinstance(step, ArgumentListNode) and all(isinstance(i, VariableNode) for i in step.items):
-                        step = DestructuringBindNode(step.line, step.column, [i.name for i in step.items])
+                step = self.parse_expression()
+                if isinstance(step, VariableNode):
+                    step = BindNode(step.line, step.column, step, None)
+                elif isinstance(step, IndexAccessNode):
+                    step = BindNode(step.line, step.column, step, None)
+                elif isinstance(step, ArgumentListNode) and all(
+                    isinstance(item, VariableNode) for item in step.items
+                ):
+                    step = DestructuringBindNode(
+                        step.line, step.column, [item.name for item in step.items]
+                    )
             nodes.append(step)
-            
+
         return Pipeline(line, col, nodes, ops)
 
-    def parse_node(self) -> ASTNode:
-        curr = self.current()
-        line, col = curr.line, curr.column
-
-        return self.parse_expression()
-
     def parse_expression(self) -> ASTNode:
-        curr = self.current()
-        line, col = curr.line, curr.column
-
-        if curr.type == 'VERB' and curr.value == 'Check':
-            self.advance()
-            alias = self._parse_optional_block_alias()
-            self.expect('COLON')
-            branches = []
-            while self.current() and self.current().type in ('IS', 'ELSE'):
-                if self.match('IS'):
-                    cond, mode = self.parse_check_condition()
-                    self.expect('COLON')
-                    block = self.parse_block({'IS', 'ELSE', 'END'})
-                    branches.append(Branch(line, col, cond, block, mode))
-                elif self.match('ELSE'):
-                    self.expect('COLON')
-                    block = self.parse_block({'END'})
-                    branches.append(Branch(curr.line, curr.column, None, block, 'else'))
-            if not branches or branches[-1].mode != 'else':
-                raise ParseError("Check requires a final else branch")
-            self.expect('END')
-            return CheckBlock(line, col, branches, alias)
-            
-        if curr.type == 'VERB' and curr.value == 'Loop':
-            self.advance()
-            alias = self._parse_optional_block_alias()
-            self.expect('COLON')
-            block = self.parse_block({'END'})
-            self.expect('END')
-            return LoopBlock(line, col, block, alias)
-            
-        if curr.type == 'VERB' and curr.value == 'Break':
-            self.advance()
-            return BreakNode(line, col)
-
         return self.parse_or()
-
-    def _parse_optional_block_alias(self) -> Optional[str]:
-        if not self.match('LPAREN'):
-            return None
-        token = self.current()
-        if not token or token.type != 'VARIABLE':
-            raise ParseError("A block alias must be a single lowercase variable name")
-        self.advance()
-        self.expect('RPAREN')
-        return token.value
-
-    def parse_check_condition(self):
-        """Parse `is` candidates or an explicit Boolean predicate.
-
-        A bare literal sequence such as `is 1 or 2` is a candidate list.  Any
-        expression referring to `@` (or the Check alias) is a predicate and
-        must evaluate to Bool at runtime.
-        """
-        first = self.parse_and()
-        if isinstance(first, ExpressionNode):
-            # `is @ == 1 or @ == 2` remains an ordinary Boolean predicate.
-            while self.current() and self.current().type == 'OR':
-                token = self.current(); self.advance()
-                first = ExpressionNode(token.line, token.column, first, 'or', self.parse_and())
-            return first, 'predicate'
-        candidates = [first]
-        while self.current() and self.current().type == 'OR':
-            self.advance()
-            candidate = self.parse_and()
-            if isinstance(candidate, ExpressionNode):
-                raise ParseError("Check candidates must be values; use @ for a predicate")
-            candidates.append(candidate)
-        if not all(self._is_check_candidate(candidate) for candidate in candidates):
-            raise ParseError("Check candidates must be literal values")
-        return ArgumentListNode(first.line, first.column, candidates), 'candidates'
-
-    def _is_check_candidate(self, node: ASTNode) -> bool:
-        if isinstance(node, LiteralNode):
-            if isinstance(node.value, list):
-                return all(
-                    isinstance(item, Pipeline)
-                    and not item.ops
-                    and len(item.nodes) == 1
-                    and self._is_check_candidate(item.nodes[0])
-                    for item in node.value
-                )
-            return True
-        if isinstance(node, DictNode):
-            return all(
-                isinstance(value, Pipeline)
-                and not value.ops
-                and len(value.nodes) == 1
-                and self._is_check_candidate(value.nodes[0])
-                for value in node.values
-            )
-        if isinstance(node, ArgumentListNode):
-            return all(self._is_check_candidate(item) for item in node.items)
-        return (
-            isinstance(node, UnaryOpNode)
-            and node.operator == '-'
-            and isinstance(node.right, LiteralNode)
-            and type(node.right.value) in (int, float)
-        )
 
     def parse_or(self, left_node=None) -> ASTNode:
         left = self.parse_and(left_node=left_node)
-        while self.current() and (self.current().value == 'or' or self.current().type == 'OR'):
-            op = self.current().value
-            line, col = self.current().line, self.current().column
+        while self.current() and self.current().type == "OR":
+            tok = self.current()
             self.advance()
             right = self.parse_and()
-            left = ExpressionNode(line, col, left, op, right)
+            left = ExpressionNode(tok.line, tok.column, left, "or", right)
         return left
 
     def parse_and(self, left_node=None) -> ASTNode:
         left = self.parse_comp(left_node=left_node)
-        while self.current() and (self.current().value == 'and' or self.current().type == 'AND'):
-            op = self.current().value
-            line, col = self.current().line, self.current().column
+        while self.current() and self.current().type == "AND":
+            tok = self.current()
             self.advance()
             right = self.parse_comp()
-            left = ExpressionNode(line, col, left, op, right)
+            left = ExpressionNode(tok.line, tok.column, left, "and", right)
         return left
+
+    def _is_comp_token(self, tok: Optional[Token]) -> bool:
+        if not tok:
+            return False
+        if tok.type == "IN":
+            return True
+        return tok.type == "OPERATOR" and tok.value in ("==", "!=", ">", "<", ">=", "<=")
 
     def parse_comp(self, left_node=None) -> ASTNode:
         left = left_node if left_node else self.parse_additive()
-        while self.current() and self.current().type == 'OPERATOR' and self.current().value in ('==', '!=', '>', '<', '>=', '<='):
-            op = self.current().value
-            line, col = self.current().line, self.current().column
+        if self._is_comp_token(self.current()):
+            tok = self.current()
             self.advance()
             right = self.parse_additive()
-            left = ExpressionNode(line, col, left, op, right)
+            if self._is_comp_token(self.current()):
+                nxt = self.current()
+                raise ParseError(
+                    f"Comparison operator '{nxt.value}' is non-associative at line {nxt.line}, column {nxt.column}"
+                )
+            return ExpressionNode(tok.line, tok.column, left, tok.value, right)
         return left
 
     def parse_additive(self) -> ASTNode:
         left = self.parse_multiplicative()
-        while self.current() and self.current().type == 'OPERATOR' and self.current().value in ('+', '-'):
-            token = self.current(); self.advance()
-            left = ExpressionNode(token.line, token.column, left, token.value, self.parse_multiplicative())
+        while (
+            self.current()
+            and self.current().type == "OPERATOR"
+            and self.current().value in ("+", "-")
+        ):
+            token = self.current()
+            self.advance()
+            left = ExpressionNode(
+                token.line, token.column, left, token.value, self.parse_multiplicative()
+            )
         return left
 
     def parse_multiplicative(self) -> ASTNode:
-        left = self.parse_primary()
-        while self.current() and self.current().type == 'OPERATOR' and self.current().value in ('*', '/', '%'):
-            token = self.current(); self.advance()
-            left = ExpressionNode(token.line, token.column, left, token.value, self.parse_primary())
+        left = self.parse_unary()
+        while (
+            self.current()
+            and self.current().type == "OPERATOR"
+            and self.current().value in ("*", "/", "%")
+        ):
+            token = self.current()
+            self.advance()
+            left = ExpressionNode(
+                token.line, token.column, left, token.value, self.parse_unary()
+            )
         return left
+
+    def parse_unary(self) -> ASTNode:
+        curr = self.current()
+        if not curr:
+            raise ParseError("Unexpected end of input")
+        if (curr.type == "OPERATOR" and curr.value == "-") or curr.type == "NOT":
+            op = "-" if curr.type == "OPERATOR" else "not"
+            line, col = curr.line, curr.column
+            self.advance()
+            right = self.parse_unary()
+            return UnaryOpNode(line, col, op, right)
+        return self.parse_postfix()
 
     def _parse_base_primary(self) -> ASTNode:
         curr = self.current()
+        if not curr:
+            raise ParseError("Unexpected end of input")
         line, col = curr.line, curr.column
 
-        if (curr.type == 'OPERATOR' and curr.value == '-') or curr.type == 'NOT':
-            op = curr.value if curr.type == 'OPERATOR' else 'not'
-            self.advance()
-            right = self.parse_primary()
-            return UnaryOpNode(line, col, op, right)
-
-        if curr.type == 'DOUBLE_COLON':
-            # Do NOT advance. parse_primary will consume the DOUBLE_COLON
-            return ImplicitVariableNode(line, col, '@')
-
-        if curr.type == 'NUMBER':
+        if curr.type == "NUMBER":
             self.advance()
             return LiteralNode(line, col, curr.value)
-        if curr.type == 'STRING':
+
+        if curr.type == "STRING":
             self.advance()
-            val = curr.value
-            if isinstance(val, str) and ('{' in val or '}' in val):
-                parts = []
-                literal = []
-                i = 0
-                has_expr = False
-                while i < len(val):
-                    if val.startswith('{{', i):
-                        literal.append('{')
-                        i += 2
-                        continue
-                    if val.startswith('}}', i):
-                        literal.append('}')
-                        i += 2
-                        continue
-                    if val[i] == '{':
-                        j = val.find('}', i + 1)
-                        if j < 0:
-                            raise ParseError(f"Unclosed interpolation at line {line}")
-                        if literal:
-                            parts.append(''.join(literal))
-                            literal = []
-                        expr_str = val[i+1:j]
-                        from .lexer import Lexer
-                        sub_tokens = Lexer(expr_str).tokenize()
-                        if not sub_tokens:
-                            raise ParseError(f"Empty interpolation at line {line}")
-                        parts.append(Parser(sub_tokens).parse_pipeline())
-                        has_expr = True
-                        i = j + 1
-                        continue
-                    if val[i] == '}':
-                        raise ParseError(f"Unescaped }} at line {line}; use }}}} for a literal brace")
-                    literal.append(val[i])
-                    i += 1
-                if literal:
-                    parts.append(''.join(literal))
-                if has_expr:
-                    return InterpolatedStringNode(line, col, parts)
-                return LiteralNode(line, col, ''.join(part for part in parts if isinstance(part, str)))
-            return LiteralNode(line, col, val)
-        if curr.type in ('TRUE', 'FALSE', 'NULL'):
+            return LiteralNode(line, col, curr.value)
+
+        if curr.type == "INTERP_STRING":
             self.advance()
-            if curr.type == 'NULL':
+            parts = []
+            for seg in curr.value:
+                if seg[0] == "text":
+                    parts.append(seg[1])
+                else:
+                    _, expr_src, expr_line, expr_col = seg
+                    sub_tokens = Lexer(
+                        expr_src, line_offset=expr_line, col_offset=expr_col
+                    ).tokenize()
+                    if not sub_tokens:
+                        raise ParseError(
+                            f"Empty interpolation at line {expr_line}, column {expr_col}"
+                        )
+                    sub_parser = Parser(sub_tokens)
+                    sub_pipe = sub_parser.parse_pipeline()
+                    if sub_parser.current() is not None:
+                        extra = sub_parser.current()
+                        raise ParseError(
+                            f"Unexpected token {extra.type} ({extra.value}) in interpolation at line {extra.line}, column {extra.column}"
+                        )
+                    parts.append(sub_pipe)
+            return InterpolatedStringNode(line, col, parts)
+
+        if curr.type in ("TRUE", "FALSE", "NULL"):
+            self.advance()
+            if curr.type == "NULL":
                 return LiteralNode(line, col, None)
-            return LiteralNode(line, col, True if curr.type == 'TRUE' else False)
-        if curr.type == 'VARIABLE':
+            return LiteralNode(line, col, curr.type == "TRUE")
+
+        if curr.type == "VARIABLE":
             self.advance()
             return VariableNode(line, col, curr.value)
-        if curr.type == 'IMPLICIT_VAR':
+
+        if curr.type == "IMPLICIT_VAR":
             self.advance()
             return ImplicitVariableNode(line, col, curr.value)
-        if curr.type == 'LBRACKET':
+
+        if curr.type == "LBRACKET":
             self.advance()
             items = []
-            if self.match('RBRACKET'):
+            if self.match("RBRACKET"):
                 return LiteralNode(line, col, items)
             while True:
-                items.append(self.parse_pipeline())
-                if self.match('RBRACKET'):
+                items.append(self.parse_expression())
+                if self.match("RBRACKET"):
                     break
-                self.expect('COMMA')
-                if self.match('RBRACKET'):
+                self.expect("COMMA")
+                if self.match("RBRACKET"):
                     break
-            return ListNode(line, col, items) if hasattr(self, 'ListNode') else LiteralNode(line, col, items)
+            return LiteralNode(line, col, items)
 
-        if curr.type == 'LBRACE':
+        if curr.type == "LBRACE":
             self.advance()
             keys = []
             values = []
-            if self.match('RBRACE'):
+            if self.match("RBRACE"):
                 return DictNode(line, col, keys, values)
             while True:
-                key_token = self.expect('STRING')
+                key_token = self.expect("STRING")
                 keys.append(key_token.value)
-                self.expect('COLON')
-                values.append(self.parse_pipeline())
-                if self.match('RBRACE'):
+                self.expect("COLON")
+                values.append(self.parse_expression())
+                if self.match("RBRACE"):
                     break
-                self.expect('COMMA')
-                if self.match('RBRACE'):
+                self.expect("COMMA")
+                if self.match("RBRACE"):
                     break
             return DictNode(line, col, keys, values)
-            
-        if curr.type == 'LPAREN':
+
+        if curr.type == "LPAREN":
             self.advance()
             first = self.parse_pipeline()
-            if self.current() and self.current().type == 'COMMA':
-                items = [first]
-                while self.current() and self.current().type == 'COMMA':
-                    self.advance() # consume COMMA
-                    if self.current() and self.current().type == 'RPAREN':
+            if isinstance(first, Pipeline) and len(first.nodes) == 1:
+                first_expr = first.nodes[0]
+            elif isinstance(first, Pipeline):
+                first_expr = GroupedPipelineNode(first.line, first.column, first)
+            else:
+                first_expr = first
+            if self.current() and self.current().type == "COMMA":
+                # ValueList = "(" Expression "," Expression { "," Expression } [ "," ] ")"
+                items = [first_expr]
+                while self.current() and self.current().type == "COMMA":
+                    self.advance()
+                    if self.current() and self.current().type == "RPAREN":
                         break
-                    items.append(self.parse_pipeline())
-                self.expect('RPAREN')
+                    items.append(self.parse_expression())
+                self.expect("RPAREN")
                 if len(items) < 2:
-                    raise ParseError("A value list requires at least two values")
+                    raise ParseError(
+                        f"A value list requires at least two values at line {line}, column {col}"
+                    )
                 return ArgumentListNode(line, col, items)
             else:
-                self.expect('RPAREN')
-                return first
+                self.expect("RPAREN")
+                return first_expr
 
-        if curr.type == 'VERB':
-            self.advance()
-            if curr.value == 'Return':
-                return ReturnNode(line, col)
-            if self.current() and self.current().type == 'LPAREN':
-                raise ParseError("Parentheses after a function name are reserved for block aliases")
-            return FunctionCallNode(line, col, curr.value)
+        if curr.type == "VERB":
+            raise ParseError(
+                f"Cannot call '{curr.value}' without '>>' at line {line}, column {col}"
+            )
 
-        raise ParseError(f"Unexpected token {curr.type} ({curr.value}) at line {line}")
+        raise ParseError(
+            f"Unexpected token {curr.type} ({curr.value}) at line {line}, column {col}"
+        )
 
-    def parse_primary(self) -> ASTNode:
+    def parse_postfix(self) -> ASTNode:
         curr = self.current()
         line = curr.line if curr else 1
-        col = curr.column if curr else 0
+        col = curr.column if curr else 1
         node = self._parse_base_primary()
-        while self.current() and self.current().type in ('LBRACKET', 'DOUBLE_COLON'):
-            if self.current().type == 'LBRACKET':
+        while self.current() and self.current().type in ("LBRACKET", "DOUBLE_COLON"):
+            if self.current().type == "LBRACKET":
                 self.advance()
                 idx = self.parse_expression()
-                self.expect('RBRACKET')
+                self.expect("RBRACKET")
                 node = IndexAccessNode(line, col, node, idx)
-            elif self.current().type == 'DOUBLE_COLON':
+            elif self.current().type == "DOUBLE_COLON":
                 self.advance()
                 prop_token = self.current()
-                if prop_token and prop_token.type == 'VARIABLE':
+                if prop_token and (
+                    prop_token.type in ("VARIABLE", "VERB")
+                    or prop_token.type in _KEYWORD_TOKEN_TYPES
+                ):
                     self.advance()
-                    idx = LiteralNode(prop_token.line, prop_token.column, prop_token.value)
+                    idx = LiteralNode(
+                        prop_token.line, prop_token.column, prop_token.value
+                    )
                     node = IndexAccessNode(line, col, node, idx)
                 else:
-                    raise ParseError(f"Expected property name after ::, got {prop_token.type if prop_token else 'EOF'}")
+                    loc = (
+                        f"at line {prop_token.line}, column {prop_token.column}"
+                        if prop_token
+                        else "at EOF"
+                    )
+                    raise ParseError(
+                        f"Expected property name after ::, got {prop_token.type if prop_token else 'EOF'} {loc}"
+                    )
         return node
 
     def parse_function_def(self) -> FunctionDefNode:
-        # (a, b) >> new Plus: ... end.
-        # or new Plus: ... end.
         curr = self.current()
         line, col = curr.line, curr.column
-        
-        params = []
-        if self.match('LPAREN'):
-            # parse parameters
-            if not self.match('RPAREN'):
-                while True:
-                    type_token = self.current()
-                    if type_token.type == 'VARIABLE':
-                        param_type = 'any'
-                        var_name = type_token.value
-                        self.advance()
-                    else:
-                        raise ParseError(f"Expected parameter name in function def, got {type_token.type}")
-                    
-                    params.append(ParamDef(param_type, var_name))
-                    
-                    if self.current() and self.current().type == 'COMMA':
-                        self.advance()
-                    else:
-                        break
-                self.expect('RPAREN')
-            self.expect('STREAM_OP')
-            
-        self.expect('NEW')
-        name = self.expect('VERB').value
-        self.expect('COLON')
 
-        block = self.parse_block({'END'})
-        self.expect('END')
+        params: List[ParamDef] = []
+        if self.match("LPAREN"):
+            if self.current() and self.current().type == "RPAREN":
+                raise ParseError(
+                    f"Parameter list cannot be empty at line {line}, column {col}"
+                )
+            while True:
+                param_token = self.current()
+                if param_token and param_token.type == "VARIABLE":
+                    params.append(ParamDef("any", param_token.value))
+                    self.advance()
+                else:
+                    loc = (
+                        f"at line {param_token.line}, column {param_token.column}"
+                        if param_token
+                        else "at EOF"
+                    )
+                    raise ParseError(
+                        f"Expected parameter name in function def, got {param_token.type if param_token else 'EOF'} {loc}"
+                    )
+                if self.match("COMMA"):
+                    continue
+                break
+            self.expect("RPAREN")
+            self.expect("STREAM_OP")
+
+        self.expect("NEW")
+        name = self.expect("VERB").value
+        self.expect("BLOCK_OPEN")
+        block = self.parse_block({"BLOCK_CLOSE"})
+        self.expect("BLOCK_CLOSE")
 
         return FunctionDefNode(line, col, name, params, block)

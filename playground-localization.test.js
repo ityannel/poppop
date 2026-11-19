@@ -10,13 +10,17 @@ assert.equal(
   "名前エラー: 変数「missing」は定義されていません。",
 );
 assert.equal(
-  localizeError("SyntaxError: Unexpected character '!' on line 2"),
+  localizeError("SyntaxError: Unexpected character '!' on line 2, column 5"),
   "文法エラー: 使用できない文字 '!' があります。（2行目）",
 );
 assert.equal(
-  localizeError("EvaluatorError: Filter block must return Bool"),
-  "評価エラー: Filter のブロックは Bool を返す必要があります。",
+  localizeError("TypeError: Filter block must return Bool"),
+  "型エラー: Filter のブロックは Bool を返す必要があります。",
 );
-assert.equal(errorLine("ParseError: something at line 14"), 14);
+assert.equal(
+  localizeError("SyntaxError: Cannot call 'Add' without '>>' at line 3, column 1"),
+  "文法エラー: 関数「Add」は >> の右側で呼び出してください。（3行目）",
+);
+assert.equal(errorLine("ParseError: something at line 14, column 3"), 14);
 
 console.log("Playground Japanese localization tests passed.");

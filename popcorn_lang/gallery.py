@@ -21,9 +21,9 @@ GALLERY = (
         "description": "Mapでリストのすべての数値を2倍にします。",
         "interactive": False,
         "code": (
-            "[1, 2, 3, 4] >> Map(value):\n"
+            "[1, 2, 3, 4] >> Map as value (:\n"
             "    value * 2.\n"
-            ".. >> doubled.\n\n"
+            ":) >> doubled.\n\n"
             "doubled >> Display."
         ),
     },
@@ -34,9 +34,9 @@ GALLERY = (
         "description": "Filterで条件に合う数値だけを選びます。",
         "interactive": False,
         "code": (
-            "[1, 2, 3, 4, 5, 6] >> Filter(value):\n"
+            "[1, 2, 3, 4, 5, 6] >> Filter as value (:\n"
             "    value % 2 == 0.\n"
-            ".. >> evens.\n\n"
+            ":) >> evens.\n\n"
             "evens >> Display."
         ),
     },
@@ -47,18 +47,18 @@ GALLERY = (
         "description": "1から30までをFizz、Buzz、FizzBuzzに変換します。",
         "interactive": False,
         "code": (
-            "30 >> Range >> Map(number):\n"
-            "    number >> Check(value):\n"
-            "        is value % 15 == 0:\n"
+            "(1, 30) >> Range >> Map as number (:\n"
+            "    number >> Check as value (:\n"
+            "        when value % 15 == 0:\n"
             '            "FizzBuzz".\n'
-            "        is value % 3 == 0:\n"
+            "        when value % 3 == 0:\n"
             '            "Fizz".\n'
-            "        is value % 5 == 0:\n"
+            "        when value % 5 == 0:\n"
             '            "Buzz".\n'
             "        else:\n"
             "            value >> Str.\n"
-            "    ..\n"
-            ".. >> fizzbuzz.\n\n"
+            "    :)\n"
+            ":) >> fizzbuzz.\n\n"
             "fizzbuzz >> Display."
         ),
     },
@@ -72,7 +72,7 @@ GALLERY = (
             '"あなたの名前は？ " >> Input >> name.\n'
             '["大吉", "中吉", "小吉", "吉", "末吉"] >> fortunes.\n'
             "(0, 4) >> Random >> fortune_index.\n"
-            "(fortunes, fortune_index) >> Get >> fortune.\n\n"
+            "fortunes >> Get(fortune_index) >> fortune.\n\n"
             '"{name}さんの今日の運勢は「{fortune}」です！" >> Display.'
         ),
     },
@@ -85,12 +85,12 @@ GALLERY = (
         "code": (
             "(1, 10) >> Random >> secret.\n"
             '"1から10までの数字を当ててね: " >> Input >> Int >> guess.\n\n'
-            "guess == secret >> Check:\n"
-            "    is true:\n"
+            "guess >> Check (:\n"
+            "    when @ == secret:\n"
             '        "大正解！".\n'
             "    else:\n"
             '        "おしい！ 正解は {secret} でした。".\n'
-            ".. >> message.\n\n"
+            ":) >> message.\n\n"
             "message >> Display."
         ),
     },
@@ -104,13 +104,13 @@ GALLERY = (
             '["グー", "チョキ", "パー"] >> hands.\n'
             '"グー、チョキ、パーのどれにする？ " >> Input >> choice.\n'
             "(0, 2) >> Random >> robot_index.\n"
-            "(hands, robot_index) >> Get >> robot.\n\n"
-            "choice == robot >> Check:\n"
-            "    is true:\n"
+            "hands >> Get(robot_index) >> robot.\n\n"
+            "choice >> Check (:\n"
+            "    when @ == robot:\n"
             '        "あいこです！ あなたもロボット君も{choice}。".\n'
             "    else:\n"
             '        "あなたは{choice}、ロボット君は{robot}でした！".\n'
-            ".. >> result.\n\n"
+            ":) >> result.\n\n"
             "result >> Display."
         ),
     },
@@ -123,17 +123,14 @@ GALLERY = (
         "code": (
             "(1, 6) >> Random >> player.\n"
             "(1, 6) >> Random >> robot.\n\n"
-            "player > robot >> Check:\n"
-            "    is true:\n"
+            "player >> Check (:\n"
+            "    when @ > robot:\n"
             '        "あなたの勝ち！ {player} 対 {robot}".\n'
+            "    when @ == robot:\n"
+            '        "引き分け！ どちらも {player}".\n'
             "    else:\n"
-            "        player == robot >> Check:\n"
-            "            is true:\n"
-            '                "引き分け！ どちらも {player}".\n'
-            "            else:\n"
-            '                "ロボット君の勝ち！ {player} 対 {robot}".\n'
-            "        ..\n"
-            ".. >> result.\n\n"
+            '        "ロボット君の勝ち！ {player} 対 {robot}".\n'
+            ":) >> result.\n\n"
             "result >> Display."
         ),
     },
@@ -145,12 +142,12 @@ GALLERY = (
         "interactive": True,
         "code": (
             '"日本の首都は？ " >> Input >> answer.\n\n'
-            'answer == "東京" >> Check:\n'
-            "    is true:\n"
+            "answer >> Check (:\n"
+            '    when @ == "東京":\n'
             '        "正解です！".\n'
             "    else:\n"
             '        "残念。正解は東京です。".\n'
-            ".. >> result.\n\n"
+            ":) >> result.\n\n"
             "result >> Display."
         ),
     },
@@ -161,15 +158,15 @@ GALLERY = (
         "description": "Loopで5から0まで数え、Breakで安全に止めます。",
         "interactive": False,
         "code": (
-            "5 >> Loop(count):\n"
+            "5 >> Loop as count (:\n"
             "    count >> Display.\n"
-            "    count >> Check(value):\n"
-            "        is value == 0:\n"
+            "    count >> Check as value (:\n"
+            "        when value == 0:\n"
             '            "発射！" >> Break.\n'
             "        else:\n"
             "            value - 1.\n"
-            "    ..\n"
-            ".. >> result.\n\n"
+            "    :)\n"
+            ":) >> result.\n\n"
             "result >> Display."
         ),
     },
@@ -180,9 +177,9 @@ GALLERY = (
         "description": "Reduceで商品の価格を足し合わせます。",
         "interactive": False,
         "code": (
-            "[120, 250, 80, 300] >> Reduce(state):\n"
-            "    state[0] + state[1].\n"
-            ".. >> total.\n\n"
+            "[120, 250, 80, 300] >> Reduce(0) as (acc, price) (:\n"
+            "    acc + price.\n"
+            ":) >> total.\n\n"
             '"お買い物の合計は {total} 円です。" >> Display.'
         ),
     },
@@ -205,8 +202,7 @@ GALLERY = (
         "description": "Splitで文章を分け、Lengthで数を調べます。",
         "interactive": False,
         "code": (
-            '"pop pop corn" >> text.\n'
-            '(text, " ") >> Split >> words.\n'
+            '"pop pop corn" >> Split(" ") >> words.\n'
             "words >> Length >> count.\n\n"
             '"言葉は {count} 個あります。" >> Display.'
         ),
@@ -231,7 +227,7 @@ GALLERY = (
         "interactive": False,
         "code": (
             '["朝ごはん", "散歩"] >> plan.\n'
-            '(plan, "PopCornを書く") >> Append >> today.\n\n'
+            'plan >> Append("PopCornを書く") >> today.\n\n'
             "today >> Display."
         ),
     },
@@ -239,13 +235,13 @@ GALLERY = (
         "id": "sort-ranking",
         "category": "リスト",
         "title": "リスト｜点数順に並べよう",
-        "description": "Sortで辞書のリストを点数の高い順に並べます。",
+        "description": "SortDescで辞書のリストを点数の高い順に並べます。",
         "interactive": False,
         "code": (
             '[{"name": "Aoi", "score": 92}, {"name": "Ren", "score": 75}, {"name": "Sora", "score": 88}] >> players.\n'
-            "players >> Sort(player):\n"
-            "    -player::score.\n"
-            ".. >> ranking.\n\n"
+            "players >> SortDesc as player (:\n"
+            "    player::score.\n"
+            ":) >> ranking.\n\n"
             "ranking >> Display."
         ),
     },
@@ -257,9 +253,9 @@ GALLERY = (
         "interactive": False,
         "code": (
             '[{"color": "red", "name": "apple"}, {"color": "yellow", "name": "banana"}, {"color": "red", "name": "strawberry"}] >> fruits.\n'
-            "fruits >> Group(fruit):\n"
+            "fruits >> Group as fruit (:\n"
             "    fruit::color.\n"
-            ".. >> boxes.\n\n"
+            ":) >> boxes.\n\n"
             "boxes >> Display."
         ),
     },
@@ -271,10 +267,10 @@ GALLERY = (
         "interactive": False,
         "code": (
             '{"name": "PopCorn", "level": 1} >> profile.\n'
-            "profile >> Update(user):\n"
+            "profile >> Update as user (:\n"
             "    user::level + 1 >> user::level.\n"
-            '    "PopCorn" >> user::release.\n'
-            ".. >> next_profile.\n\n"
+            '    "PopCorn 1" >> user::release.\n'
+            ":) >> next_profile.\n\n"
             "next_profile >> Display."
         ),
     },
@@ -282,15 +278,15 @@ GALLERY = (
         "id": "fork-statistics",
         "category": "集計",
         "title": "集計｜まとめて計算しよう",
-        "description": "Forkで同じリストから複数の結果を作ります。",
+        "description": "ラベル付きForkで同じリストから複数の結果を辞書にまとめます。",
         "interactive": False,
         "code": (
             "[4, 8, 15, 16, 23, 42] >> scores.\n"
-            "scores >> Fork(values):\n"
-            "    values >> Sum.\n"
-            "    values >> Max.\n"
-            "    values >> Min.\n"
-            ".. >> summary.\n\n"
+            "scores >> Fork as values (:\n"
+            "    total: values >> Sum.\n"
+            "    max:   values >> Max.\n"
+            "    min:   values >> Min.\n"
+            ":) >> summary.\n\n"
             "summary >> Display."
         ),
     },
@@ -301,10 +297,26 @@ GALLERY = (
         "description": "Zipで二つのリストを組にしてからMapで足します。",
         "interactive": False,
         "code": (
-            "([1, 2, 3], [10, 20, 30]) >> Zip >> Map(pair):\n"
-            "    pair[0] + pair[1].\n"
-            ".. >> sums.\n\n"
+            "([1, 2, 3], [10, 20, 30]) >> Zip >> Map as (a, b) (:\n"
+            "    a + b.\n"
+            ":) >> sums.\n\n"
             "sums >> Display."
+        ),
+    },
+    {
+        "id": "try-catch-parse",
+        "category": "エラー処理",
+        "title": "エラー処理｜安全に数値へ変換しよう",
+        "description": "TryとCatchで変換エラーを受け取り、代わりの値を返します。",
+        "interactive": False,
+        "code": (
+            '"abc" >> Try (:\n'
+            "    @ >> Int.\n"
+            ":) Catch as err (:\n"
+            '    "エラー（{err::type}）のため 0 にしました" >> Display.\n'
+            "    0.\n"
+            ":) >> number.\n\n"
+            "number >> Display."
         ),
     },
     {
@@ -316,7 +328,7 @@ GALLERY = (
         "code": (
             '["ポップコーン", "プリン", "クッキー", "ドーナツ"] >> snacks.\n'
             "(0, 3) >> Random >> index.\n"
-            "(snacks, index) >> Get >> snack.\n\n"
+            "snacks >> Get(index) >> snack.\n\n"
             '"今日のおやつは {snack} です。" >> Display.'
         ),
     },

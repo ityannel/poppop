@@ -3,7 +3,7 @@
 // These keywords may be legal words in the grammar, but they are never
 // variable binding targets.
 const RESERVED_WORDS = new Set([
-    "and", "else", "false", "is", "new", "not", "null", "or", "true"
+    "and", "as", "else", "false", "in", "new", "not", "null", "or", "true", "when"
 ]);
 
 const IDENTIFIER = "[a-z_][a-zA-Z0-9_]*";

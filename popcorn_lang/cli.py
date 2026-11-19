@@ -49,7 +49,7 @@ async def repl() -> int:
 
     while True:
         try:
-            line = input(".. " if not buffer else "   ")
+            line = input(">> " if not buffer else "   ")
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
@@ -58,11 +58,15 @@ async def repl() -> int:
             return 0
 
         buffer.append(line)
-        if not (line.strip().endswith(".") or line.strip() == ".."):
+        joined = "\n".join(buffer)
+        if joined.count("(:") > joined.count(":)"):
+            continue
+        stripped = line.strip()
+        if not (stripped.endswith(".") or stripped.endswith(":)")):
             continue
 
         try:
-            await evaluate("\n".join(buffer), evaluator)
+            await evaluate(joined, evaluator)
         except Exception as exc:
             print(format_error(exc))
         finally:

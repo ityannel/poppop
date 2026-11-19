@@ -8,9 +8,9 @@ PopCorn is a small, pipeline-oriented programming language. Values move from
 left to right through `>>`, and each statement ends with `.`.
 
 ```popcorn
-[1, 2, 3] >> Map:
+[1, 2, 3] >> Map (:
     @ * 2.
-.. >> doubled.
+:) >> doubled.
 
 doubled >> Display.
 ```
@@ -114,7 +114,7 @@ The repository also contains the optional Japanese VS Code extension in
 ## Safety
 
 PopCorn code can access the file system and network through built-ins such as
-`Fetch`, `PostFetch`, and `WriteFile`. Only run programs you trust. See
+`ReadFile`, `WriteFile`, `Fetch`, `PostFetch`, and `HttpRequest`. Only run programs you trust. See
 [SECURITY.md](SECURITY.md).
 
 ## License

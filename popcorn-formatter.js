@@ -58,17 +58,42 @@
   function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
-    let indent = 0;
+    const stack = [];
     const formatted = rawLines.map((rawLine) => {
       const trimmed = rawLine.trim();
       if (!trimmed) return "";
 
       const trimmedCode = maskNonCode(trimmed);
-      if (/^\.\./.test(trimmedCode)) indent = Math.max(0, indent - 1);
-      const line = " ".repeat(indent * indentSize)
+      const startsWithClose = /^:\)/.test(trimmedCode);
+      const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
+
+      if (startsWithClose) {
+        if (stack.at(-1) === "branch") stack.pop();
+        if (stack.at(-1) === "block") stack.pop();
+      } else if (isBranchHeader && stack.at(-1) === "branch") {
+        stack.pop();
+      }
+
+      const line = " ".repeat(stack.length * indentSize)
         + normalizePipelineSpacing(trimmed, trimmedCode);
+
       const lineCode = maskNonCode(line.trim());
-      if (lineCode.trim().endsWith(":") && !lineCode.includes("..")) indent += 1;
+      const openCount = (lineCode.match(/\(\:/g) || []).length;
+      const closeCount = (lineCode.match(/\:\)/g) || []).length;
+      const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+      const netOpens = openCount - remainingCloses;
+
+      if (netOpens > 0) {
+        for (let i = 0; i < netOpens; i += 1) stack.push("block");
+      } else if (netOpens < 0) {
+        for (let i = 0; i < -netOpens; i += 1) {
+          if (stack.at(-1) === "branch") stack.pop();
+          if (stack.at(-1) === "block") stack.pop();
+        }
+      } else if (isBranchHeader) {
+        stack.push("branch");
+      }
+
       return line;
     });
     return formatted.join(eol);

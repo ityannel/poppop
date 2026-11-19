@@ -4,7 +4,7 @@ const { maskNonCode } = require("./assignment-targets");
 
 const VARIABLE_IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const IMPLICIT_SCOPE_HEADER = />>\s*(?:Map|Filter|Reduce|Loop|Sort|Group|Fork|Update|Check)\b[^\r\n]*:/;
+const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\(:/;
 
 function scanLines(text, callback) {
     const lines = text.split("\n");
@@ -64,32 +64,45 @@ function findImplicitVariableOffsets(text) {
 }
 
 /**
- * Finds Map/Filter/etc. blocks. Generic blocks are also kept on the stack so
- * a nested check/fork block cannot accidentally close the surrounding @ scope.
+ * Finds Map/Filter/etc. blocks delimited by `(:` and `:)`.
+ * Generic blocks (such as `new Func (:`) are also kept on the stack so
+ * nested blocks cannot accidentally close a surrounding @ scope.
  */
 function findImplicitVariableScopeRanges(text) {
     const ranges = [];
     const blockStack = [];
-    let documentEnd = text.length;
+    const documentEnd = text.length;
 
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
+        const startsWithClose = /^:\)/.test(trimmed);
 
-        if (/^\.\./.test(trimmed)) {
+        if (startsWithClose) {
             const block = blockStack.pop();
             if (block && block.isImplicitScope) {
                 ranges.push({ start: block.start, end: lineStart });
             }
-            return;
         }
 
-        // Block headers end in a colon. Inline blocks close on the same line
-        // with `..`, so they intentionally do not create a multi-line scope.
-        if (trimmed.endsWith(":") && !trimmed.includes("..")) {
-            blockStack.push({
-                start: lineStart,
-                isImplicitScope: IMPLICIT_SCOPE_HEADER.test(code)
-            });
+        const openCount = (code.match(/\(\:/g) || []).length;
+        const closeCount = (code.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+
+        if (netOpens > 0) {
+            for (let i = 0; i < netOpens; i += 1) {
+                blockStack.push({
+                    start: lineStart,
+                    isImplicitScope: IMPLICIT_SCOPE_HEADER.test(code)
+                });
+            }
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) {
+                const block = blockStack.pop();
+                if (block && block.isImplicitScope) {
+                    ranges.push({ start: block.start, end: lineStart });
+                }
+            }
         }
     });
 

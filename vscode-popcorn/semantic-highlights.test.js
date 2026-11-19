@@ -10,9 +10,9 @@ const {
 } = require("./semantic-highlights");
 
 const source = [
-    "[1, 2] >> Map(item):",
+    "[1, 2] >> Map as item (:",
     "    item >> Display.",
-    ".. >> values.",
+    ":) >> values.",
     "values >> Length >> count.",
     "\"Map >> ignored\" >> Display. // @ignored"
 ].join("\r\n");
@@ -21,9 +21,9 @@ const sliceRanges = ranges => ranges.map(({ start, end }) => source.slice(start,
 const sliceOffsets = offsets => offsets.map(({ start, length }) => source.slice(start, start + length));
 
 assert.deepStrictEqual(sliceRanges(findPipelineGuideRanges(source)), [
-    "[1, 2] >> Map(item):",
+    "[1, 2] >> Map as item (:",
     "item >> Display.",
-    ".. >> values.",
+    ":) >> values.",
     "values >> Length >> count.",
     "\"Map >> ignored\" >> Display."
 ]);

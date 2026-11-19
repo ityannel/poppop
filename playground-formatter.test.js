@@ -9,10 +9,12 @@ await import("./popcorn-formatter.js");
 const { formatDocument: formatInPlayground } = globalThis.PopCornFormatter;
 
 const cases = [
-  "1>>value.\n[1]>>Map(item):\nitem>>Display.\n..",
+  "1>>value.\n[1]>>Map as item (:\nitem>>Display.\n:)",
   '"a>>b"   >> Display. // >> inside a comment\n',
-  "1>>Check(value):\nis value > 0:\n\"yes\".\nelse:\n\"no\".\n..",
-  "[1, 2]\r\n    >>Map(value):\r\nvalue*2.\r\n..",
+  '1>>Check as value (:\nwhen value > 0:\n"yes".\nelse:\n"no".\n:)',
+  "[1, 2]\r\n    >>Map as value (:\r\nvalue*2.\r\n:)",
+  '"x">>Try (:\n@>>Int.\n:) Catch as err (:\n0.\n:)',
+  "[1, 2, 3]>>Map as x (: x * 2. :)>>doubled.",
 ];
 
 for (const source of cases) {
@@ -22,5 +24,19 @@ for (const source of cases) {
     `Playground formatter diverged for:\n${source}`,
   );
 }
+
+assert.strictEqual(
+  formatInPlayground('2>>Check as value (:\nwhen value == 0:\n"zero".\nwhen value in [1, 2, 3]:\n"small".\nelse:\n"other".\n:)>>label.'),
+  [
+    "2 >> Check as value (:",
+    "    when value == 0:",
+    '        "zero".',
+    "    when value in [1, 2, 3]:",
+    '        "small".',
+    "    else:",
+    '        "other".',
+    ":) >> label.",
+  ].join("\n"),
+);
 
 console.log("Playground formatter parity tests passed.");

@@ -5,78 +5,93 @@ const { findImplicitVariableScopeRanges, findVariableReferenceOffsets, variableA
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const STREAM_BLOCK = />>\s*(Map|Filter|Reduce|Loop|Sort|Group|Fork|Update|Check)\b/;
+const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
+const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
-    "and", "else", "false", "is", "new", "null", "not", "or", "true"
+    "and", "as", "else", "false", "in", "new", "not", "null", "or", "true", "when"
 ]);
 
-// PopCorn 本体に実装されている標準関数と、エディター上での説明です。
+// PopCorn 1 本体に実装されている標準関数と、エディター上での説明です。
 // `output` は型フロー表示で使う、おおまかな戻り値の型です。
 const STANDARD_FUNCTIONS = Object.freeze({
     Display: { description: "値を表示し、そのまま次の処理へ渡します。", output: "same" },
-    Input: { description: "入力を受け取り、文字列として次の処理へ渡します。", output: "文字列" },
-    Fetch: { description: "URL からデータを取得します。", output: "式" },
-    PostFetch: { description: "POST リクエストを送り、応答を受け取ります。", output: "式" },
-    WriteFile: { description: "指定した内容をファイルへ書き込みます。", output: "same" },
+    Input: { description: "プロンプトを表示して入力を受け取り、文字列として渡します。", output: "文字列" },
+    ReadFile: { description: "ローカルファイルの内容を UTF-8 の文字列として読み込みます。", output: "文字列" },
+    WriteFile: { description: "指定した内容をファイルへ書き込み、内容をそのまま返します。", output: "same" },
+    Fetch: { description: "URL へ HTTP GET リクエストを送り、応答本文を返します。", output: "文字列" },
+    PostFetch: { description: "URL へ HTTP POST リクエストを送り、応答本文を返します。", output: "文字列" },
+    HttpRequest: { description: "任意の HTTP リクエストを送り、status・headers・body の辞書を返します。", output: "辞書" },
     Type: { description: "値の型名を文字列で返します。", output: "文字列" },
     Sleep: { description: "指定秒数だけ待機し、値はそのまま渡します。", output: "same" },
-    Add: { description: "2 つの値を加算します。", output: "数値" },
+    Add: { description: "2 つの値を加算または連結します。", output: "数値" },
+    Div: { description: "2 つの整数を 0 の方向へ切り捨てて整数除算します。", output: "数値" },
     Sum: { description: "数値の配列を合計します。", output: "数値" },
     Max: { description: "配列の最大値を返します。", output: "要素" },
     Min: { description: "配列の最小値を返します。", output: "要素" },
-    Average: { description: "数値の配列の平均を返します。", output: "数値" },
-    Round: { description: "数値を四捨五入します。", output: "数値" },
+    Average: { description: "数値の配列の平均を Num で返します。", output: "数値" },
+    Round: { description: "数値を四捨五入して最も近い整数を返します。", output: "数値" },
     Abs: { description: "数値の絶対値を返します。", output: "数値" },
-    Num: { description: "文字列または数値を数値に変換します。", output: "数値" },
-    Int: { description: "値を整数へ変換します。", output: "数値" },
-    Str: { description: "値を文字列へ変換します。", output: "文字列" },
-    Bool: { description: "値を真偽値へ変換します。", output: "真偽値" },
-    List: { description: "値を配列として扱います。", output: "配列" },
-    Array: { description: "指定した大きさの配列を作成します。", output: "配列" },
-    Dict: { description: "値を辞書として扱います。", output: "辞書" },
-    Length: { description: "文字列・配列・辞書の要素数を返します。", output: "数値" },
-    Sort: { description: "配列を昇順に並べ替えます。", output: "配列" },
+    Num: { description: "値を浮動小数点数（Num）に変換します。", output: "数値" },
+    Int: { description: "値を整数（Int）に変換します。", output: "数値" },
+    Str: { description: "値を規定の形式の文字列に変換します。", output: "文字列" },
+    Bool: { description: "値を厳格なルールで真偽値に変換します。", output: "真偽値" },
+    List: { description: "リストまたは値リストをリストとして返します。", output: "配列" },
+    Array: { description: "指定した大きさの配列を 0 で埋めて作成します。", output: "配列" },
+    Dict: { description: "値が辞書であることを確認して返します。", output: "辞書" },
+    Length: { description: "文字列・配列・辞書・値リストの長さを返します。", output: "数値" },
+    Sort: { description: "配列をキーで昇順に安定ソートします。", output: "配列" },
+    SortDesc: { description: "配列をキーで降順に安定ソートします。", output: "配列" },
     Reverse: { description: "配列または文字列を逆順にします。", output: "same" },
     Uppercase: { description: "文字列をすべて大文字にします。", output: "文字列" },
     Lowercase: { description: "文字列をすべて小文字にします。", output: "文字列" },
     Split: { description: "文字列を区切り文字で分割して配列にします。", output: "配列" },
     Replace: { description: "文字列内の文字列を置き換えます。", output: "文字列" },
-    Join: { description: "配列の要素を区切り文字で連結します。", output: "文字列" },
-    Get: { description: "辞書のキー、または配列の位置から値を取り出します。", output: "要素" },
-    Set: { description: "辞書または配列の値を設定します。", output: "same" },
-    Merge: { description: "辞書を結合します。", output: "辞書" },
-    Contains: { description: "値や要素を含むかどうかを調べます。", output: "真偽値" },
-    Append: { description: "配列または文字列の末尾に値を追加します。", output: "same" },
-    Slice: { description: "文字列または配列の一部を取り出します。", output: "same" },
-    Format: { description: "値を使って文字列を整形します。", output: "文字列" },
-    Now: { description: "現在時刻を取得します。", output: "文字列" },
-    Random: { description: "乱数を生成します。", output: "数値" },
+    Join: { description: "配列の要素を文字列化して区切り文字で連結します。", output: "文字列" },
+    Get: { description: "辞書のキー、または配列の位置から値を取り出します（省略可能な既定値付き）。", output: "要素" },
+    Set: { description: "辞書または配列の値を非破壊的に置き換えます。", output: "same" },
+    Remove: { description: "辞書から指定キーを取り除いた新しい辞書を返します。", output: "辞書" },
+    Keys: { description: "辞書のキー一覧を挿入順の配列で返します。", output: "配列" },
+    Values: { description: "辞書の値一覧を挿入順の配列で返します。", output: "配列" },
+    Entries: { description: "辞書の [key, value] ペアを挿入順の配列で返します。", output: "配列" },
+    Merge: { description: "2 つの辞書を結合した新しい辞書を返します。", output: "辞書" },
+    Contains: { description: "値やキー・部分文字列を含むかどうかを調べます。", output: "真偽値" },
+    Append: { description: "配列の末尾に値を追加した新しい配列を返します。", output: "配列" },
+    Slice: { description: "文字列または配列の一部を切り出します。", output: "same" },
+    Format: { description: "位置プレースホルダ {0}, {1} で文字列を整形します。", output: "文字列" },
+    Now: { description: "現在日時を辞書で取得します。", output: "辞書" },
+    Random: { description: "指定範囲のランダムな整数を生成します。", output: "数値" },
     ToJson: { description: "値を JSON 文字列に変換します。", output: "文字列" },
     FromJson: { description: "JSON 文字列を PopCorn の値へ変換します。", output: "式" },
-    Range: { description: "連続した数値の配列を作成します。", output: "配列" },
-    Return: { description: "現在の関数から値を返します。", output: "式" },
-    Break: { description: "現在の繰り返し処理を終了します。", output: "式" },
+    Range: { description: "(start, end) の連続した整数の配列を作成します。", output: "配列" },
+    Return: { description: "いちばん内側の new 関数から値を返します。", output: "式" },
+    Break: { description: "いちばん内側の Loop を終了して値を返します。", output: "式" },
     Group: { description: "ブロックが返す文字列をキーとして配列をグループ化します。", output: "辞書" },
-    Debug: { description: "値をデバッグ表示し、そのまま渡します。", output: "same" },
-    Throw: { description: "指定した内容でエラーを発生させます。", output: "エラー" },
+    Fork: { description: "同じ入力から複数の分岐を評価します。", output: "式" },
+    Check: { description: "when / else の条件分岐で 1 つのブロックを選びます。", output: "式" },
+    Try: { description: "エラーを Catch で捕捉するブロックを開始します。", output: "式" },
+    Catch: { description: "Try ブロックで起きたエラーを受け取って回復します。", output: "式" },
+    Debug: { description: "デバッグ用に型と値を表示し、そのまま渡します。", output: "same" },
+    Throw: { description: "指定した内容で UserError を発生させます。", output: "エラー" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
     Reduce: { description: "配列を 1 つの値へ集約します。", output: "要素" },
     Zip: { description: "複数の配列を位置ごとにまとめます。", output: "配列" },
     Loop: { description: "状態値を Break まで繰り返し更新します。", output: "式" },
-    Update: { description: "辞書のキーを更新し、存在しないキーは新規追加します。", output: "辞書" }
+    Update: { description: "辞書のキーを非破壊的に更新・追加します。", output: "辞書" }
 });
 
 const SYSTEM_KEYWORDS = Object.freeze({
-    is: "Check の候補照合または Boolean 述語を開始します。",
-    else: "それまでの条件に一致しない場合の処理です。",
-    new: "ユーザー定義関数を宣言します。",
-    true: "Boolean の真を表します。",
-    false: "Boolean の偽を表します。",
+    when: "Check の Bool 条件分岐を開始します。",
+    else: "それまでの条件に一致しない場合の分岐です。",
+    as: "ストリームブロックの現在値に別名を付けます。",
+    new: "トップレベルのユーザー定義関数を宣言します。",
+    true: "Bool の真を表します。",
+    false: "Bool の偽を表します。",
     null: "Null 値を表します。",
-    and: "Boolean の短絡論理積です。",
-    or: "Boolean の短絡論理和です。",
-    not: "Boolean を否定します。"
+    and: "Bool の短絡論理積です。",
+    or: "Bool の短絡論理和です。",
+    not: "Bool を否定します。",
+    in: "要素・キー・部分文字列の含有判定（Bool）を行います。"
 });
 
 function scanLines(text, callback) {
@@ -176,10 +191,10 @@ function isVariableName(name) {
 function findStreamParameterDefinitions(text, name) {
     const definitions = [];
     scanLines(text, ({ code, lineNumber, lineStart }) => {
-        const streamPattern = />>\s*(?:Map|Filter|Reduce|Loop|Sort|Group|Fork|Update|Check)\s*\(([^)]*)\)/g;
-        for (const stream of code.matchAll(streamPattern)) {
-            const parameterText = stream[1];
-            const parameterStart = stream.index + stream[0].indexOf(parameterText);
+        for (const stream of code.matchAll(STREAM_ALIAS_PATTERN)) {
+            const parameterText = stream[1] || stream[2] || "";
+            const asIndex = stream[0].indexOf("as");
+            const parameterStart = stream.index + stream[0].indexOf(parameterText, asIndex + 2);
             for (const parameter of parameterText.matchAll(/[a-z_][a-zA-Z0-9_]*/g)) {
                 if (parameter[0] !== name) continue;
                 definitions.push({
@@ -208,19 +223,16 @@ function findVariableReferences(text, name) {
 }
 
 function describeBlockHeader(code) {
-    const functionMatch = />>\s*new\s+([A-Z][a-zA-Z0-9_]*)\s*:/.exec(code);
+    const functionMatch = /\bnew\s+([A-Z][a-zA-Z0-9_]*)\s*\(:/.exec(code);
     if (functionMatch) {
         return { kind: "function", name: functionMatch[1] };
     }
 
     const streamMatch = STREAM_BLOCK.exec(code);
     if (streamMatch) {
-        return { kind: "stream", name: streamMatch[1] };
-    }
-
-    const checkMatch = /(?:>>\s*)?\b(check|fork|catch|loop)\b[^\r\n]*:/.exec(code);
-    if (checkMatch) {
-        return { kind: "control", name: checkMatch[1] };
+        const name = streamMatch[1] || streamMatch[2];
+        const kind = ["Check", "Loop", "Try", "Catch"].includes(name) ? "control" : "stream";
+        return { kind, name };
     }
 
     return { kind: "block", name: "block" };
@@ -234,16 +246,31 @@ function findBlockRanges(text) {
     scanLines(text, ({ code, lineNumber }) => {
         lastLine = lineNumber;
         const trimmed = code.trim();
-        if (/^\.\./.test(trimmed)) {
+        const startsWithClose = /^:\)/.test(trimmed);
+
+        if (startsWithClose) {
             const block = stack.pop();
             if (block) {
                 blocks.push({ ...block, endLine: lineNumber });
             }
-            return;
         }
 
-        if (trimmed.endsWith(":") && !trimmed.includes("..")) {
-            stack.push({ ...describeBlockHeader(code), startLine: lineNumber });
+        const openCount = (code.match(/\(\:/g) || []).length;
+        const closeCount = (code.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+
+        if (netOpens > 0) {
+            for (let i = 0; i < netOpens; i += 1) {
+                stack.push({ ...describeBlockHeader(code), startLine: lineNumber });
+            }
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) {
+                const block = stack.pop();
+                if (block) {
+                    blocks.push({ ...block, endLine: lineNumber });
+                }
+            }
         }
     });
 
@@ -265,7 +292,7 @@ function inferValueType(expression) {
 }
 
 function stageName(stage) {
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\b/.exec(stage.replace(/[.:]+\s*$/, ""));
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\b/.exec(stage.replace(/[.:)]+\s*$/, ""));
     return match?.[1];
 }
 
@@ -345,7 +372,7 @@ function findPipelineAtOffset(text, offset) {
         pipelineEnd = Math.max(pipelineEnd, blockEndLine.lineStart + lastNonWhitespaceIndex(blockEndLine.code) + 1);
     }
 
-    const carriedType = block && /^\s*\.\./.test(line.code)
+    const carriedType = block && /^\s*:\)/.test(line.code)
         ? STANDARD_FUNCTIONS[block.name]?.output
         : undefined;
     const typeFlow = buildTypeFlow(
@@ -375,8 +402,11 @@ function allVariableOccurrences(text) {
     scanLines(text, ({ code, lineStart }) => {
         IDENTIFIER.lastIndex = 0;
         for (const match of code.matchAll(IDENTIFIER)) {
-            const isPropertyName = code.slice(0, match.index).endsWith("::");
-            if (isVariableName(match[0]) && !isPropertyName) {
+            const before = code.slice(0, match.index);
+            const after = code.slice(match.index + match[0].length);
+            const isPropertyName = before.endsWith("::");
+            const isForkLabel = /^\s*$/.test(before) && /^\s*:(?!:)/.test(after);
+            if (isVariableName(match[0]) && !isPropertyName && !isForkLabel) {
                 occurrences.push({ name: match[0], start: lineStart + match.index, length: match[0].length });
             }
         }
@@ -413,8 +443,9 @@ function functionParameters(text) {
 function streamParameters(text) {
     const names = new Set();
     scanLines(text, ({ code }) => {
-        for (const stream of code.matchAll(/>>\s*(?:Map|Filter|Reduce|Loop|Sort|Group|Fork|Update|Check)\s*\(([^)]*)\)/g)) {
-            for (const match of stream[1].matchAll(/[a-z_][a-zA-Z0-9_]*/g)) {
+        for (const stream of code.matchAll(STREAM_ALIAS_PATTERN)) {
+            const parameterText = stream[1] || stream[2] || "";
+            for (const match of parameterText.matchAll(/[a-z_][a-zA-Z0-9_]*/g)) {
                 names.add(match[0]);
             }
         }
@@ -455,14 +486,15 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = />>\s*(Map|Filter|Reduce|Loop|Sort|Group|Fork|Update|Check)\b\s*(?:\(([^)]*)\))?\s*:/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\(:/.exec(code);
     if (!match) return undefined;
-    const parameters = (match[2] || "")
-        .match(/[a-z_][a-zA-Z0-9_]*/g) || [];
+    const stream = match[1] || match[2];
+    const paramText = match[3] || match[4] || "";
+    const parameters = paramText.match(/[a-z_][a-zA-Z0-9_]*/g) || [];
     return {
-        stream: match[1],
+        stream,
         parameters,
-        value: parameters.length > 1 ? `[${parameters.join(", ")}]` : (parameters[0] || "@")
+        value: parameters.length > 1 ? `(${parameters.join(", ")})` : (parameters[0] || "@")
     };
 }
 
@@ -476,10 +508,20 @@ function implicitContextAtOffset(text, offset) {
     scanLines(text, ({ code, lineStart }) => {
         if (context || lineStart > offset) return;
         const trimmed = code.trim();
-        if (/^\.\./.test(trimmed)) {
+        const startsWithClose = /^:\)/.test(trimmed);
+        if (startsWithClose) {
             stack.pop();
-        } else if (trimmed.endsWith(":") && !trimmed.includes("..")) {
-            stack.push({ streamContext: streamContextFromHeader(code) });
+        }
+        const openCount = (code.match(/\(\:/g) || []).length;
+        const closeCount = (code.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+        if (netOpens > 0) {
+            for (let i = 0; i < netOpens; i += 1) {
+                stack.push({ streamContext: streamContextFromHeader(code) });
+            }
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) stack.pop();
         }
         if (offset >= lineStart && offset <= lineStart + code.length) {
             context = [...stack].reverse().find(block => block.streamContext)?.streamContext;
@@ -504,8 +546,6 @@ function implicitValueAtOffset(text, offset) {
     const markerIndex = offset - lineStart;
     if (line[markerIndex] !== "@") return undefined;
 
-    // @ は直前のパイプライン段階が返した値を指す。文字列やコメントを
-    // マスクすると @ の位置を取り違える場合があるため、ここでは元の行を使う。
     const before = line.slice(0, markerIndex).replace(/\/\/.*$/, "");
     const operators = [...before.matchAll(/>>/g)];
     const currentOperator = operators.at(-1);
@@ -514,7 +554,6 @@ function implicitValueAtOffset(text, offset) {
     const expressionStart = previousOperator
         ? previousOperator.index + previousOperator[0].length
         : 0;
-    // `false >> @` の @ は、@ の直前にある演算子の「前」の値を受け取る。
     const expression = before.slice(expressionStart, currentOperator.index).trim();
     return expression ? { expression, type: inferValueType(expression) } : undefined;
 }
@@ -564,14 +603,16 @@ function findUpdatePropertyOffsets(text) {
 
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
-        if (/^\.\./.test(trimmed)) {
+        const startsWithClose = /^:\)/.test(trimmed);
+        if (startsWithClose) {
             stack.pop();
-            return;
         }
 
-        const isInsideUpdate = stack.some(block => block.kind === "update");
-        if (isInsideUpdate) {
-            for (const match of code.matchAll(/>>\s*@::([a-z_][a-zA-Z0-9_]*)/g)) {
+        const updateBlock = [...stack].reverse().find(block => block.kind === "update");
+        if (updateBlock) {
+            const targetPrefix = updateBlock.alias ? `(?:@|${updateBlock.alias})` : "@";
+            const pattern = new RegExp(`>>\\s*${targetPrefix}::([a-z_][a-zA-Z0-9_]*)`, "g");
+            for (const match of code.matchAll(pattern)) {
                 const name = match[1];
                 const nameOffset = match[0].lastIndexOf(name);
                 const isNew = !knownKeys.has(name);
@@ -580,16 +621,26 @@ function findUpdatePropertyOffsets(text) {
             }
         }
 
-        if (trimmed.endsWith(":") && !trimmed.includes("..")) {
-            stack.push({ kind: />>\s*Update\b/i.test(code) ? "update" : "block" });
+        const openCount = (code.match(/\(\:/g) || []).length;
+        const closeCount = (code.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+        if (netOpens > 0) {
+            const updateMatch = />>\s*Update(?:\s+as\s+([a-z_][a-zA-Z0-9_]*))?\s*\(:/.exec(code);
+            for (let i = 0; i < netOpens; i += 1) {
+                stack.push(
+                    updateMatch
+                        ? { kind: "update", alias: updateMatch[1] || "" }
+                        : { kind: "block", alias: "" }
+                );
+            }
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) stack.pop();
         }
     });
     return properties;
 }
 
-// Returns true only when one insertion, deletion, or replacement separates the
-// names, and that differing character is not a digit. `score1` / `score2`
-// therefore remains a valid pair of distinct keys.
 function differsByOneNonNumericCharacter(left, right) {
     if (left === right || Math.abs(left.length - right.length) > 1) return false;
 
@@ -631,16 +682,27 @@ function findUpdateScopeRanges(text) {
     const stack = [];
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
-        if (/^\.\./.test(trimmed)) {
+        const startsWithClose = /^:\)/.test(trimmed);
+        if (startsWithClose) {
             const block = stack.pop();
             if (block?.kind === "update") ranges.push({ start: block.start, end: lineStart });
-            return;
         }
-        if (trimmed.endsWith(":") && !trimmed.includes("..")) {
-            stack.push({
-                kind: />>\s*Update\b/i.test(code) ? "update" : "block",
-                start: lineStart
-            });
+        const openCount = (code.match(/\(\:/g) || []).length;
+        const closeCount = (code.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+        if (netOpens > 0) {
+            for (let i = 0; i < netOpens; i += 1) {
+                stack.push({
+                    kind: />>\s*Update\b/.test(code) ? "update" : "block",
+                    start: lineStart
+                });
+            }
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) {
+                const block = stack.pop();
+                if (block?.kind === "update") ranges.push({ start: block.start, end: lineStart });
+            }
         }
     });
     for (const block of stack) {
@@ -674,8 +736,12 @@ function typeMismatchDiagnostic(inputType, functionName, start, length) {
         Sum: ["配列"],
         Average: ["配列"],
         Sort: ["配列"],
+        SortDesc: ["配列"],
         Update: ["辞書"],
-        Map: ["配列", "辞書"],
+        Keys: ["辞書"],
+        Values: ["辞書"],
+        Entries: ["辞書"],
+        Map: ["配列"],
         Filter: ["配列"],
         Reduce: ["配列"],
         Group: ["配列"],
@@ -699,10 +765,8 @@ function pipelineDiagnostics(text) {
         PIPELINE_OPERATOR.lastIndex = 0;
         if (!operators.length) return;
 
-        // `code` masks strings to avoid false operators. The original line is
-        // required here because a quoted string is a valid pipeline input.
         const firstStage = line.slice(0, operators[0].index).trim();
-        if (!firstStage && !code.trimStart().startsWith("..")) {
+        if (!firstStage && !code.trimStart().startsWith(":)")) {
             diagnostics.push({
                 kind: "empty-pipeline-input",
                 severity: "warning",
@@ -833,7 +897,13 @@ function analyzeDocument(text) {
         if (PIPELINE_OPERATOR.test(code)) {
             PIPELINE_OPERATOR.lastIndex = 0;
             const end = lastNonWhitespaceIndex(code);
-            if (end !== -1 && code[end] !== "." && !trimmed.endsWith(":") && !trimmed.includes("..")) {
+            if (
+                end !== -1
+                && code[end] !== "."
+                && !trimmed.endsWith("(:")
+                && !trimmed.endsWith(":)")
+                && !trimmed.endsWith(":")
+            ) {
                 diagnostics.push({
                     kind: "missing-terminator",
                     severity: "warning",
@@ -848,8 +918,6 @@ function analyzeDocument(text) {
 
     diagnostics.push(...pipelineDiagnostics(text));
 
-    // Update は未知キーを意図的に追加できる。ただし既存キーと数字以外で
-    // 一文字だけ違う場合は、追加前に誤字の可能性を知らせる。
     const knownUpdateKeys = objectLiteralKeys(text);
     for (const property of findUpdatePropertyOffsets(text)) {
         if (property.isNew) {
@@ -894,20 +962,40 @@ function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
     const state = { inBlockComment: false };
-    let indent = 0;
+    const stack = [];
     const formatted = rawLines.map(rawLine => {
         const trimmed = rawLine.trim();
         if (!trimmed) return "";
 
         const trimmedCode = maskNonCode(trimmed, state);
-        if (/^\.\./.test(trimmedCode)) {
-            indent = Math.max(0, indent - 1);
+        const startsWithClose = /^:\)/.test(trimmedCode);
+        const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
+
+        if (startsWithClose) {
+            if (stack.at(-1) === "branch") stack.pop();
+            if (stack.at(-1) === "block") stack.pop();
+        } else if (isBranchHeader && stack.at(-1) === "branch") {
+            stack.pop();
         }
-        const line = " ".repeat(indent * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
+
+        const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
         const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
-        if (lineCode.trim().endsWith(":") && !lineCode.includes("..")) {
-            indent += 1;
+        const openCount = (lineCode.match(/\(\:/g) || []).length;
+        const closeCount = (lineCode.match(/\:\)/g) || []).length;
+        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
+        const netOpens = openCount - remainingCloses;
+
+        if (netOpens > 0) {
+            for (let i = 0; i < netOpens; i += 1) stack.push("block");
+        } else if (netOpens < 0) {
+            for (let i = 0; i < -netOpens; i += 1) {
+                if (stack.at(-1) === "branch") stack.pop();
+                if (stack.at(-1) === "block") stack.pop();
+            }
+        } else if (isBranchHeader) {
+            stack.push("branch");
         }
+
         return line;
     });
     return formatted.join(eol);
