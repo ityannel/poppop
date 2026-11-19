@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE = {
-    source: "popcorn.playground.source.v3",
+    source: "popcorn.playground.source.v4",
     theme: "popcorn.playground.theme",
     editorTheme: "popcorn.playground.editorTheme.v1",
     fontSize: "popcorn.playground.fontSize",
@@ -17,9 +17,9 @@
     resultWidth: "popcorn.playground.resultWidth.v1",
     mobileResultHeight: "popcorn.playground.mobileResultHeight.v1",
   };
-  const FALLBACK_SOURCE = `[1, 2, 3, 4] >> Map as value (:
+  const FALLBACK_SOURCE = `[1, 2, 3, 4] >> Map as value {
     value * 2.
-:) >> doubled.
+} >> doubled.
 
 doubled >> Display.`;
   const LESSON_FEATURES = {
@@ -28,7 +28,7 @@ doubled >> Display.`;
     reduce: "Reduce",
     update: "Update",
     check: "Check",
-    function: "new",
+    function: "pop",
     loop: "Loop",
   };
 
@@ -196,12 +196,12 @@ doubled >> Display.`;
               regex: "(>>)(\\s*)([a-z_][a-zA-Z0-9_]*)(?=\\s*(?:\\[[^\\]\\r\\n]*\\]\\s*)*\\.\\s*(?://.*)?$)",
             },
             { token: "constant.language", regex: "\\b(?:true|false|null)\\b" },
-            { token: "keyword.control", regex: "\\b(?:new|when|else|as|and|or|not|in)\\b" },
+            { token: "keyword.control", regex: "\\b(?:pop|when|else|as|and|or|not|in)\\b" },
             { token: "support.function", regex: "\\b[A-Z][A-Za-z0-9_]*\\b" },
             { token: "variable.language", regex: "@" },
             { token: "constant.numeric", regex: "\\b\\d+(?:\\.\\d+)?\\b" },
             { token: "keyword.operator", regex: ">>|::|==|!=|>=|<=|[+\\-*\\/%><]" },
-            { token: "punctuation.operator", regex: "\\(:|:\\)|[.():,\\[\\]{}]" },
+            { token: "punctuation.operator", regex: "[.():,\\[\\]{}]" },
           ],
         };
         this.normalizeRules();
@@ -1600,10 +1600,10 @@ doubled >> Display.`;
           "変更してよいのは、文字列・数値・小文字の変数名と、既存ブロック内の短い式だけです。",
           "存在しない単独の関数呼び出し形式を作ってはいけません。Range(1, 6)、Sum()、Check(x) のように >> なしでは書けません。",
           "標準関数は `(1, 6) >> Range >> values.`、`values >> Sum >> total.`、またはパイプ追加引数 `items >> Get(0)` のように `>>` の右側に書きます。",
-          "Mapなどのブロックは、元の例と同じ `Map as name (: ... :)` の形を保ちます。",
+          "Mapなどのブロックは、元の例と同じ `Map as name { ... }` の形を保ちます。",
           "starterは実行可能だが目標をまだ満たさず、solutionは目標を満たす完成コードにします。",
           "starterとsolutionの最後の文は、必ず `値または変数 >> Display.` にしてください。",
-          "改行には構文上の意味がありません。通常の文は `.`、ブロック全体は `(:` で開いて `:)` で閉じます。",
+          "改行には構文上の意味がありません。通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。",
           "小学高学年でも一度で読める、自然で優しい日本語にしてください。",
           "題名は「何を作るか」が分かる18文字以内の表現にし、できれば「〜しよう」で終えてください。",
           "「全員を変換」「非破壊更新」「道を選ぶ」のような直訳調・仕様書調の題名は禁止です。",
@@ -2086,11 +2086,11 @@ doubled >> Display.`;
         [
           "あなたはPopCorn言語のやさしい先生です。",
           "基礎8問を終えた学習者向けの、少し発展的な練習問題を1つ作ってください。",
-          "PopCornは `>>` で値を流し、通常の文は `.`、ブロック全体は `(:` で開いて `:)` で閉じます。",
-          "使えるもの: Display, Map as name (:, Filter as name (:, Reduce(0) as (acc, item) (:, SortDesc as name (:, Check as name (: when ...: ... else: :), Update as name (:, Fork as name (:, Try (: ... :) Catch as err (:, Range, Sum, Length, Random, Get。",
+          "PopCornは `>>` で値を流し、通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。関数定義は `pop` を使います。数値型は `Num` のみです。",
+          "使えるもの: Display, Map as name {, Filter as name {, Reduce(0) as (acc, item) {, SortDesc as name {, Check as name { when ...: ... else: }, Update as name {, Fork as name {, Try { ... } Catch as err {, 後置 `when 条件.`, Range, Sum, Length, Random, Get。",
           "標準関数を `>>` なしで `Range(1, 6)` や `Sum()` のように単独呼び出ししてはいけません。",
           "標準関数は `(1, 6) >> Range >> values.`、`values >> Sum >> total.`、`items >> Get(0)` のように、必ず `>>` の右側に書いてください。",
-          "ブロックは提示した `Map as name (: ... :)` などの形を崩さないでください。",
+          "ブロックは提示した `Map as name { ... }` などの形を崩さないでください。",
           "最終結果は必ず `>> Display.` で表示してください。",
           "starterには、学習者が必ず修正しなければ目標を達成できない誤りを一つだけ残してください。",
           "starterとsolutionは、変数名や空白だけでなく、演算子・条件・値・処理段階のいずれかが意味的に異なる必要があります。",
@@ -2101,10 +2101,10 @@ doubled >> Display.`;
           "買い物の集計、ゲームの得点判定、予定や記録の整理など、結果の使い道が分かる実利的な題材にしてください。",
           "可能なら Filter の後に Sum を使うなど、既習機能を2段階以上組み合わせてください。",
           "次の検査済みの形を参考に、値・名前・式を題材に合わせて変更してください。",
-          "Mapの形:\n[1, 2, 3] >> Map as value (:\n    value * 2.\n:) >> result.\nresult >> Display.",
-          "Filterの形:\n[1, 2, 3, 4] >> Filter as value (:\n    value % 2 == 0.\n:) >> result.\nresult >> Display.",
-          "Reduceの形:\n[1, 2, 3] >> Reduce(0) as (acc, item) (:\n    acc + item.\n:) >> result.\nresult >> Display.",
-          "二段階集計の形:\n[120, 80, 250] >> Filter as price (:\n    price >= 100.\n:) >> selected.\nselected >> Sum >> total.\ntotal >> Display.",
+          "Mapの形:\n[1, 2, 3] >> Map as value {\n    value * 2.\n} >> result.\nresult >> Display.",
+          "Filterの形:\n[1, 2, 3, 4] >> Filter as value {\n    value % 2 == 0.\n} >> result.\nresult >> Display.",
+          "Reduceの形:\n[1, 2, 3] >> Reduce(0) as (acc, item) {\n    acc + item.\n} >> result.\nresult >> Display.",
+          "二段階集計の形:\n[120, 80, 250] >> Filter as price {\n    price >= 100.\n} >> selected.\nselected >> Sum >> total.\ntotal >> Display.",
           learnerProfileSummary(),
           `これまでの学習記録: ${learningSummary()}`,
           `これまでの会話:\n${recentTutorConversation() || "なし"}`,
@@ -2257,7 +2257,7 @@ doubled >> Display.`;
     const localized = localizeError(error);
     if (text.includes("SyntaxError")) {
       setRobotMood("encourage", 1800);
-      return `文法を読み取れなかったよ。\n${localized}\n\`. \` や \`(:\` / \`:)\`、括弧の閉じ忘れを確認してみよう。`;
+      return `文法を読み取れなかったよ。\n${localized}\n\`. \` や \`{\` / \`}\`、括弧の閉じ忘れを確認してみよう。`;
     }
     if (text.includes("Undefined") || text.includes("not defined")) {
       return `まだ名前が作られていないようです。\n${localized}\n名前を付けるパイプが先に実行されているか見てみよう。`;
@@ -2344,7 +2344,7 @@ doubled >> Display.`;
           "あなたはPopCorn Playgroundに住むロボット先生です。",
           "短く自然な日本語で、質問に直接答えてください。",
           "完成コードを丸ごと渡さず、理解できる次の一手を示してください。",
-          "PopCornでは改行に構文上の意味はなく、通常の文は `.`、ブロック全体は `(:` で開いて `:)` で閉じます。",
+          "PopCornでは改行に構文上の意味はなく、通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。",
           ">> は左の値を右へ流します。すべての標準関数は元の値を破壊しません。",
           "不確かな仕様を作らず、分からない場合は仕様書を確認するよう伝えてください。",
           "JSONだけを返してください。",
@@ -2487,7 +2487,7 @@ doubled >> Display.`;
 
   // ===== サンプル: 例は、samples フォルダーのファイルとして格納する。「例」のタブは、それを開くだけ =====
   const SAMPLES_DIR = "samples";
-  const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v2";
+  const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v3";
 
   function sampleFileName(title) {
     const name = String(title).split("｜").at(-1).trim().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();

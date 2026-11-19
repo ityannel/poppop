@@ -130,7 +130,7 @@ function escapeHtml(value) {
 
 function flowNodeKind(label) {
     if (/^::/.test(label)) return 'property';
-    if (/^(when|else|as|new|in)\b/.test(label)) return 'system';
+    if (/^(when|else|as|pop|in)\b/.test(label)) return 'system';
     if (/^[A-Z][a-zA-Z0-9_]*/.test(label)) return 'function';
     if (/^[\[{]/.test(label)) return 'object';
     return 'variable';
@@ -141,11 +141,11 @@ function stagesFromLine(line, lineNumber) {
     if (!operators.length) return [];
     const stages = [];
     const input = line.slice(0, operators[0].index).trim();
-    if (input && input !== ':)') stages.push({ line: lineNumber, label: input, kind: flowNodeKind(input) });
+    if (input && input !== '}') stages.push({ line: lineNumber, label: input, kind: flowNodeKind(input) });
     operators.forEach((operator, index) => {
         const start = operator.index + operator[0].length;
         const end = index + 1 < operators.length ? operators[index + 1].index : line.length;
-        const label = line.slice(start, end).trim().replace(/(?:\(:|:\)|[.:])+$/, '').trim() || '処理';
+        const label = line.slice(start, end).trim().replace(/[{}.:]+$/, '').trim() || '処理';
         stages.push({ line: lineNumber, label, kind: flowNodeKind(label) });
     });
     return stages;
@@ -162,7 +162,7 @@ function buildFlowModel(flowText, firstLine) {
         const stages = stagesFromLine(item.line, item.number);
         return { input: stages[0], steps: stages.slice(1) };
     });
-    const tail = items.filter(item => /^\s*:\)/.test(item.line) && />>/.test(item.line)).flatMap(item => stagesFromLine(item.line, item.number));
+    const tail = items.filter(item => /^\s*\}/.test(item.line) && />>/.test(item.line)).flatMap(item => stagesFromLine(item.line, item.number));
     return {
         kind: 'map-update',
         root: headerStages[0],

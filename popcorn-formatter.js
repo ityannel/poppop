@@ -64,7 +64,7 @@
       if (!trimmed) return "";
 
       const trimmedCode = maskNonCode(trimmed);
-      const startsWithClose = /^:\)/.test(trimmedCode);
+      const startsWithClose = /^\}/.test(trimmedCode);
       const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
 
       if (startsWithClose) {
@@ -78,8 +78,8 @@
         + normalizePipelineSpacing(trimmed, trimmedCode);
 
       const lineCode = maskNonCode(line.trim());
-      const openCount = (lineCode.match(/\(\:/g) || []).length;
-      const closeCount = (lineCode.match(/\:\)/g) || []).length;
+      const openCount = (lineCode.match(/\{/g) || []).length;
+      const closeCount = (lineCode.match(/\}/g) || []).length;
       const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
       const netOpens = openCount - remainingCloses;
 

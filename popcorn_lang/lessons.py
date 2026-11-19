@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .evaluator import _values_equal, format_popcorn_str
+
 
 LESSONS = (
     {
@@ -33,22 +35,22 @@ LESSONS = (
         "intro": "Mapは、リストの値を一つずつ同じルールで作り替えるよ。",
         "goal": "[1, 2, 3] の数字をそれぞれ2倍にしてください。",
         "starter": (
-            "[1, 2, 3] >> Map as number (:\n"
+            "[1, 2, 3] >> Map as number {\n"
             "    number + 1.\n"
-            ":) >> doubled.\n\n"
+            "} >> doubled.\n\n"
             "doubled >> Display."
         ),
         "solution": (
-            "[1, 2, 3] >> Map as number (:\n"
+            "[1, 2, 3] >> Map as number {\n"
             "    number * 2.\n"
-            ":) >> doubled.\n\n"
+            "} >> doubled.\n\n"
             "doubled >> Display."
         ),
         "hints": (
             "`number`には、1、2、3が順番に入ります。",
             "`number + 1` を `number * 2` に変えてみよう。",
         ),
-        "expected": [2, 4, 6],
+        "expected": [2.0, 4.0, 6.0],
         "required": ("Map", "*", "Display"),
         "success": "きれいに2倍になりました！ Mapは新しいリストを作ります。",
     },
@@ -59,22 +61,22 @@ LESSONS = (
         "intro": "Filterは、条件に合う値だけを新しいリストへ集めるよ。",
         "goal": "[1, 2, 3, 4] から2と4だけを残してください。",
         "starter": (
-            "[1, 2, 3, 4] >> Filter as number (:\n"
+            "[1, 2, 3, 4] >> Filter as number {\n"
             "    number > 2.\n"
-            ":) >> evens.\n\n"
+            "} >> evens.\n\n"
             "evens >> Display."
         ),
         "solution": (
-            "[1, 2, 3, 4] >> Filter as number (:\n"
+            "[1, 2, 3, 4] >> Filter as number {\n"
             "    number % 2 == 0.\n"
-            ":) >> evens.\n\n"
+            "} >> evens.\n\n"
             "evens >> Display."
         ),
         "hints": (
             "偶数は、2で割った余りが0になる数です。",
             "条件を `number % 2 == 0` にしてみよう。",
         ),
-        "expected": [2, 4],
+        "expected": [2.0, 4.0],
         "required": ("Filter", "%", "==", "Display"),
         "success": "2と4を集められました！ 条件がtrueの値だけが残ります。",
     },
@@ -85,22 +87,22 @@ LESSONS = (
         "intro": "Reduceは、これまでの結果と次の値を使って一つの答えを作るよ。",
         "goal": "[1, 2, 3, 4] を順番に足して、10にしてください。",
         "starter": (
-            "[1, 2, 3, 4] >> Reduce(1) as (acc, item) (:\n"
+            "[1, 2, 3, 4] >> Reduce(1) as (acc, item) {\n"
             "    acc * item.\n"
-            ":) >> total.\n\n"
+            "} >> total.\n\n"
             "total >> Display."
         ),
         "solution": (
-            "[1, 2, 3, 4] >> Reduce(0) as (acc, item) (:\n"
+            "[1, 2, 3, 4] >> Reduce(0) as (acc, item) {\n"
             "    acc + item.\n"
-            ":) >> total.\n\n"
+            "} >> total.\n\n"
             "total >> Display."
         ),
         "hints": (
             "`acc`はこれまでの結果、`item`は次の数字です。初期値も0にしよう。",
             "`Reduce(1)` を `Reduce(0)` に、`acc * item` を `acc + item` に変えてみよう。",
         ),
-        "expected": 10,
+        "expected": 10.0,
         "required": ("Reduce", "+", "Display"),
         "success": "合計は10です！ Reduceで複数の値を一つにまとめられました。",
     },
@@ -111,23 +113,23 @@ LESSONS = (
         "intro": "Updateは、元の辞書を変えずに新しい内容の辞書を作るよ。",
         "goal": "scoreを15にして、activeにtrueを追加してください。",
         "starter": (
-            '{"name": "Ada", "score": 10} >> Update as user (:\n'
+            '{"name": "Ada", "score": 10} >> Update as user {\n'
             "    11 >> user::score.\n"
-            ":) >> updated.\n\n"
+            "} >> updated.\n\n"
             "updated >> Display."
         ),
         "solution": (
-            '{"name": "Ada", "score": 10} >> Update as user (:\n'
+            '{"name": "Ada", "score": 10} >> Update as user {\n'
             "    15 >> user::score.\n"
             "    true >> user::active.\n"
-            ":) >> updated.\n\n"
+            "} >> updated.\n\n"
             "updated >> Display."
         ),
         "hints": (
             "書き方は `新しい値 >> user::項目名.` の順番です。",
             "`15 >> user::score.` の次に、activeの行も追加してみよう。",
         ),
-        "expected": {"name": "Ada", "score": 15, "active": True},
+        "expected": {"name": "Ada", "score": 15.0, "active": True},
         "required": ("Update", "::score", "::active", "Display"),
         "success": "プロフィールを更新できました！ 元の辞書はそのまま残ります。",
     },
@@ -138,23 +140,23 @@ LESSONS = (
         "intro": "Checkは、条件を上から調べて最初に合った答えを選ぶよ。",
         "goal": "数字の2を、文字列のsmallに分類してください。",
         "starter": (
-            "2 >> Check as value (:\n"
+            "2 >> Check as value {\n"
             "    when value == 0:\n"
             '        "zero".\n'
             "    else:\n"
             '        "unknown".\n'
-            ":) >> label.\n\n"
+            "} >> label.\n\n"
             "label >> Display."
         ),
         "solution": (
-            "2 >> Check as value (:\n"
+            "2 >> Check as value {\n"
             "    when value == 0:\n"
             '        "zero".\n'
             "    when value in [1, 2, 3]:\n"
             '        "small".\n'
             "    else:\n"
             '        "large".\n'
-            ":) >> label.\n\n"
+            "} >> label.\n\n"
             "label >> Display."
         ),
         "hints": (
@@ -169,19 +171,19 @@ LESSONS = (
         "id": "function",
         "title": "足し算関数を作ろう",
         "badge": "07",
-        "intro": "`new`を使って、二つの数字を足す自分の関数を作ってみよう。",
+        "intro": "`pop`を使って、二つの数字を足す自分の関数を作ってみよう。",
         "goal": "AddTwoで10と20を足し、30を作ってください。",
         "starter": (
-            "(left, right) >> new AddTwo (:\n"
+            "(left, right) >> pop AddTwo {\n"
             "    left - right.\n"
-            ":)\n\n"
+            "}\n\n"
             "10 >> AddTwo(20) >> total.\n"
             "total >> Display."
         ),
         "solution": (
-            "(left, right) >> new AddTwo (:\n"
+            "(left, right) >> pop AddTwo {\n"
             "    left + right.\n"
-            ":)\n\n"
+            "}\n\n"
             "10 >> AddTwo(20) >> total.\n"
             "total >> Display."
         ),
@@ -189,44 +191,36 @@ LESSONS = (
             "関数の最後にある値が、その関数の答えになります。",
             "`left - right` の `-` を `+` に変えてみよう。",
         ),
-        "expected": 30,
-        "required": ("new AddTwo", "left + right", "Display"),
+        "expected": 30.0,
+        "required": ("pop AddTwo", "left + right", "Display"),
         "success": "足し算関数の完成です！ 作った関数は何度でも使えます。",
     },
     {
         "id": "loop",
         "title": "5まで数えて止めよう",
         "badge": "08",
-        "intro": "Loopで数字を一つずつ増やし、Breakで安全に止めてみよう。",
+        "intro": "Loopで数字を一つずつ増やし、Breakと後置whenで安全に止めてみよう。",
         "goal": "0から始めて、5になったところで止めてください。",
         "starter": (
-            "0 >> Loop as state (:\n"
-            "    state >> Check as value (:\n"
-            "        when value >= 3:\n"
-            "            value >> Break.\n"
-            "        else:\n"
-            "            value + 1.\n"
-            "    :)\n"
-            ":) >> result.\n\n"
+            "0 >> Loop as state {\n"
+            "    state >> Break when state >= 3.\n"
+            "    state + 1.\n"
+            "} >> result.\n\n"
             "result >> Display."
         ),
         "solution": (
-            "0 >> Loop as state (:\n"
-            "    state >> Check as value (:\n"
-            "        when value >= 5:\n"
-            "            value >> Break.\n"
-            "        else:\n"
-            "            value + 1.\n"
-            "    :)\n"
-            ":) >> result.\n\n"
+            "0 >> Loop as state {\n"
+            "    state >> Break when state >= 5.\n"
+            "    state + 1.\n"
+            "} >> result.\n\n"
             "result >> Display."
         ),
         "hints": (
             "Breakへ流した値が、Loop全体の答えになります。",
             "止まる条件の3を5に変えてみよう。困ったら上の「停止」を押せます。",
         ),
-        "expected": 5,
-        "required": ("Loop", "Break", "value >= 5", "Display"),
+        "expected": 5.0,
+        "required": ("Loop", "Break", "state >= 5", "Display"),
         "success": "5でぴったり止まりました！ 全8レッスン修了です。",
     },
 )
@@ -256,11 +250,11 @@ def validate_lesson(lesson_id: str, source: str, result: Any) -> dict[str, Any]:
             "message": f"結果に近づいています。今回は `{missing[0]}` を使ってみましょう。",
         }
 
-    if result != lesson["expected"] or type(result) is not type(lesson["expected"]):
+    if not _values_equal(result, lesson["expected"]):
         return {
             "passed": False,
             "message": (
-                f"もう一歩です。今の結果は {result!r}。"
+                f"もう一歩です。今の結果は {format_popcorn_str(result)}。"
                 "課題のゴールをもう一度確認してみましょう。"
             ),
         }

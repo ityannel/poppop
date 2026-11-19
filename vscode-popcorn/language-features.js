@@ -8,7 +8,7 @@ const PIPELINE_OPERATOR = />>/g;
 const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
 const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
-    "and", "as", "else", "false", "in", "new", "not", "null", "or", "true", "when"
+    "and", "as", "else", "false", "in", "not", "null", "or", "pop", "true", "when"
 ]);
 
 // PopCorn 1 本体に実装されている標準関数と、エディター上での説明です。
@@ -29,10 +29,9 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Max: { description: "配列の最大値を返します。", output: "要素" },
     Min: { description: "配列の最小値を返します。", output: "要素" },
     Average: { description: "数値の配列の平均を Num で返します。", output: "数値" },
-    Round: { description: "数値を四捨五入して最も近い整数を返します。", output: "数値" },
+    Round: { description: "数値を四捨五入して最も近い整数値の Num を返します。", output: "数値" },
     Abs: { description: "数値の絶対値を返します。", output: "数値" },
-    Num: { description: "値を浮動小数点数（Num）に変換します。", output: "数値" },
-    Int: { description: "値を整数（Int）に変換します。", output: "数値" },
+    Num: { description: "変換できる値を数値（Num）に変換します。", output: "数値" },
     Str: { description: "値を規定の形式の文字列に変換します。", output: "文字列" },
     Bool: { description: "値を厳格なルールで真偽値に変換します。", output: "真偽値" },
     List: { description: "リストまたは値リストをリストとして返します。", output: "配列" },
@@ -63,7 +62,7 @@ const STANDARD_FUNCTIONS = Object.freeze({
     ToJson: { description: "値を JSON 文字列に変換します。", output: "文字列" },
     FromJson: { description: "JSON 文字列を PopCorn の値へ変換します。", output: "式" },
     Range: { description: "(start, end) の連続した整数の配列を作成します。", output: "配列" },
-    Return: { description: "いちばん内側の new 関数から値を返します。", output: "式" },
+    Return: { description: "いちばん内側の pop 関数から値を返します。", output: "式" },
     Break: { description: "いちばん内側の Loop を終了して値を返します。", output: "式" },
     Group: { description: "ブロックが返す文字列をキーとして配列をグループ化します。", output: "辞書" },
     Fork: { description: "同じ入力から複数の分岐を評価します。", output: "式" },
@@ -81,10 +80,10 @@ const STANDARD_FUNCTIONS = Object.freeze({
 });
 
 const SYSTEM_KEYWORDS = Object.freeze({
-    when: "Check の Bool 条件分岐を開始します。",
+    when: "Check の Bool 条件分岐、または文末の条件付き実行（後置 when）に使います。",
     else: "それまでの条件に一致しない場合の分岐です。",
     as: "ストリームブロックの現在値に別名を付けます。",
-    new: "トップレベルのユーザー定義関数を宣言します。",
+    pop: "トップレベルのユーザー定義関数を宣言します。",
     true: "Bool の真を表します。",
     false: "Bool の偽を表します。",
     null: "Null 値を表します。",
@@ -223,7 +222,7 @@ function findVariableReferences(text, name) {
 }
 
 function describeBlockHeader(code) {
-    const functionMatch = /\bnew\s+([A-Z][a-zA-Z0-9_]*)\s*\(:/.exec(code);
+    const functionMatch = /\bpop\s+([A-Z][a-zA-Z0-9_]*)\s*\{/.exec(code);
     if (functionMatch) {
         return { kind: "function", name: functionMatch[1] };
     }
@@ -246,7 +245,7 @@ function findBlockRanges(text) {
     scanLines(text, ({ code, lineNumber }) => {
         lastLine = lineNumber;
         const trimmed = code.trim();
-        const startsWithClose = /^:\)/.test(trimmed);
+        const startsWithClose = /^\}/.test(trimmed);
 
         if (startsWithClose) {
             const block = stack.pop();
@@ -255,8 +254,8 @@ function findBlockRanges(text) {
             }
         }
 
-        const openCount = (code.match(/\(\:/g) || []).length;
-        const closeCount = (code.match(/\:\)/g) || []).length;
+        const openCount = (code.match(/\{/g) || []).length;
+        const closeCount = (code.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
 
@@ -292,7 +291,7 @@ function inferValueType(expression) {
 }
 
 function stageName(stage) {
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\b/.exec(stage.replace(/[.:)]+\s*$/, ""));
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\b/.exec(stage.replace(/[.:}]+\s*$/, ""));
     return match?.[1];
 }
 
@@ -372,7 +371,7 @@ function findPipelineAtOffset(text, offset) {
         pipelineEnd = Math.max(pipelineEnd, blockEndLine.lineStart + lastNonWhitespaceIndex(blockEndLine.code) + 1);
     }
 
-    const carriedType = block && /^\s*:\)/.test(line.code)
+    const carriedType = block && /^\s*\}/.test(line.code)
         ? STANDARD_FUNCTIONS[block.name]?.output
         : undefined;
     const typeFlow = buildTypeFlow(
@@ -427,7 +426,7 @@ function namedImplicitVariables(text) {
 function functionParameters(text) {
     const names = new Set();
     scanLines(text, ({ code }) => {
-        const functionOperator = code.indexOf(">> new");
+        const functionOperator = code.indexOf(">> pop");
         if (functionOperator === -1) return;
         const parameterPart = code.slice(0, functionOperator);
         IDENTIFIER.lastIndex = 0;
@@ -486,7 +485,7 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\(:/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
     if (!match) return undefined;
     const stream = match[1] || match[2];
     const paramText = match[3] || match[4] || "";
@@ -508,12 +507,12 @@ function implicitContextAtOffset(text, offset) {
     scanLines(text, ({ code, lineStart }) => {
         if (context || lineStart > offset) return;
         const trimmed = code.trim();
-        const startsWithClose = /^:\)/.test(trimmed);
+        const startsWithClose = /^\}/.test(trimmed);
         if (startsWithClose) {
             stack.pop();
         }
-        const openCount = (code.match(/\(\:/g) || []).length;
-        const closeCount = (code.match(/\:\)/g) || []).length;
+        const openCount = (code.match(/\{/g) || []).length;
+        const closeCount = (code.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
         if (netOpens > 0) {
@@ -603,7 +602,7 @@ function findUpdatePropertyOffsets(text) {
 
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
-        const startsWithClose = /^:\)/.test(trimmed);
+        const startsWithClose = /^\}/.test(trimmed);
         if (startsWithClose) {
             stack.pop();
         }
@@ -621,12 +620,12 @@ function findUpdatePropertyOffsets(text) {
             }
         }
 
-        const openCount = (code.match(/\(\:/g) || []).length;
-        const closeCount = (code.match(/\:\)/g) || []).length;
+        const openCount = (code.match(/\{/g) || []).length;
+        const closeCount = (code.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
         if (netOpens > 0) {
-            const updateMatch = />>\s*Update(?:\s+as\s+([a-z_][a-zA-Z0-9_]*))?\s*\(:/.exec(code);
+            const updateMatch = />>\s*Update(?:\s+as\s+([a-z_][a-zA-Z0-9_]*))?\s*\{/.exec(code);
             for (let i = 0; i < netOpens; i += 1) {
                 stack.push(
                     updateMatch
@@ -682,13 +681,13 @@ function findUpdateScopeRanges(text) {
     const stack = [];
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
-        const startsWithClose = /^:\)/.test(trimmed);
+        const startsWithClose = /^\}/.test(trimmed);
         if (startsWithClose) {
             const block = stack.pop();
             if (block?.kind === "update") ranges.push({ start: block.start, end: lineStart });
         }
-        const openCount = (code.match(/\(\:/g) || []).length;
-        const closeCount = (code.match(/\:\)/g) || []).length;
+        const openCount = (code.match(/\{/g) || []).length;
+        const closeCount = (code.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
         if (netOpens > 0) {
@@ -730,7 +729,6 @@ function inferVariableType(text, name) {
 function typeMismatchDiagnostic(inputType, functionName, start, length) {
     const expected = {
         Num: ["数値", "文字列"],
-        Int: ["数値", "文字列"],
         Uppercase: ["文字列"],
         Lowercase: ["文字列"],
         Sum: ["配列"],
@@ -766,7 +764,7 @@ function pipelineDiagnostics(text) {
         if (!operators.length) return;
 
         const firstStage = line.slice(0, operators[0].index).trim();
-        if (!firstStage && !code.trimStart().startsWith(":)")) {
+        if (!firstStage && !code.trimStart().startsWith("}")) {
             diagnostics.push({
                 kind: "empty-pipeline-input",
                 severity: "warning",
@@ -900,8 +898,8 @@ function analyzeDocument(text) {
             if (
                 end !== -1
                 && code[end] !== "."
-                && !trimmed.endsWith("(:")
-                && !trimmed.endsWith(":)")
+                && !trimmed.endsWith("{")
+                && !trimmed.endsWith("}")
                 && !trimmed.endsWith(":")
             ) {
                 diagnostics.push({
@@ -968,7 +966,7 @@ function formatDocument(text, indentSize = 4) {
         if (!trimmed) return "";
 
         const trimmedCode = maskNonCode(trimmed, state);
-        const startsWithClose = /^:\)/.test(trimmedCode);
+        const startsWithClose = /^\}/.test(trimmedCode);
         const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
 
         if (startsWithClose) {
@@ -980,8 +978,8 @@ function formatDocument(text, indentSize = 4) {
 
         const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
         const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
-        const openCount = (lineCode.match(/\(\:/g) || []).length;
-        const closeCount = (lineCode.match(/\:\)/g) || []).length;
+        const openCount = (lineCode.match(/\{/g) || []).length;
+        const closeCount = (lineCode.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
 

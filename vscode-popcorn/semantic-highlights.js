@@ -4,7 +4,7 @@ const { maskNonCode } = require("./assignment-targets");
 
 const VARIABLE_IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\(:/;
+const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\{/;
 
 function scanLines(text, callback) {
     const lines = text.split("\n");
@@ -64,8 +64,8 @@ function findImplicitVariableOffsets(text) {
 }
 
 /**
- * Finds Map/Filter/etc. blocks delimited by `(:` and `:)`.
- * Generic blocks (such as `new Func (:`) are also kept on the stack so
+ * Finds Map/Filter/etc. blocks delimited by `{` and `}`.
+ * Generic blocks (such as `pop Func {`) are also kept on the stack so
  * nested blocks cannot accidentally close a surrounding @ scope.
  */
 function findImplicitVariableScopeRanges(text) {
@@ -75,7 +75,7 @@ function findImplicitVariableScopeRanges(text) {
 
     scanLines(text, ({ code, lineStart }) => {
         const trimmed = code.trim();
-        const startsWithClose = /^:\)/.test(trimmed);
+        const startsWithClose = /^\}/.test(trimmed);
 
         if (startsWithClose) {
             const block = blockStack.pop();
@@ -84,8 +84,8 @@ function findImplicitVariableScopeRanges(text) {
             }
         }
 
-        const openCount = (code.match(/\(\:/g) || []).length;
-        const closeCount = (code.match(/\:\)/g) || []).length;
+        const openCount = (code.match(/\{/g) || []).length;
+        const closeCount = (code.match(/\}/g) || []).length;
         const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
         const netOpens = openCount - remainingCloses;
 

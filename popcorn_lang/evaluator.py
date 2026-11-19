@@ -7,8 +7,7 @@ from typing import Any
 from .ast_nodes import *
 from .environment import Environment
 
-INT64_MIN = -(1 << 63)
-INT64_MAX = (1 << 63) - 1
+_SKIPPED = object()
 
 
 class EvaluatorError(Exception):
@@ -34,32 +33,27 @@ class BreakException(BaseException):
         self.value = value
 
 
-def _is_int(value: Any) -> bool:
-    return type(value) is int
-
-
 def _is_number(value: Any) -> bool:
     return type(value) in (int, float)
-
-
-def _check_int64(value: int) -> int:
-    if value < INT64_MIN or value > INT64_MAX:
-        raise PopCornError("RuntimeError", f"Integer overflow: {value}")
-    return value
 
 
 def _check_finite(value: float) -> float:
     if math.isnan(value) or math.isinf(value):
         raise PopCornError("RuntimeError", "Numeric result is NaN or Infinity")
-    return value
+    return 0.0 if value == 0.0 else value
 
 
-def _check_number_result(value: Any) -> Any:
-    if type(value) is int:
-        return _check_int64(value)
-    if type(value) is float:
-        return _check_finite(value)
-    return value
+def _to_num(value: Any) -> float:
+    return _check_finite(float(value))
+
+
+def _as_whole_int(value: Any, err_msg: str = "Expected a whole number (Num)") -> int:
+    if not _is_number(value):
+        raise PopCornError("TypeError", err_msg)
+    num = _to_num(value)
+    if not num.is_integer():
+        raise PopCornError("TypeError", err_msg)
+    return int(num)
 
 
 def popcorn_type_name(value: Any) -> str:
@@ -67,9 +61,7 @@ def popcorn_type_name(value: Any) -> str:
         return "Null"
     if isinstance(value, bool):
         return "Bool"
-    if type(value) is int:
-        return "Int"
-    if type(value) is float:
+    if _is_number(value):
         return "Num"
     if isinstance(value, str):
         return "Str"
@@ -88,11 +80,13 @@ def format_popcorn_str(value: Any, *, nested: bool = False) -> str:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
-    if type(value) is int:
-        return str(value)
-    if type(value) is float:
-        _check_finite(value)
-        return str(value)
+    if _is_number(value):
+        num = _to_num(value)
+        if num == 0.0:
+            return "0"
+        if num.is_integer() and abs(num) < 1e21:
+            return str(int(num))
+        return str(num)
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False) if nested else value
     if isinstance(value, list):
@@ -112,7 +106,7 @@ def format_popcorn_str(value: Any, *, nested: bool = False) -> str:
 
 def _values_equal(left: Any, right: Any) -> bool:
     if _is_number(left) and _is_number(right):
-        return left == right
+        return float(left) == float(right)
     if type(left) is not type(right):
         return False
     if isinstance(left, (list, tuple)):
@@ -168,7 +162,7 @@ def _validate_sort_keys(keys: list[Any]) -> None:
         if not all(isinstance(k, str) for k in keys):
             raise PopCornError("RuntimeError", "Sort keys are not mutually comparable")
     else:
-        raise PopCornError("RuntimeError", "Sort keys must be numbers or Str values")
+        raise PopCornError("RuntimeError", "Sort keys must be Num or Str values")
 
 
 class Evaluator:
@@ -212,8 +206,6 @@ class Evaluator:
         raise PopCornError("RuntimeError", f"No eval method for {type(node).__name__}")
 
     async def eval_Program(self, node: Program, env: Environment):
-        # Pass 1: hoist all top-level function definitions for mutual recursion
-        # and order-independent calls.
         for stmt in node.statements:
             if isinstance(stmt, FunctionDefNode):
                 env.set_function(stmt.name, (stmt, None, env))
@@ -221,14 +213,25 @@ class Evaluator:
         result = None
         for stmt in node.statements:
             if isinstance(stmt, FunctionDefNode):
-                # Capture outer variables by value at definition time.
                 env.set_function(stmt.name, (stmt, dict(env.variables), env))
             else:
                 env.set_current(None)
-                result = await self.eval(stmt, env)
+                stmt_res = await self.eval(stmt, env)
+                if stmt_res is not _SKIPPED:
+                    result = stmt_res
 
         env.set_current(result)
         return result
+
+    async def eval_ConditionalStatementNode(
+        self, node: ConditionalStatementNode, env: Environment
+    ):
+        cond_val = await self.eval(node.condition, env)
+        if not isinstance(cond_val, bool):
+            raise PopCornError("TypeError", "when condition must return Bool")
+        if not cond_val:
+            return _SKIPPED
+        return await self.eval(node.pipeline, env)
 
     async def eval_GroupedPipelineNode(self, node: GroupedPipelineNode, env: Environment):
         prev_item = env.current_item
@@ -350,14 +353,16 @@ class Evaluator:
                     fork_env = Environment(parent=env)
                     fork_env.set_current(val)
                     _bind_aliases(fork_env, n.var_names, val)
-                    labeled_results[entry.label] = await self.eval(entry.statement, fork_env)
+                    res = await self.eval(entry.statement, fork_env)
+                    labeled_results[entry.label] = None if res is _SKIPPED else res
                 return labeled_results
             results = []
             for pipeline in n.block.pipelines:
                 fork_env = Environment(parent=env)
                 fork_env.set_current(val)
                 _bind_aliases(fork_env, n.var_names, val)
-                results.append(await self.eval(pipeline, fork_env))
+                res = await self.eval(pipeline, fork_env)
+                results.append(None if res is _SKIPPED else res)
             return results
 
         if n.stream_type == "Update":
@@ -416,9 +421,11 @@ class Evaluator:
     async def eval_BlockNode(self, node: BlockNode, env: Environment):
         block_input = env.get_current()
         result = block_input
-        for pipeline in node.pipelines:
+        for stmt in node.pipelines:
             env.set_current(block_input)
-            result = await self.eval(pipeline, env)
+            stmt_res = await self.eval(stmt, env)
+            if stmt_res is not _SKIPPED:
+                result = stmt_res
         env.set_current(result)
         return result
 
@@ -438,19 +445,15 @@ class Evaluator:
                 env.set_current(saved_current)
                 items.append(await self.eval(item, env) if isinstance(item, ASTNode) else item)
             return items
-        if type(node.value) is int:
-            return _check_int64(node.value)
-        if type(node.value) is float:
-            return _check_finite(node.value)
+        if _is_number(node.value):
+            return _to_num(node.value)
         return node.value
 
     async def eval_UnaryOpNode(self, node: UnaryOpNode, env: Environment):
         if node.operator == "-":
-            if isinstance(node.right, LiteralNode) and type(node.right.value) is int:
-                return _check_int64(-node.right.value)
             right = await self.eval(node.right, env)
             if _is_number(right):
-                return _check_number_result(-right)
+                return _to_num(-float(right))
             raise PopCornError(
                 "TypeError", f"Cannot negate non-number: {popcorn_type_name(right)}"
             )
@@ -495,40 +498,40 @@ class Evaluator:
         right = await self.eval(node.right, env)
         if op == "+":
             if _is_number(left) and _is_number(right):
-                return _check_number_result(left + right)
+                return _to_num(float(left) + float(right))
             if isinstance(left, str) and isinstance(right, str):
                 return left + right
             if isinstance(left, list) and isinstance(right, list):
                 return left + right
             raise PopCornError(
-                "TypeError", "+ requires numbers, two Str values, or two List values"
+                "TypeError", "+ requires Num values, two Str values, or two List values"
             )
         if op == "-":
             if _is_number(left) and _is_number(right):
-                return _check_number_result(left - right)
-            raise PopCornError("TypeError", "- requires numbers")
+                return _to_num(float(left) - float(right))
+            raise PopCornError("TypeError", "- requires Num values")
         if op == "*":
             if _is_number(left) and _is_number(right):
-                return _check_number_result(left * right)
-            raise PopCornError("TypeError", "* requires numbers")
+                return _to_num(float(left) * float(right))
+            raise PopCornError("TypeError", "* requires Num values")
         if op == "/":
             if not (_is_number(left) and _is_number(right)):
-                raise PopCornError("TypeError", "/ requires numbers")
-            if right == 0:
+                raise PopCornError("TypeError", "/ requires Num values")
+            if float(right) == 0.0:
                 raise PopCornError("RuntimeError", "Division by zero")
-            return _check_finite(float(left) / float(right))
+            return _to_num(float(left) / float(right))
         if op == "%":
             if not (_is_number(left) and _is_number(right)):
-                raise PopCornError("TypeError", "% requires numbers")
-            if right == 0:
+                raise PopCornError("TypeError", "% requires Num values")
+            if float(right) == 0.0:
                 raise PopCornError("RuntimeError", "Modulo by zero")
-            return _check_number_result(left % right)
+            return _to_num(float(left) % float(right))
         if op in (">", "<", ">=", "<="):
             comparable = (_is_number(left) and _is_number(right)) or (
                 isinstance(left, str) and isinstance(right, str)
             )
             if not comparable:
-                raise PopCornError("TypeError", f"{op} requires two numbers or two Str values")
+                raise PopCornError("TypeError", f"{op} requires two Num or two Str values")
             if op == ">":
                 return left > right
             if op == "<":
@@ -626,11 +629,10 @@ class Evaluator:
         idx = await self.eval(node.index, env)
 
         if isinstance(target, (list, tuple)):
-            if not _is_int(idx):
-                raise PopCornError("TypeError", "List indices must be Int")
-            if idx < 0 or idx >= len(target):
-                raise PopCornError("IndexError", f"Index {idx} out of bounds")
-            return target[idx]
+            whole_idx = _as_whole_int(idx, "List indices must be whole Num values")
+            if whole_idx < 0 or whole_idx >= len(target):
+                raise PopCornError("IndexError", f"Index {whole_idx} out of bounds")
+            return target[whole_idx]
 
         if isinstance(target, dict):
             if not isinstance(idx, str):
@@ -720,7 +722,7 @@ class Evaluator:
                 break
             scope = scope.parent
         if not scope:
-            raise PopCornError("RuntimeError", "Return can only be used inside a new function")
+            raise PopCornError("RuntimeError", "Return can only be used inside a pop function")
         raise ReturnException(env.get_current())
 
     async def eval_DestructuringBindNode(self, node: DestructuringBindNode, env: Environment):

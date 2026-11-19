@@ -59,10 +59,10 @@ async def repl() -> int:
 
         buffer.append(line)
         joined = "\n".join(buffer)
-        if joined.count("(:") > joined.count(":)"):
+        if joined.count("{") > joined.count("}"):
             continue
         stripped = line.strip()
-        if not (stripped.endswith(".") or stripped.endswith(":)")):
+        if not (stripped.endswith(".") or stripped.endswith("}")):
             continue
 
         try:

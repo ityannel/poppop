@@ -10,7 +10,20 @@ PopCorn 1
 
 PopCorn は、値を `>>` で次の処理へ渡していくデータフロー言語です。値の加工は非破壊的で、元のリストや辞書を書き換えません。画面表示やファイル操作など外部へ作用する処理は、値の加工とは分けて扱います。
 
-改行には構文上の意味がありません。空白・改行・インデントは読みやすさのために自由に使えます。ふつうの文は `.` で終え、ブロックは `(:` で開いて `:)` で閉じます。
+改行には構文上の意味がありません。空白・改行・インデントは読みやすさのために自由に使えます。ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。
+
+### 言語の分類と特徴
+
+PopCorn 1 は、次の性質を組み合わせたデータフロー言語です。
+
+| 分類軸 | PopCorn 1 の性質 |
+|---|---|
+| パラダイム | データフロー型 ＋ 関数型寄り（`Loop`・`Break`・`Return` などの手続き型要素も備える） |
+| データの扱い | 非破壊（イミュータブル）中心。クラスやオブジェクト指向・ドット記法を持たない |
+| 型システム | 強い動的型付け（型注釈は不要だが、暗黙の真偽値変換などは禁止） |
+| 評価とスコープ | 先行評価（`and`/`or` は短絡評価）・レキシカルスコープ |
+| 構文の向き | 代入・関数定義・加工のすべてが左から右（`>>`）に統一 |
+| 主な用途 | 単一ファイル完結の API・JSON 加工、自動化スクリプト、プログラミング入門 |
 
 ```
 42 >> answer.
@@ -27,7 +40,7 @@ answer >> Display.
 
 | 分類 | 記号 |
 |---|---|
-| 文とブロック | `.`、`(:`、`:)`、`:` |
+| 文とブロック | `.`、`{ }`、`:` |
 | パイプ | `>>` |
 | グループ | `( )`、`[ ]`、`{ }` |
 | 区切り | `,` |
@@ -48,13 +61,13 @@ answer >> Display.
 
 ```
 Map  Filter  Reduce  Sort  SortDesc  Group  Fork  Update  Check  Loop  Try  Catch
-Break  Return  Zip  Int  Bool  Str  List  Dict  Num  Type
+Break  Return  Zip  Bool  Str  List  Dict  Num  Type
 ```
 
 次の語は小文字の予約語です。
 
 ```
-when  else  as  new  true  false  null  and  or  not  in
+when  else  as  pop  true  false  null  and  or  not  in
 ```
 
 予約語になるのは、上と完全に同じ綴りだけです。
@@ -75,8 +88,7 @@ PopCorn では次の型を扱います。
 |---|---|---|
 | `Null` | `null` | 値がないことを表す単一の値 |
 | `Bool` | `true`、`false` | 真偽値 |
-| `Int` | `42` | 64ビット符号付き整数（オーバーフロー時は `RuntimeError`） |
-| `Num` | `3.14` | IEEE 754 倍精度浮動小数点数（`NaN`・`Infinity` になる演算は `RuntimeError`） |
+| `Num` | `42`、`3.14` | IEEE 754 倍精度浮動小数点数（`NaN`・`Infinity` になる演算は `RuntimeError`）。添字や回数には小数部のない整数値を使います |
 | `Str` | `"PopCorn"`、`'PopCorn'` | Unicode コードポイント列 |
 | `List` | `[1, 2, 3]` | 順序付き配列（添字は 0 から始まります） |
 | `Dict` | `{"name": "PopCorn"}` | 挿入順を保つ連想配列（キーは `Str`） |
@@ -94,8 +106,7 @@ PopCorn では次の型を扱います。
 
 ```
 Digit          = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
-IntLiteral     = Digit { Digit } .
-NumLiteral     = Digit { Digit } "." Digit { Digit } .
+NumLiteral     = Digit { Digit } [ "." Digit { Digit } ] .
 BoolLiteral    = "true" | "false" .
 NullLiteral    = "null" .
 ListLiteral    = "[" [ Expression { "," Expression } [ "," ] ] "]" .
@@ -117,29 +128,28 @@ ValueList      = "(" Expression "," Expression
 
 ### 等価性
 
-`==` は型と中身を比べます。`Int` と `Num` は数値として比べるため、`1 == 1.0` は `true` です。一方で `Bool` は数値と区別するため、`true == 1` は `false` です。`List` と値リストは、同じ型・同じ長さで、すべての位置の値が等しいときに等しくなります。`Dict` は挿入順に関係なく、同じキーを持ち、それぞれの値が等しいときに等しくなります。比較結果は `Bool` です。
+`==` は型と中身を比べます。`1` と `1.0` はどちらも同じ `Num` の値なので `1 == 1.0` は `true` です。一方で `Bool` は数値と区別するため、`true == 1` は `false` です。`List` と値リストは、同じ型・同じ長さで、すべての位置の値が等しいときに等しくなります。`Dict` は挿入順に関係なく、同じキーを持ち、それぞれの値が等しいときに等しくなります。比較結果は `Bool` です。
 
 ### `Type` と型変換
 
 `Type` は次のいずれかの `Str` を返します。
 
 ```
-Null  Bool  Int  Num  Str  List  Dict  Tuple
+Null  Bool  Num  Str  List  Dict  Tuple
 ```
 
 標準の型処理は次のとおりです。
 
 | 処理 | 意味 |
 |---|---|
-| `Int` | 変換できる値を整数（`Int`）にします |
-| `Num` | 変換できる値を浮動小数点数（`Num`）にします |
+| `Num` | 変換できる値を数値（`Num`）にします |
 | `Str` | 値を規定の形式の文字列（`Str`）にします |
 | `List` | `List` はそのまま返し、値リスト（`Tuple`）は `List` に変換します。それ以外は `TypeError` |
 | `Dict` | 値が `Dict` であることを確かめてそのまま返します。それ以外は `TypeError` |
 | `Type` | PopCorn の型名を返します |
 | `Bool` | 厳格なルールで `Bool` に変換します |
 
-`Int` は、`Int` をそのまま返し、`Num` は小数部分を 0 の方向へ切り捨て、10進整数を表す `Str` をその整数へ変換します。`Num` は、`Int` と `Num` を `Num` として返し、10進数を表す `Str` を `Num` へ変換します。`Bool` は `Int` や `Num` の入力には使えません。
+`Num` は、`Num` をそのまま返し、10進数を表す `Str` を `Num` へ変換します。`Bool` は `Num` の入力には使えません。
 
 `Bool` が受け付けるのは `true`、`false`、数値の `1`、数値の `0` だけです。`1` は `true`、`0` は `false` になります。それ以外の値（`"false"` や `2` など）を渡すと `TypeError` になります。
 
@@ -156,8 +166,7 @@ Null  Bool  Int  Num  Str  List  Dict  Tuple
 |---|---|---|
 | `Null` | `"null"` | 固定文字列 `"null"` |
 | `Bool` | `"true"` / `"false"` | 固定文字列 |
-| `Int` | `"42"`、`"-7"` | 10進表記 |
-| `Num` | `"3.14"`、`"1.0"` | 最短の10進表記（整数値でも `.0` を残します） |
+| `Num` | `"42"`、`"3.14"` | 小数部がない整数値は `"42"` のように小数点なしで表記し、小数は最短の10進表記にします |
 | `Str` | そのまま | 元の文字列をそのまま返します |
 | `List` | `"[1, 2, 3]"` | JSON 互換表記（要素の間は `, `） |
 | `Dict` | `'{"name": "Ada"}'` | JSON 互換表記（挿入順を保ち、`: ` と `, ` で区切ります） |
@@ -172,7 +181,6 @@ Null  Bool  Int  Num  Str  List  Dict  Tuple
 | 分類 | 処理 | 入力 | 結果とルール |
 |---|---|---|---|
 | 型 | `Type` | 任意の値 | PopCorn の型名を返します。 |
-| 型 | `Int` | 整数に変換できる値 | `Int` を返します。変換できない場合は `TypeError`。 |
 | 型 | `Num` | 数値に変換できる値 | `Num` を返します。変換できない場合は `TypeError`。 |
 | 型 | `Str` | 任意の値 | 規定の文字列表現を返します。 |
 | 型 | `List` | `List` または値リスト | `List` を返します。それ以外は `TypeError`。 |
@@ -190,22 +198,22 @@ Null  Bool  Int  Num  Str  List  Dict  Tuple
 | ストリーム | `Loop` | 任意の状態値と反復用ブロック | `Break` まで状態値を更新し続け、`Break` に渡した値を返します。 |
 | ストリーム | `Try` / `Catch` | 任意の値と本体・捕捉ブロック | 本体でエラーが起きたとき、`Catch` で受け取って回復値を返します。 |
 | 数値 | `Add` | `(left, right)` | 2つの値を `+` で足すか連結します。 |
-| 数値 | `Div` | `(left, right)` | 2つの `Int` を 0 の方向へ切り捨てて整数除算した `Int` を返します。0 除算は `RuntimeError`。 |
+| 数値 | `Div` | `(left, right)` | 2つの整数値（小数部のない `Num`）を 0 の方向へ切り捨てて整数除算した `Num` を返します。0 除算は `RuntimeError`。 |
 | 数値 | `Sum` | 数値だけの `List` | 合計を返します。空 `List` は `0`。 |
 | 数値 | `Average` | 数値だけの空でない `List` | 平均を `Num` で返します。空 `List` は `RuntimeError`。 |
 | 数値 | `Max` | 比較できる値の空でない `List` | 最大値を返します。空 `List` は `RuntimeError`。 |
 | 数値 | `Min` | 比較できる値の空でない `List` | 最小値を返します。空 `List` は `RuntimeError`。 |
-| 数値 | `Round` | `Int` または `Num` | いちばん近い `Int` を返します。中間値（`.5`）は 0 から遠い方向へ丸めます（四捨五入）。 |
-| 数値 | `Abs` | `Int` または `Num` | 絶対値を返します（入力と同じ数値型）。 |
-| 数値 | `Random` | `(minimum, maximum)` の 2つの `Int` | 両端を含む範囲からランダムな `Int` を返します。`minimum > maximum` は `RuntimeError`。外部効果あり。 |
-| 数値 | `Range` | `(start, end)` の 2つの `Int` | `start` から `end` まで（両端を含む）の `Int` の `List` を返します。`start > end` なら空 `List` `[]`。 |
+| 数値 | `Round` | `Num` | いちばん近い整数値の `Num` を返します。中間値（`.5`）は 0 から遠い方向へ丸めます（四捨五入）。 |
+| 数値 | `Abs` | `Num` | 絶対値の `Num` を返します。 |
+| 数値 | `Random` | `(minimum, maximum)` の 2つの整数値（`Num`） | 両端を含む範囲からランダムな整数値の `Num` を返します。`minimum > maximum` は `RuntimeError`。外部効果あり。 |
+| 数値 | `Range` | `(start, end)` の 2つの整数値（`Num`） | `start` から `end` まで（両端を含む）の `Num` の `List` を返します。`start > end` なら空 `List` `[]`。 |
 | 文字列 | `Uppercase` | `Str` | 大文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Lowercase` | `Str` | 小文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Split` | `(text, delimiter)` | 区切り文字で分けた `Str` の `List` を返します。 |
 | 文字列 | `Replace` | `(text, old, new)` | 置換後の新しい `Str` を返します。非破壊。 |
 | 文字列 | `Join` | `(items, delimiter)` | `List` の各要素を `Str` 変換してつないだ `Str` を返します。 |
 | 文字列 | `Format` | `(template, value, ...)` | `{0}`、`{1}` などの位置プレースホルダに値を埋め込んだ `Str` を返します。ふだんは `{式}` 補間を使うのがおすすめです。 |
-| コレクション | `Length` | `List`、`Dict`、`Str`、値リスト | 要素数、キー数、または Unicode コードポイント数を `Int` で返します。 |
+| コレクション | `Length` | `List`、`Dict`、`Str`、値リスト | 要素数、キー数、または Unicode コードポイント数を `Num` で返します。 |
 | コレクション | `Reverse` | `List` または `Str` | 逆順にした新しい `List` または `Str`（コードポイント単位）を返します。非破壊。 |
 | コレクション | `Get` | `(target, key)` または `(target, key, default)` | `List` の添字や `Dict` のキーに対応する値を返します。見つからないとき、`default` があればそれを返し、なければ `IndexError` / `KeyError`。 |
 | コレクション | `Set` | `(target, key, value)` | `List` の要素や `Dict` のフィールドを置き換えた新しい値を返します。非破壊。 |
@@ -217,12 +225,12 @@ Null  Bool  Int  Num  Str  List  Dict  Tuple
 | コレクション | `Contains` | `(target, item)` | `List` の要素、`Dict` の `Str` キー、`Str` の部分文字列を探して `Bool` を返します。 |
 | コレクション | `Append` | `(items, item)` | `item` を末尾に追加した新しい `List` を返します。非破壊。 |
 | コレクション | `Slice` | `(target, end)` または `(target, start, end)` | 範囲を切り出した新しい `List` または `Str`（コードポイント単位）を返します。終端 `end` は含みません。負の添字・`start > end`・範囲外は `IndexError`。 |
-| コレクション | `Array` | 非負 `Int` の `size` またはサイズの `List` | 指定した各次元を `0` で埋めた新しい `List` を返します。 |
+| コレクション | `Array` | 非負の整数値（`Num`）の `size` またはサイズの `List` | 指定した各次元を `0` で埋めた新しい `List` を返します。 |
 | コレクション | `Zip` | 空でない `List` 群（値リスト） | 同じ位置の要素どうしを `List` にまとめた `List` を返します。いちばん短い入力の長さで止まります。 |
 | JSON | `ToJson` | JSON にできる値 | JSON 文字列を返します。 |
 | JSON | `FromJson` | JSON 文字列 | JSON を PopCorn の値に変換します。壊れた JSON は `RuntimeError`。 |
 | 時間 | `Now` | 任意の値 | 現在日時を `year`・`month`・`day`・`hour`・`minute`・`second` を持つ `Dict` で返します。外部効果あり。 |
-| 時間 | `Sleep` | 秒数を表す `Int` または `Num` | 指定した秒数だけ待ってから、入力値をそのまま返します。負の値は `RuntimeError`。外部効果あり。 |
+| 時間 | `Sleep` | 秒数を表す `Num` | 指定した秒数だけ待ってから、入力値をそのまま返します。負の値は `RuntimeError`。外部効果あり。 |
 | 入出力 | `Display` | 任意の値 | 値を `Str` 変換して表示し、元の値をそのまま返します。外部効果あり。 |
 | 入出力 | `Input` | 表示するプロンプト（`Str`） | ユーザーが入力した `Str` を返します。外部効果あり。 |
 | 入出力 | `Debug` | 任意の値 | デバッグ用に型と値を表示し、元の値をそのまま返します。外部効果あり。 |
@@ -230,8 +238,8 @@ Null  Bool  Int  Num  Str  List  Dict  Tuple
 | 入出力 | `WriteFile` | `(content, path)` | 内容をファイルへ書き込み、`content` をそのまま返します。失敗時は `IOError`。外部効果あり。 |
 | 入出力 | `Fetch` | URL を表す `Str` | HTTP GET の応答本文を `Str` で返します。通信失敗や 4xx/5xx は `NetworkError`。外部効果あり。 |
 | 入出力 | `PostFetch` | `(body, url)` または `(body, url, headers)` | HTTP POST を送り、応答本文を `Str` で返します。`headers` を省くと `{}` になります。通信失敗や 4xx/5xx は `NetworkError`。外部効果あり。 |
-| 入出力 | `HttpRequest` | `(method, url, headers, body)` | 任意の HTTP リクエストを送り、`{"status": Int, "headers": Dict, "body": Str}` を返します。通信できないときだけ `NetworkError`。外部効果あり。 |
-| 制御 | `Return` | 任意の値 | いちばん内側の `new` 関数を終わらせ、入力値を関数の結果にします。関数外では `RuntimeError`。 |
+| 入出力 | `HttpRequest` | `(method, url, headers, body)` | 任意の HTTP リクエストを送り、`{"status": Num, "headers": Dict, "body": Str}` を返します。通信できないときだけ `NetworkError`。外部効果あり。 |
+| 制御 | `Return` | 任意の値 | いちばん内側の `pop` 関数を終わらせ、入力値を関数の結果にします。関数外では `RuntimeError`。 |
 | 制御 | `Break` | 任意の値 | いちばん内側の `Loop` を終わらせ、入力値を `Loop` の結果にします。`Loop` 外では `RuntimeError`。 |
 | エラー | `Throw` | 任意の値 | 入力値を `Str` 変換したメッセージで `UserError` を起こします。 |
 
@@ -276,6 +284,15 @@ x >> Func(y, z)
 
 **注意点:** `Func(x, y)` のように `>>` なしで関数だけを単独で呼ぶことはできません（`SyntaxError` になります）。関数のメインの入力は、いつも左側のパイプから渡します。
 
+### 条件付き実行（後置 `when`）
+
+文の末尾（`.` の直前）に `when 条件式` を添えると、条件が `true` のときだけその文を実行します。`false` のときはその文をスキップします（条件が `Bool` 以外の場合は `TypeError`）。`Loop` からの `Break` や関数からの `Return` を 1 行で書きたいときに便利です。
+
+```
+items >> Return when (items >> Length) <= 1.
+arr >> Break when i >= n - 1.
+```
+
 ### 構文記法（EBNF）
 
 以下の構文ルールでは、`=` の左側が構文要素の名前、引用符の中がソースにそのまま書く文字、`|` が選択、`[ ]` が省略可能、`{ }` が 0 回以上の繰り返しを表します。
@@ -283,7 +300,7 @@ x >> Func(y, z)
 ```
 Program            = { TopLevelStatement } .
 TopLevelStatement  = FunctionDefinition | Statement .
-Statement          = Pipeline "." | BlockTerminatedPipeline .
+Statement          = Pipeline [ "when" Expression ] "." | BlockTerminatedPipeline .
 Block              = { Statement } .
 
 Pipeline           = Expression { ">>" PipelineStage } .
@@ -305,30 +322,30 @@ StreamBlock        = SimpleStreamBlock
 AliasClause        = "as" ( VariableName
                      | "(" VariableName "," VariableName { "," VariableName } ")" ) .
 
-SimpleStreamBlock  = SimpleStreamName [ AliasClause ] "(:" Block ":)" .
+SimpleStreamBlock  = SimpleStreamName [ AliasClause ] "{" Block "}" .
 SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" | "Loop" .
 
-ReduceBlock        = "Reduce" [ "(" Expression ")" ] [ AliasClause ] "(:" Block ":)" .
+ReduceBlock        = "Reduce" [ "(" Expression ")" ] [ AliasClause ] "{" Block "}" .
 
-ForkBlock          = "Fork" [ AliasClause ] "(:" ( ForkListBody | ForkDictBody ) ":)" .
+ForkBlock          = "Fork" [ AliasClause ] "{" ( ForkListBody | ForkDictBody ) "}" .
 ForkListBody       = Statement { Statement } .
 ForkDictBody       = ForkEntry { ForkEntry } .
 ForkEntry          = VariableName ":" Statement .
 
-UpdateBlock        = "Update" [ AliasClause ] "(:" { UpdateStatement } ":)" .
+UpdateBlock        = "Update" [ AliasClause ] "{" { UpdateStatement } "}" .
 UpdateStatement    = Expression ">>" FieldTarget "." .
 FieldTarget        = ( VariableName | "@" ) "::" Identifier .
 
-CheckBlock         = "Check" [ AliasClause ] "(:"
-                     WhenBranch { WhenBranch } ElseBranch ":)" .
+CheckBlock         = "Check" [ AliasClause ] "{"
+                     WhenBranch { WhenBranch } ElseBranch "}" .
 WhenBranch         = "when" Expression ":" Block .
 ElseBranch         = "else" ":" Block .
 
-TryBlock           = "Try" [ AliasClause ] "(:" Block ":)"
-                     "Catch" [ AliasClause ] "(:" Block ":)" .
+TryBlock           = "Try" [ AliasClause ] "{" Block "}"
+                     "Catch" [ AliasClause ] "{" Block "}" .
 
-FunctionDefinition = [ ParameterList ">>" ] "new" ProcessName "(:"
-                     Block ":)" .
+FunctionDefinition = [ ParameterList ">>" ] "pop" ProcessName "{"
+                     Block "}" .
 ParameterList      = "(" VariableName { "," VariableName } ")" .
 
 Expression         = OrExpr .
@@ -344,7 +361,7 @@ PrimaryExpr        = Literal | VariableName | "@"
 ```
 
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
-* `BlockTerminatedPipeline` の `:)` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
+* `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 
 ### パイプラインの評価
@@ -373,9 +390,9 @@ PrimaryExpr        = Literal | VariableName | "@"
 ストリームブロックでは、`as` を使って現在値にわかりやすい別名を付けられます。
 
 ```
-[1, 2, 3] >> Map as value (:
+[1, 2, 3] >> Map as value {
     value * 2.
-:) >> doubled.
+} >> doubled.
 ```
 
 `Reduce` や `Loop` のように値リストや `List` が流れてくるブロックでは、`as (a, b)` で分解して名前を付けられます。別名はブロックの中だけで有効なので、外側に同じ名前があっても上書きしません。
@@ -423,8 +440,8 @@ and  or
 
 ### 数値演算の型ルール
 
-* `/` はいつでも `Num` を返します（例: `4 / 2` は `2.0`）。整数どうしの割り算をしたいときは標準関数 `Div` を使います（例: `7 >> Div(2)` は `3`）。
-* `+`、`-`、`*`、`%` は、`Int` どうしなら `Int`、どちらかが `Num` なら `Num` を返します（例: `1 + 2.0` は `3.0`）。
+* 数値演算（`+`、`-`、`*`、`/`、`%`）はすべて `Num` を入力とし、`Num` を返します。
+* 整数どうしの割り算（小数点以下切り捨て）をしたいときは標準関数 `Div` を使います（例: `7 >> Div(2)` は `3`）。
 * `0` での割り算（`/`、`Div`）と剰余（`%`）は `RuntimeError` です。
 * `+` は数値の足し算だけでなく、`Str` どうしや `List` どうしの連結にも使えます。連結結果は新しい値として作られます。
 
@@ -470,10 +487,10 @@ value in [1, 3, 5] >> matched.
 
 ## 8. 標準ストリーム処理
 
-ストリーム処理は、処理名、任意の引数や `as` 別名、`(:`、本体、`:)` の順に書きます。別名を省いたときは本体の中で `@` を使います。本体は上から順に評価され、最後の文の結果がブロック全体の結果になります。空の本体は、受け取った現在値をそのまま返します。短い処理なら 1 行でも書けます。
+ストリーム処理は、処理名、任意の引数や `as` 別名、`{`、本体、`}` の順に書きます。別名を省いたときは本体の中で `@` を使います。本体は上から順に評価され、最後の文の結果がブロック全体の結果になります。空の本体は、受け取った現在値をそのまま返します。短い処理なら 1 行でも書けます。
 
 ```
-[1, 2, 3] >> Map as x (: x * 2. :) >> doubled.
+[1, 2, 3] >> Map as x { x * 2. } >> doubled.
 ```
 
 ### `Map`
@@ -481,9 +498,9 @@ value in [1, 3, 5] >> matched.
 `Map` は `List` の各要素を順番に変換し、同じ長さの新しい `List` を返します。
 
 ```
-[1, 2, 3] >> Map as value (:
+[1, 2, 3] >> Map as value {
     value * 2.
-:) >> doubled.
+} >> doubled.
 ```
 
 ### `Filter`
@@ -491,9 +508,9 @@ value in [1, 3, 5] >> matched.
 `Filter` は、ブロックが `Bool` の `true` を返した要素だけを残します。
 
 ```
-[1, 2, 3, 4] >> Filter as value (:
+[1, 2, 3, 4] >> Filter as value {
     value % 2 == 0.
-:) >> evens.
+} >> evens.
 ```
 
 ### `Reduce`
@@ -504,14 +521,14 @@ value in [1, 3, 5] >> matched.
 * 初期値を省いたときは先頭要素が初期 `accumulator` になり、空 `List` は `RuntimeError` です。
 
 ```
-[1, 2, 3, 4] >> Reduce(0) as (acc, item) (:
+[1, 2, 3, 4] >> Reduce(0) as (acc, item) {
     acc + item.
-:) >> total.
+} >> total.
 
 // 初期値を省略する書き方
-[1, 2, 3, 4] >> Reduce as (acc, item) (:
+[1, 2, 3, 4] >> Reduce as (acc, item) {
     acc + item.
-:) >> total2.
+} >> total2.
 ```
 
 ### `Sort` と `SortDesc`
@@ -524,13 +541,13 @@ value in [1, 3, 5] >> matched.
     {"name": "Bob", "score": 10}
 ] >> users.
 
-users >> SortDesc as user (:
+users >> SortDesc as user {
     user::score.
-:) >> by_score.
+} >> by_score.
 
-users >> SortDesc as user (:
+users >> SortDesc as user {
     user::name.
-:) >> by_name_desc.
+} >> by_name_desc.
 ```
 
 ### `Group`
@@ -542,9 +559,9 @@ users >> SortDesc as user (:
     {"team": "red", "name": "A"},
     {"team": "blue", "name": "B"},
     {"team": "red", "name": "C"}
-] >> Group as member (:
+] >> Group as member {
     member::team.
-:) >> by_team.
+} >> by_team.
 ```
 
 ### `Fork`
@@ -556,10 +573,10 @@ users >> SortDesc as user (:
 
 ```
 // ラベル付き形式（Dict を返します）
-[1, 2, 3] >> Fork as values (:
+[1, 2, 3] >> Fork as values {
     total: values >> Sum.
     max:   values >> Max.
-:) >> stats.
+} >> stats.
 stats::total >> Display.
 ```
 
@@ -568,10 +585,10 @@ stats::total >> Display.
 `Update` は `Dict` を非破壊的に更新します。`UpdateBlock` の中では `Expression >> target::field.` の形で、トップレベルのフィールドを追加・上書きします。書いた順に反映されるため、後ろの行から直前に更新したフィールドを参照できます。
 
 ```
-{"name": "Ada", "score": 10} >> Update as user (:
+{"name": "Ada", "score": 10} >> Update as user {
     15 >> user::score.
     true >> user::active.
-:) >> updated.
+} >> updated.
 ```
 
 更新後は新しい外側の `Dict` が作られ、触っていない入れ子の値はそのまま残ります。キーを削除したいときは `Remove` を使ってください。
@@ -593,7 +610,7 @@ stats::total >> Display.
 すべての `when` 条件は `Bool` を返す必要があります。`Bool` 以外を返すと `TypeError` です。複数の候補に当てはまるか調べたいときは `in` 演算子が便利です。
 
 ```
-2 >> Check as value (:
+2 >> Check as value {
     when value == 0:
         "zero".
     when value in [1, 2, 3]:
@@ -602,12 +619,12 @@ stats::total >> Display.
         "large".
     else:
         value >> Str.
-:) >> label.
+} >> label.
 ```
 
 ## 11. `Loop` と `Break`
 
-`Loop` は状態値をくり返し更新する標準ストリーム処理です。ブロックの最後の値が、次の反復の状態になります。状態値が 1 つなら `Loop as state (:`、値リストで複数持つなら `Loop as (a, b) (:` と書けます。
+`Loop` は状態値をくり返し更新する標準ストリーム処理です。ブロックの最後の値が、次の反復の状態になります。状態値が 1 つなら `Loop as state {`、値リストで複数持つなら `Loop as (a, b) {` と書けます。
 
 各反復は次の順で進みます。
 
@@ -619,14 +636,10 @@ stats::total >> Display.
 `Break` はいちばん内側の `Loop` を終わらせ、現在のパイプ値を `Loop` の結果にします。`Loop` の外で `Break` を使うと `RuntimeError` です。
 
 ```
-(0, 0) >> Loop as (count, total) (:
-    count >> Check (:
-        when @ >= 5:
-            total >> Break.
-        else:
-            (count + 1, total + count).
-    :)
-:) >> result.
+(0, 0) >> Loop as (count, total) {
+    total >> Break when count >= 5.
+    (count + 1, total + count).
+} >> result.
 ```
 
 意図的な無限ループも許されます。`Loop` を入れ子にしたとき、`Break` が止めるのは常にいちばん内側の `Loop` だけです。
@@ -641,24 +654,24 @@ stats::total >> Display.
 
 ```
 "https://api.example.com/user"
-    >> Try (:
+    >> Try {
         @ >> Fetch >> FromJson.
-    :)
-    Catch as err (:
+    }
+    Catch as err {
         err::message >> Debug.
         {"name": "guest"}.
-    :)
+    }
     >> user.
 ```
 
 ## 13. 関数と `Return`
 
-関数はプログラムのいちばん外側（`TopLevelStatement`）で `new` を使って定義します。関数本体の最後の値が自動的に返ります。トップレベルの関数どうしは、ファイル内の書く順番に関係なく呼び合ったり、再帰呼び出ししたりできます。
+関数はプログラムのいちばん外側（`TopLevelStatement`）で `pop` を使って定義します。関数本体の最後の値が自動的に返ります。トップレベルの関数どうしは、ファイル内の書く順番に関係なく呼び合ったり、再帰呼び出ししたりできます。
 
 ```
-(left, right) >> new AddTwo (:
+(left, right) >> pop AddTwo {
     left + right.
-:)
+}
 
 (10, 20) >> AddTwo >> total.
 10 >> AddTwo(20) >> total2.
@@ -672,19 +685,19 @@ stats::total >> Display.
 
 ### `Return`
 
-`Return` は関数の途中で早めに抜けるための標準パイプ処理です。いちばん内側の `new` 関数をその場で終わらせ、現在のパイプ値を関数の結果にします。関数の外で使うと `RuntimeError` です。
+`Return` は関数の途中で早めに抜けるための標準パイプ処理です。いちばん内側の `pop` 関数をその場で終わらせ、現在のパイプ値を関数の結果にします。関数の外で使うと `RuntimeError` です。
 
 ```
-(value, min, max) >> new Clamp (:
-    value >> Check (:
+(value, min, max) >> pop Clamp {
+    value >> Check {
         when @ < min:
             min >> Return.
         when @ > max:
             max >> Return.
         else:
             @.
-    :)
-:)
+    }
+}
 
 150 >> Clamp(0, 100) >> clamped.
 ```
@@ -710,12 +723,12 @@ value >> Reverse >> value.
 
 | 分類 | 起きる例 |
 |---|---|
-| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧やブロック記号 `(:` / `:)` の抜け、単独の `Func(...)` 呼び出し |
+| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧やブロックの `{` / `}` の抜け、単独の `Func(...)` 呼び出し |
 | `NameError` | 未定義の変数や関数の参照 |
 | `TypeError` | 標準処理・演算子・`when`/`Filter` 条件に合わない型を渡したとき |
 | `IndexError` | `List` の範囲外アクセス、不正な `Slice` 範囲 |
 | `KeyError` | `Dict` にないキーへのアクセス（デフォルト値なしの `Get` や `::`） |
-| `RuntimeError` | 0 除算、整数オーバーフロー、`NaN`/`Infinity`、比較できない `Sort` キー、`Loop` 外の `Break`、関数外の `Return`、壊れた JSON |
+| `RuntimeError` | 0 除算、`NaN`/`Infinity`、比較できない `Sort` キー、`Loop` 外の `Break`、関数外の `Return`、壊れた JSON |
 | `IOError` | `ReadFile` / `WriteFile` の失敗 |
 | `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` の通信失敗や HTTP エラー |
 | `UserError` | `Throw` を評価したとき |
@@ -739,7 +752,7 @@ PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スク�
 
 ### 推奨スタイルガイド
 
-* **ブロック記号 `(:` / `:)` の使い分け:** 1文だけの短い処理は `[1, 2, 3] >> Map as x (: x * 2. :)` のように 1 行で書き、複数行になるときは閉じ `:)` を単独行か `:) >> 次段階.` の行頭に揃えると見やすくなります。
+* **ブロック `{ }` の書き分け:** 1文だけの短い処理は `[1, 2, 3] >> Map as x { x * 2. }` のように 1 行で書き、複数行になるときは閉じ `}` を単独行か `} >> 次段階.` の行頭に揃えると見やすくなります。
 * **対等なペア引数の書き方:** `Random` の `(minimum, maximum)` や `Zip` の複数 `List` のように、引数が対等な関数は `(1, 6) >> Random` のように値リストで渡すのがおすすめです。
 * **長いパイプラインの改行:** 3 段階以上つながるパイプラインは、`>>` の前で改行して縦に揃えると読みやすくなります。
 

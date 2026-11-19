@@ -40,13 +40,19 @@ class Pipeline(ASTNode):
 
 
 @dataclass
+class ConditionalStatementNode(ASTNode):
+    pipeline: Pipeline
+    condition: ASTNode
+
+
+@dataclass
 class GroupedPipelineNode(ASTNode):
     pipeline: Pipeline
 
 
 @dataclass
 class BlockNode(ASTNode):
-    pipelines: List[Pipeline]
+    pipelines: List[ASTNode]
 
 
 @dataclass
@@ -113,7 +119,7 @@ class InterpolatedStringNode(ASTNode):
 @dataclass
 class ForkEntryNode(ASTNode):
     label: str
-    statement: Pipeline
+    statement: ASTNode
 
 
 # Block Nodes

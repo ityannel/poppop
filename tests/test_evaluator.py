@@ -42,7 +42,7 @@ def test_evaluator_builtin_math():
 
 def test_legacy_error_pipeline_is_rejected():
     try:
-        run_code('"abc" >> Int >~> 0.')
+        run_code('"abc" >> Num >~> 0.')
     except Exception:
         return
     assert False, "legacy pipeline operators must be rejected"
@@ -51,9 +51,9 @@ def test_legacy_error_pipeline_is_rejected():
 def test_readme_map_pipeline():
     res = run_code(
         """
-        [1, 2, 3] >> Map (:
+        [1, 2, 3] >> Map {
             @ * 2.
-        :) >> doubled.
+        } >> doubled.
         doubled.
         """
     )
@@ -61,15 +61,15 @@ def test_readme_map_pipeline():
 
 
 def test_inline_map_pipeline():
-    assert run_code("[1, 2, 3] >> Map as x (: x * 2. :) >> doubled. doubled.") == [2, 4, 6]
+    assert run_code("[1, 2, 3] >> Map as x { x * 2. } >> doubled. doubled.") == [2, 4, 6]
 
 
 def test_named_map_pipeline():
     res = run_code(
         """
-        [1, 2, 3] >> Map as value (:
+        [1, 2, 3] >> Map as value {
             value * 2.
-        :) >> doubled.
+        } >> doubled.
         doubled.
         """
     )
@@ -79,9 +79,9 @@ def test_named_map_pipeline():
 def test_filter_pipeline():
     res = run_code(
         """
-        [1, 2, 3, 4] >> Filter (:
+        [1, 2, 3, 4] >> Filter {
             @ % 2 == 0.
-        :) >> evens.
+        } >> evens.
         evens.
         """
     )
@@ -89,18 +89,18 @@ def test_filter_pipeline():
 
 
 def test_reduce_with_and_without_initial_value():
-    assert run_code("[1, 2, 3, 4] >> Reduce(0) as (acc, item) (: acc + item. :)") == 10
-    assert run_code("[] >> Reduce(42) as (acc, item) (: acc + item. :)") == 42
-    assert run_code("[1, 2, 3, 4] >> Reduce as (acc, item) (: acc + item. :)") == 10
-    assert run_code("[1, 2, 3, 4] >> Reduce (: @[0] + @[1]. :)") == 10
-    expect_error("[] >> Reduce as (acc, item) (: acc + item. :)", "RuntimeError")
+    assert run_code("[1, 2, 3, 4] >> Reduce(0) as (acc, item) { acc + item. }") == 10
+    assert run_code("[] >> Reduce(42) as (acc, item) { acc + item. }") == 42
+    assert run_code("[1, 2, 3, 4] >> Reduce as (acc, item) { acc + item. }") == 10
+    assert run_code("[1, 2, 3, 4] >> Reduce { @[0] + @[1]. }") == 10
+    expect_error("[] >> Reduce as (acc, item) { acc + item. }", "RuntimeError")
 
 
 def test_zip_builtin_and_pipe_extra_args():
     assert run_code("([1, 2], [10, 20]) >> Zip.") == [[1, 10], [2, 20]]
     assert run_code("[1, 2] >> Zip([10, 20]).") == [[1, 10], [2, 20]]
     assert (
-        run_code("([1, 2], [10, 20]) >> Zip >> Map as (a, b) (: a + b. :)")
+        run_code("([1, 2], [10, 20]) >> Zip >> Map as (a, b) { a + b. }")
         == [11, 22]
     )
 
@@ -113,17 +113,17 @@ def test_sort_and_sort_desc():
         {"name": "Cara", "score": 20}
     ] >> users.
     """
-    asc = run_code(code + "users >> Sort as u (: u::score. :)")
+    asc = run_code(code + "users >> Sort as u { u::score. }")
     assert [u["name"] for u in asc] == ["Bob", "Ada", "Cara"]
 
-    desc = run_code(code + "users >> SortDesc as u (: u::score. :)")
+    desc = run_code(code + "users >> SortDesc as u { u::score. }")
     assert [u["name"] for u in desc] == ["Ada", "Cara", "Bob"]
 
-    by_name_desc = run_code(code + "users >> SortDesc as u (: u::name. :)")
+    by_name_desc = run_code(code + "users >> SortDesc as u { u::name. }")
     assert [u["name"] for u in by_name_desc] == ["Cara", "Bob", "Ada"]
 
-    expect_error('[1, "a"] >> Sort (: @. :)', "RuntimeError")
-    expect_error("[true, false] >> Sort (: @. :)", "RuntimeError")
+    expect_error('[1, "a"] >> Sort { @. }', "RuntimeError")
+    expect_error("[true, false] >> Sort { @. }", "RuntimeError")
 
 
 def test_group_pipeline():
@@ -133,36 +133,36 @@ def test_group_pipeline():
             {"team": "red", "name": "A"},
             {"team": "blue", "name": "B"},
             {"team": "red", "name": "C"}
-        ] >> Group as member (:
+        ] >> Group as member {
             member::team.
-        :) >> teams.
+        } >> teams.
         teams.
         """
     )
     assert list(res.keys()) == ["red", "blue"]
     assert [entry["name"] for entry in res["red"]] == ["A", "C"]
     assert [entry["name"] for entry in res["blue"]] == ["B"]
-    expect_error("[1, 2] >> Group as value (: [value]. :)", "TypeError")
+    expect_error("[1, 2] >> Group as value { [value]. }", "TypeError")
 
 
 def test_fork_unlabeled_and_labeled():
     assert (
         run_code(
             """
-            [1, 2, 3] >> Fork (:
+            [1, 2, 3] >> Fork {
                 @ >> Sum.
                 @ >> Max.
-            :)
+            }
             """
         )
         == [6, 3]
     )
     stats = run_code(
         """
-        [1, 2, 3] >> Fork as values (:
+        [1, 2, 3] >> Fork as values {
             total: values >> Sum.
             max:   values >> Max.
-        :)
+        }
         """
     )
     assert stats == {"total": 6, "max": 3}
@@ -172,22 +172,23 @@ def test_fork_unlabeled_and_labeled():
 def test_update_pipeline():
     res = run_code(
         """
-        {"name": "Ada", "score": 10} >> Update as user (:
+        {"name": "Ada", "score": 10} >> Update as user {
             15 >> user::score.
             user::score * 2 >> user::double.
             true >> user::active.
-        :)
+        }
         """
     )
     assert res == {"name": "Ada", "score": 15, "double": 30, "active": True}
-    expect_error('{"score": 10} >> Update (: @::score >> 15. :)', "RuntimeError")
+    expect_error('{"score": 10} >> Update { @::score >> 15. }', "RuntimeError")
 
 
 def test_dictionary_access_and_error_types():
     assert run_code('{"name": "PopCorn"} >> project. project::name.') == "PopCorn"
     expect_error('{"name": "PopCorn"} >> p. p::missing.', "KeyError")
-    expect_error('[1, 2] >> xs. xs[5].', "IndexError")
-    expect_error('[1, 2] >> xs. xs[-1].', "IndexError")
+    expect_error("[1, 2] >> xs. xs[5].", "IndexError")
+    expect_error("[1, 2] >> xs. xs[-1].", "IndexError")
+    expect_error("[1, 2] >> xs. xs[1.5].", "TypeError")
     expect_error('[1, 2] >> xs. xs["a"].', "TypeError")
     expect_error('{"a": 1} >> d. d[0].', "TypeError")
 
@@ -202,102 +203,100 @@ def test_tuple_vs_list_semantics():
     assert run_code("(1, 2) >> Length.") == 2
     assert run_code("(1, 2) >> Str.") == "(1, 2)"
 
-    # List is NOT unpacked as multiple arguments; only Tuple is
     code = """
-    (left, right) >> new AddTwo (:
+    (left, right) >> pop AddTwo {
         left + right.
-    :)
+    }
     """
     assert run_code(code + "(10, 20) >> AddTwo.") == 30
     assert run_code(code + "10 >> AddTwo(20).") == 30
     expect_error(code + "[10, 20] >> AddTwo.", "RuntimeError")
 
-    # Single-param function receives List as single argument
     single = """
-    (items) >> new Head (:
+    (items) >> pop Head {
         items[0].
-    :)
+    }
     [10, 20] >> Head.
     """
     assert run_code(single) == 10
 
 
 def test_pipe_extra_arguments_chain():
-    assert (
-        run_code('"a,b,c" >> Split(",") >> Join("-") >> Uppercase.')
-        == "A-B-C"
-    )
-    assert (
-        run_code('{"name": "Ada"} >> Get("nickname", "名無し").')
-        == "名無し"
-    )
+    assert run_code('"a,b,c" >> Split(",") >> Join("-") >> Uppercase.') == "A-B-C"
+    assert run_code('{"name": "Ada"} >> Get("nickname", "名無し").') == "名無し"
     assert run_code('{"name": "Ada"} >> Get("name", "名無し").') == "Ada"
 
 
 def test_at_resets_across_statements_in_block():
     code = """
-    [5] >> Map (:
+    [5] >> Map {
         @ * 2 >> doubled.
         @ + doubled.
-    :)
+    }
     """
     assert run_code(code) == [15]
 
 
 def test_parenthesized_pipeline_in_expression():
     assert run_code("([1, 2] >> Length) + 1.") == 3
-    # Preserves outer @ inside block
-    assert run_code("[10] >> Map (: ([1, 2] >> Length) + @. :)") == [12]
+    assert run_code("[10] >> Map { ([1, 2] >> Length) + @. }") == [12]
 
 
-def test_str_conversion_rules_and_interpolation():
+def test_unified_num_type_str_and_json():
+    assert run_code("42 >> Type.") == "Num"
+    assert run_code("3.14 >> Type.") == "Num"
+    assert run_code("1 == 1.0.") is True
     assert run_code("null >> Str.") == "null"
     assert run_code("true >> Str.") == "true"
     assert run_code("false >> Str.") == "false"
     assert run_code("42 >> Str.") == "42"
+    assert run_code("42.0 >> Str.") == "42"
     assert run_code("-7 >> Str.") == "-7"
     assert run_code("3.14 >> Str.") == "3.14"
-    assert run_code("1.0 >> Str.") == "1.0"
+    assert run_code("1.0 >> Str.") == "1"
     assert run_code('"Ada" >> Str.') == "Ada"
     assert run_code("[1, 2, 3] >> Str.") == "[1, 2, 3]"
-    assert run_code('{"name": "Ada"} >> Str.') == '{"name": "Ada"}'
+    assert run_code('{"name": "Ada", "age": 30} >> Str.') == '{"name": "Ada", "age": 30}'
     assert run_code("(1, 2) >> Str.") == "(1, 2)"
+    assert run_code("[1, 2, 3] >> ToJson.") == "[1, 2, 3]"
+    assert run_code('"[1, 2.5]" >> FromJson >> Map { @ >> Type. }') == ["Num", "Num"]
 
+    # Int builtin is removed
+    expect_error('"42" >> Int.', "NameError")
+
+    # Interpolation
     assert run_code('"Ada" >> person. "Hello, {person}!".') == "Hello, Ada!"
     assert run_code('"{{name}}".') == "{name}"
     assert run_code('7 >> value. "{{Value: {value}}}".') == "{Value: 7}"
     assert run_code('\'Dict: { {"a": 1}::a }\'.') == "Dict: 1"
-    assert run_code('"{true} {null} {1.0}".') == "true null 1.0"
+    assert run_code('"{true} {null} {1.0}".') == "true null 1"
     expect_error('"Hello, {missing}.".', "NameError")
 
 
-def test_numeric_rules_div_round_overflow():
-    # / always returns Num (float)
-    res_div = run_code("4 / 2.")
-    assert res_div == 2.0 and type(res_div) is float
-    # Div truncates toward zero and returns Int
+def test_numeric_rules_div_round_infinity():
+    assert run_code("4 / 2.") == 2.0
+    assert run_code("4 / 2 >> Type.") == "Num"
     assert run_code("7 >> Div(2).") == 3
     assert run_code("-7 >> Div(2).") == -3
     assert run_code("7 >> Div(-2).") == -3
+    assert run_code("7 >> Div(2) >> Type.") == "Num"
     expect_error("7 >> Div(0).", "RuntimeError")
-    expect_error("7.0 >> Div(2).", "TypeError")
-    # Num always returns float
-    res_num = run_code("5 >> Num.")
-    assert res_num == 5.0 and type(res_num) is float
-    assert run_code('"5" >> Num >> Type.') == "Num"
+    expect_error("7.5 >> Div(2).", "TypeError")
+
+    assert run_code('"5" >> Num.') == 5.0
+    assert run_code('"5.5" >> Num >> Type.') == "Num"
+    expect_error("true >> Num.", "TypeError")
+
     # Round half away from zero
     assert run_code("2.5 >> Round.") == 3
     assert run_code("1.5 >> Round.") == 2
     assert run_code("-2.5 >> Round.") == -3
     assert run_code("-1.5 >> Round.") == -2
-    assert run_code("42 >> Round.") == 42
-    # Int64 bounds and overflow
-    assert run_code("-9223372036854775808.") == -(1 << 63)
-    expect_error("9223372036854775807 + 1.", "RuntimeError")
-    expect_error("-9223372036854775808 >> Abs.", "RuntimeError")
+    assert run_code("42 >> Round >> Type.") == "Num"
+
     # Float infinity -> RuntimeError
     expect_error(
-        "100000000000000000000.0 >> x. x * x >> x. x * x >> x. x * x >> x. x * x.",
+        "100000000000000000000 >> x. x * x >> x. x * x >> x. x * x >> x. x * x.",
         "RuntimeError",
     )
 
@@ -312,8 +311,8 @@ def test_in_operator_and_strict_bool():
     assert run_code("true or missing.") is True
     expect_error("1 and true.", "TypeError")
     expect_error("not 0.", "TypeError")
-    expect_error("[1] >> Filter (: @. :)", "TypeError")
-    expect_error('1 >> Check (: when @: "yes". else: "no". :)', "TypeError")
+    expect_error("[1] >> Filter { @. }", "TypeError")
+    expect_error('1 >> Check { when @: "yes". else: "no". }', "TypeError")
 
 
 def test_new_collection_builtins():
@@ -325,29 +324,74 @@ def test_new_collection_builtins():
     assert run_code("(1, 4) >> Range.") == [1, 2, 3, 4]
     assert run_code("(5, 2) >> Range.") == []
     expect_error("5 >> Range.", "TypeError")
-    # Slice strict bounds
+    expect_error("(1.5, 4) >> Range.", "TypeError")
     assert run_code("[10, 20, 30, 40] >> Slice(1, 3).") == [20, 30]
     assert run_code("[10, 20, 30, 40] >> Slice(2).") == [10, 20]
     assert run_code('"PopCorn" >> Slice(0, 3).') == "Pop"
     expect_error("[1, 2, 3] >> Slice(-1, 2).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(2, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(0, 5).", "IndexError")
-    # Average/Max/Min empty list -> RuntimeError
+    expect_error("[1, 2, 3] >> Slice(0.5, 2).", "TypeError")
     expect_error("[] >> Average.", "RuntimeError")
     expect_error("[] >> Max.", "RuntimeError")
     expect_error("[] >> Min.", "RuntimeError")
     assert run_code("[] >> Sum.") == 0
-    # Random min > max -> RuntimeError
     expect_error("(5, 1) >> Random.", "RuntimeError")
-    # Sleep negative -> RuntimeError
     expect_error("-1 >> Sleep.", "RuntimeError")
 
 
-def test_check_and_loop_with_destructuring():
+def test_postfix_when_and_loop():
+    # Postfix when skips statement when false, executes when true
+    assert run_code("10 >> x. 99 >> x when false. x.") == 10
+    assert run_code("10 >> x. 99 >> x when true. x.") == 99
+    expect_error("10 >> x when 1.", "TypeError")
+
+    # Spec Section 11 Loop example with postfix when
     assert (
         run_code(
             """
-            2 >> Check as value (:
+            (0, 0) >> Loop as (count, total) {
+                total >> Break when count >= 5.
+                (count + 1, total + count).
+            } >> result.
+            result.
+            """
+        )
+        == 10
+    )
+
+    # Spec Section 4 Return with postfix when
+    assert (
+        run_code(
+            """
+            (items) >> pop FirstOrSelf {
+                items >> Return when (items >> Length) <= 1.
+                items[0].
+            }
+            [42] >> FirstOrSelf.
+            """
+        )
+        == [42]
+    )
+    assert (
+        run_code(
+            """
+            (items) >> pop FirstOrSelf {
+                items >> Return when (items >> Length) <= 1.
+                items[0].
+            }
+            [10, 20] >> FirstOrSelf.
+            """
+        )
+        == 10
+    )
+
+
+def test_check_block():
+    assert (
+        run_code(
+            """
+            2 >> Check as value {
                 when value == 0:
                     "zero".
                 when value in [1, 2, 3]:
@@ -356,25 +400,10 @@ def test_check_and_loop_with_destructuring():
                     "large".
                 else:
                     value >> Str.
-            :)
+            }
             """
         )
         == "small"
-    )
-    assert (
-        run_code(
-            """
-            (0, 0) >> Loop as (count, total) (:
-                count >> Check (:
-                    when @ >= 5:
-                        total >> Break.
-                    else:
-                        (count + 1, total + count).
-                :)
-            :)
-            """
-        )
-        == 10
     )
 
 
@@ -382,11 +411,11 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "abc" >> Try (:
-                @ >> Int.
-            :) Catch as err (:
+            "abc" >> Try {
+                @ >> Num.
+            } Catch as err {
                 [err::type, err::message].
-            :)
+            }
             """
         )[0]
         == "TypeError"
@@ -394,11 +423,11 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "42" >> Try (:
-                @ >> Int.
-            :) Catch as err (:
+            "42" >> Try {
+                @ >> Num.
+            } Catch as err {
                 0.
-            :)
+            }
             """
         )
         == 42
@@ -406,26 +435,25 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "boom" >> Try (:
+            "boom" >> Try {
                 @ >> Throw.
-            :) Catch as err (:
+            } Catch as err {
                 err::type + ":" + err::message.
-            :)
+            }
             """
         )
         == "UserError:boom"
     )
-    # Return/Break must NOT be caught by Try/Catch
     assert (
         run_code(
             """
-            (x) >> new Early (:
-                x >> Try (:
+            (x) >> pop Early {
+                x >> Try {
                     99 >> Return.
-                :) Catch as err (:
+                } Catch as err {
                     -1.
-                :)
-            :)
+                }
+            }
             1 >> Early.
             """
         )
@@ -434,13 +462,13 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            0 >> Loop (:
-                @ >> Try (:
+            0 >> Loop {
+                @ >> Try {
                     7 >> Break.
-                :) Catch as err (:
+                } Catch as err {
                     -1.
-                :)
-            :)
+                }
+            }
             """
         )
         == 7
@@ -448,79 +476,63 @@ def test_try_and_catch():
 
 
 def test_functions_closures_mutual_recursion_and_return():
-    # Value capture at definition time
     assert (
         run_code(
             """
             10 >> base.
-            (x) >> new AddBase (:
+            (x) >> pop AddBase {
                 x + base.
-            :)
+            }
             999 >> base.
             5 >> AddBase.
             """
         )
         == 15
     )
-    # Mutual recursion regardless of declaration order
     assert (
         run_code(
             """
-            (n) >> new IsEven (:
-                n >> Check (:
-                    when @ == 0:
-                        true.
-                    else:
-                        (n - 1) >> IsOdd.
-                :)
-            :)
-            (n) >> new IsOdd (:
-                n >> Check (:
-                    when @ == 0:
-                        false.
-                    else:
-                        (n - 1) >> IsEven.
-                :)
-            :)
+            (n) >> pop IsEven {
+                true >> Return when n == 0.
+                (n - 1) >> IsOdd.
+            }
+            (n) >> pop IsOdd {
+                false >> Return when n == 0.
+                (n - 1) >> IsEven.
+            }
             6 >> IsEven.
             """
         )
         is True
     )
-    # Spec Clamp example with Return
     assert (
         run_code(
             """
-            (value, min, max) >> new Clamp (:
-                value >> Check (:
+            (value, min, max) >> pop Clamp {
+                value >> Check {
                     when @ < min:
                         min >> Return.
                     when @ > max:
                         max >> Return.
                     else:
                         @.
-                :)
-            :)
+                }
+            }
             150 >> Clamp(0, 100).
             """
         )
         == 100
     )
-    # Return inside Map exits enclosing function
     assert (
         run_code(
             """
-            (xs) >> new FindNeg (:
-                xs >> Map as x (:
-                    x >> Check (:
-                        when @ < 0:
-                            x >> Return.
-                        else:
-                            x.
-                    :)
-                :)
+            (xs) >> pop FindNeg {
+                xs >> Map as x {
+                    x >> Return when x < 0.
+                    x.
+                }
                 0.
-            :)
+            }
             [1, 2, -5, 4] >> FindNeg.
             """
         )
@@ -535,7 +547,6 @@ def test_readfile_and_writefile(tmp_path):
     assert run_code(f'"hello popcorn" >> WriteFile("{target}").') == "hello popcorn"
     assert run_code(f'"{target}" >> ReadFile.') == "hello popcorn"
     expect_error(f'"{target}.missing" >> ReadFile.', "IOError")
-    # Fetch must reject local paths now
     expect_error(f'"{target}" >> Fetch.', "NetworkError")
 
 
@@ -573,6 +584,7 @@ def test_http_builtins_local_server():
         assert run_code(f'"payload" >> PostFetch("{base}/echo").') == "echo:payload"
         resp = run_code(f'("GET", "{base}/missing", {{}}, "") >> HttpRequest.')
         assert resp["status"] == 404
+        assert type(resp["status"]) is float
         assert resp["body"] == "not-found"
         assert isinstance(resp["headers"], dict)
     finally:
@@ -592,7 +604,7 @@ def test_display_and_debug_output(capsys):
     assert capsys.readouterr().out == '[null, true, {"name": "PopCorn"}]\n'
 
     assert run_code("42 >> Debug.") == 42
-    assert capsys.readouterr().out == "[DEBUG] (Int) 42\n"
+    assert capsys.readouterr().out == "[DEBUG] (Num) 42\n"
 
 
 def test_destructuring_bind():

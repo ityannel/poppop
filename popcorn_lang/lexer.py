@@ -190,20 +190,17 @@ class Lexer:
                 self.tokens.append(scan_string())
                 continue
 
-            # Numbers
+            # Numbers (all numeric values are IEEE 754 Num)
             if ch.isdigit():
                 start = i
                 while i < n and code[i].isdigit():
                     advance_char()
-                is_float = False
                 if i + 1 < n and code[i] == "." and code[i + 1].isdigit():
-                    is_float = True
                     advance_char()  # '.'
                     while i < n and code[i].isdigit():
                         advance_char()
                 raw = code[start:i]
-                value = float(raw) if is_float else int(raw)
-                self.tokens.append(Token("NUMBER", value, start_line, start_col))
+                self.tokens.append(Token("NUMBER", float(raw), start_line, start_col))
                 continue
 
             # Identifiers / Keywords / Verbs
@@ -226,16 +223,6 @@ class Lexer:
                 advance_char()
                 advance_char()
                 self.tokens.append(Token("STREAM_OP", ">>", start_line, start_col))
-                continue
-            if two == "(:":
-                advance_char()
-                advance_char()
-                self.tokens.append(Token("BLOCK_OPEN", "(:", start_line, start_col))
-                continue
-            if two == ":)":
-                advance_char()
-                advance_char()
-                self.tokens.append(Token("BLOCK_CLOSE", ":)", start_line, start_col))
                 continue
             if two == "::":
                 advance_char()

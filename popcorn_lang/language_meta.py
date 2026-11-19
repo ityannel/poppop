@@ -4,7 +4,7 @@ KEYWORDS = (
     "when",
     "else",
     "as",
-    "new",
+    "pop",
     "true",
     "false",
     "null",

@@ -5,35 +5,39 @@ def test_lexer_numbers():
     lexer = Lexer("42 3.14")
     tokens = lexer.tokenize()
     assert tokens[0].type == "NUMBER"
-    assert tokens[0].value == 42
+    assert tokens[0].value == 42.0
     assert tokens[1].type == "NUMBER"
     assert tokens[1].value == 3.14
 
 
 def test_integer_followed_by_statement_dot():
     tokens = Lexer("42.").tokenize()
-    assert [(t.type, t.value) for t in tokens] == [("NUMBER", 42), ("DOT", ".")]
+    assert [(t.type, t.value) for t in tokens] == [("NUMBER", 42.0), ("DOT", ".")]
 
 
 def test_block_delimiters_and_new_keywords():
-    tokens = Lexer("when else as in (: :)").tokenize()
+    tokens = Lexer("when else as pop in { }").tokenize()
     assert [t.type for t in tokens] == [
         "WHEN",
         "ELSE",
         "AS",
+        "POP",
         "IN",
-        "BLOCK_OPEN",
-        "BLOCK_CLOSE",
+        "LBRACE",
+        "RBRACE",
     ]
 
 
-def test_is_is_now_a_plain_variable():
-    tokens = Lexer("is").tokenize()
-    assert [(t.type, t.value) for t in tokens] == [("VARIABLE", "is")]
+def test_is_and_new_are_now_plain_variables():
+    tokens = Lexer("is new").tokenize()
+    assert [(t.type, t.value) for t in tokens] == [
+        ("VARIABLE", "is"),
+        ("VARIABLE", "new"),
+    ]
 
 
 def test_lowercase_type_words_are_plain_variables():
-    tokens = Lexer("int bool str list dict").tokenize()
+    tokens = Lexer("int bool str list dict num").tokenize()
     assert all(token.type == "VARIABLE" for token in tokens)
 
 

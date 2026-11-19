@@ -2,7 +2,6 @@
 import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import json
-import math
 import random
 import re
 import sys
@@ -14,12 +13,10 @@ from .evaluator import (
     BreakException,
     PopCornError,
     ReturnException,
-    _check_finite,
-    _check_int64,
-    _check_number_result,
+    _as_whole_int,
     _contains_value,
-    _is_int,
     _is_number,
+    _to_num,
     format_popcorn_str,
     popcorn_type_name,
 )
@@ -37,6 +34,37 @@ def _wrap_unexpected(fn_name: str, exc: Exception):
     raise PopCornError("RuntimeError", f"Error in {fn_name}: {exc}")
 
 
+def _to_json_ready(value):
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if _is_number(value):
+        num = _to_num(value)
+        if num == 0.0:
+            return 0
+        if num.is_integer() and abs(num) < 1e21:
+            return int(num)
+        return num
+    if isinstance(value, list):
+        return [_to_json_ready(v) for v in value]
+    if isinstance(value, tuple):
+        return [_to_json_ready(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _to_json_ready(v) for k, v in value.items()}
+    _type_error(f"Cannot convert {popcorn_type_name(value)} to JSON")
+
+
+def _from_json_normalize(value):
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if _is_number(value):
+        return _to_num(value)
+    if isinstance(value, list):
+        return [_from_json_normalize(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _from_json_normalize(v) for k, v in value.items()}
+    return value
+
+
 # --- Type built-ins ---
 
 
@@ -47,29 +75,12 @@ def builtin_Type(current, env, evaluator):
 BUILTIN_REGISTRY["Type"] = builtin_Type
 
 
-def builtin_Int(current, env, evaluator):
-    if _is_int(current):
-        return _check_int64(current)
-    if type(current) is float:
-        _check_finite(current)
-        return _check_int64(math.trunc(current))
-    if isinstance(current, str):
-        if re.fullmatch(r"[+-]?\d+", current):
-            return _check_int64(int(current))
-    _type_error(f"Cannot cast '{current}' to Int")
-
-
-BUILTIN_REGISTRY["Int"] = builtin_Int
-
-
 def builtin_Num(current, env, evaluator):
-    if _is_int(current):
-        return _check_finite(float(current))
-    if type(current) is float:
-        return _check_finite(current)
+    if _is_number(current):
+        return _to_num(current)
     if isinstance(current, str):
         if re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)", current):
-            return _check_finite(float(current))
+            return _to_num(float(current))
     _type_error(f"Cannot cast '{current}' to Num")
 
 
@@ -107,9 +118,10 @@ def builtin_Bool(current, env, evaluator):
     if isinstance(current, bool):
         return current
     if _is_number(current):
-        if current == 1:
+        num = _to_num(current)
+        if num == 1.0:
             return True
-        if current == 0:
+        if num == 0.0:
             return False
     _type_error("Bool accepts only true, false, 1, or 0")
 
@@ -124,12 +136,12 @@ def builtin_Add(current, env, evaluator):
     if isinstance(current, tuple) and len(current) == 2:
         left, right = current
         if _is_number(left) and _is_number(right):
-            return _check_number_result(left + right)
+            return _to_num(float(left) + float(right))
         if isinstance(left, str) and isinstance(right, str):
             return left + right
         if isinstance(left, list) and isinstance(right, list):
             return left + right
-    _type_error("Add requires (left, right) of numbers, Str values, or List values")
+    _type_error("Add requires (left, right) of Num values, Str values, or List values")
 
 
 BUILTIN_REGISTRY["Add"] = builtin_Add
@@ -137,14 +149,14 @@ BUILTIN_REGISTRY["Add"] = builtin_Add
 
 def builtin_Div(current, env, evaluator):
     if isinstance(current, tuple) and len(current) == 2:
-        left, right = current
-        if _is_int(left) and _is_int(right):
-            if right == 0:
-                raise PopCornError("RuntimeError", "Division by zero")
-            q = abs(left) // abs(right)
-            res = -q if (left < 0) ^ (right < 0) else q
-            return _check_int64(res)
-    _type_error("Div requires (Int, Int)")
+        left = _as_whole_int(current[0], "Div requires two whole Num values")
+        right = _as_whole_int(current[1], "Div requires two whole Num values")
+        if right == 0:
+            raise PopCornError("RuntimeError", "Division by zero")
+        q = abs(left) // abs(right)
+        res = -q if (left < 0) ^ (right < 0) else q
+        return _to_num(res)
+    _type_error("Div requires (left, right) of two whole Num values")
 
 
 BUILTIN_REGISTRY["Div"] = builtin_Div
@@ -152,12 +164,10 @@ BUILTIN_REGISTRY["Div"] = builtin_Div
 
 def builtin_Sum(current, env, evaluator):
     if not isinstance(current, list) or not all(_is_number(item) for item in current):
-        _type_error("Sum requires a List of numbers")
-    if not current:
-        return 0
-    total = 0
+        _type_error("Sum requires a List of Num values")
+    total = 0.0
     for item in current:
-        total = _check_number_result(total + item)
+        total = _to_num(total + float(item))
     return total
 
 
@@ -166,13 +176,13 @@ BUILTIN_REGISTRY["Sum"] = builtin_Sum
 
 def builtin_Average(current, env, evaluator):
     if not isinstance(current, list) or not all(_is_number(item) for item in current):
-        _type_error("Average requires a List of numbers")
+        _type_error("Average requires a List of Num values")
     if not current:
         raise PopCornError("RuntimeError", "Average requires a non-empty List")
     total = 0.0
     for item in current:
-        total = _check_finite(total + float(item))
-    return _check_finite(total / len(current))
+        total = _to_num(total + float(item))
+    return _to_num(total / len(current))
 
 
 BUILTIN_REGISTRY["Average"] = builtin_Average
@@ -180,14 +190,14 @@ BUILTIN_REGISTRY["Average"] = builtin_Average
 
 def builtin_Max(current, env, evaluator):
     if not isinstance(current, list):
-        _type_error("Max requires a List of numbers or Str values")
+        _type_error("Max requires a List of Num or Str values")
     if not current:
         raise PopCornError("RuntimeError", "Max requires a non-empty List")
-    if all(_is_number(item) for item in current) or all(
-        isinstance(item, str) for item in current
-    ):
+    if all(_is_number(item) for item in current):
+        return _to_num(max(current))
+    if all(isinstance(item, str) for item in current):
         return max(current)
-    _type_error("Max requires a List of numbers or Str values")
+    _type_error("Max requires a List of Num or Str values")
 
 
 BUILTIN_REGISTRY["Max"] = builtin_Max
@@ -195,27 +205,25 @@ BUILTIN_REGISTRY["Max"] = builtin_Max
 
 def builtin_Min(current, env, evaluator):
     if not isinstance(current, list):
-        _type_error("Min requires a List of numbers or Str values")
+        _type_error("Min requires a List of Num or Str values")
     if not current:
         raise PopCornError("RuntimeError", "Min requires a non-empty List")
-    if all(_is_number(item) for item in current) or all(
-        isinstance(item, str) for item in current
-    ):
+    if all(_is_number(item) for item in current):
+        return _to_num(min(current))
+    if all(isinstance(item, str) for item in current):
         return min(current)
-    _type_error("Min requires a List of numbers or Str values")
+    _type_error("Min requires a List of Num or Str values")
 
 
 BUILTIN_REGISTRY["Min"] = builtin_Min
 
 
 def builtin_Round(current, env, evaluator):
-    if _is_int(current):
-        return _check_int64(current)
-    if type(current) is float:
-        _check_finite(current)
-        rounded = int(Decimal(str(current)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-        return _check_int64(rounded)
-    _type_error("Round requires Int or Num")
+    if _is_number(current):
+        num = _to_num(current)
+        rounded = int(Decimal(str(num)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        return _to_num(rounded)
+    _type_error("Round requires Num")
 
 
 BUILTIN_REGISTRY["Round"] = builtin_Round
@@ -223,8 +231,8 @@ BUILTIN_REGISTRY["Round"] = builtin_Round
 
 def builtin_Abs(current, env, evaluator):
     if _is_number(current):
-        return _check_number_result(abs(current))
-    _type_error("Abs requires Int or Num")
+        return _to_num(abs(float(current)))
+    _type_error("Abs requires Num")
 
 
 BUILTIN_REGISTRY["Abs"] = builtin_Abs
@@ -232,14 +240,12 @@ BUILTIN_REGISTRY["Abs"] = builtin_Abs
 
 def builtin_Random(current, env, evaluator):
     if isinstance(current, tuple) and len(current) == 2:
-        minimum, maximum = current
-        if _is_int(minimum) and _is_int(maximum):
-            if minimum > maximum:
-                raise PopCornError(
-                    "RuntimeError", "Random requires minimum <= maximum"
-                )
-            return random.randint(minimum, maximum)
-    _type_error("Random requires (Int, Int)")
+        minimum = _as_whole_int(current[0], "Random requires two whole Num values")
+        maximum = _as_whole_int(current[1], "Random requires two whole Num values")
+        if minimum > maximum:
+            raise PopCornError("RuntimeError", "Random requires minimum <= maximum")
+        return _to_num(random.randint(minimum, maximum))
+    _type_error("Random requires (minimum, maximum) of two whole Num values")
 
 
 BUILTIN_REGISTRY["Random"] = builtin_Random
@@ -247,12 +253,12 @@ BUILTIN_REGISTRY["Random"] = builtin_Random
 
 def builtin_Range(current, env, evaluator):
     if isinstance(current, tuple) and len(current) == 2:
-        start, end = current
-        if _is_int(start) and _is_int(end):
-            if start > end:
-                return []
-            return list(range(start, end + 1))
-    _type_error("Range requires (start, end) of two Int values")
+        start = _as_whole_int(current[0], "Range requires two whole Num values")
+        end = _as_whole_int(current[1], "Range requires two whole Num values")
+        if start > end:
+            return []
+        return [float(x) for x in range(start, end + 1)]
+    _type_error("Range requires (start, end) of two whole Num values")
 
 
 BUILTIN_REGISTRY["Range"] = builtin_Range
@@ -335,7 +341,7 @@ BUILTIN_REGISTRY["Format"] = builtin_Format
 
 def builtin_Length(current, env, evaluator):
     if isinstance(current, (list, dict, str, tuple)):
-        return len(current)
+        return _to_num(len(current))
     _type_error(f"Cannot get length of {popcorn_type_name(current)}")
 
 
@@ -361,13 +367,12 @@ def builtin_Get(current, env, evaluator):
         default = current[2] if has_default else None
 
         if isinstance(target, (list, tuple)):
-            if not _is_int(key):
-                _type_error("List indices must be Int")
-            if 0 <= key < len(target):
-                return target[key]
+            whole_key = _as_whole_int(key, "List indices must be whole Num values")
+            if 0 <= whole_key < len(target):
+                return target[whole_key]
             if has_default:
                 return default
-            raise PopCornError("IndexError", f"Index {key} out of bounds")
+            raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
 
         if isinstance(target, dict):
             if not isinstance(key, str):
@@ -395,12 +400,11 @@ def builtin_Set(current, env, evaluator):
             res[key] = value
             return res
         if isinstance(target, list):
-            if not _is_int(key):
-                _type_error("List indices must be Int")
-            if key < 0 or key >= len(target):
-                raise PopCornError("IndexError", f"Index {key} out of bounds")
+            whole_key = _as_whole_int(key, "List indices must be whole Num values")
+            if whole_key < 0 or whole_key >= len(target):
+                raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
             res = list(target)
-            res[key] = value
+            res[whole_key] = value
             return res
         _type_error("Set target must be List or Dict")
     _type_error("Set requires (target, key, value)")
@@ -492,16 +496,14 @@ def builtin_Slice(current, env, evaluator):
             _type_error("Slice target must be List or Str")
         if len(current) == 2:
             start = 0
-            end = current[1]
-            if not _is_int(end):
-                _type_error("Slice indices must be Int")
+            end = _as_whole_int(current[1], "Slice indices must be whole Num values")
         else:
-            start, end = current[1], current[2]
-            if not (_is_int(start) and _is_int(end)):
-                _type_error("Slice indices must be Int")
+            start = _as_whole_int(current[1], "Slice indices must be whole Num values")
+            end = _as_whole_int(current[2], "Slice indices must be whole Num values")
         if start < 0 or end < 0 or start > end or end > len(target):
             raise PopCornError(
-                "IndexError", f"Invalid Slice range ({start}, {end}) for length {len(target)}"
+                "IndexError",
+                f"Invalid Slice range ({start}, {end}) for length {len(target)}",
             )
         return target[start:end]
     _type_error("Slice requires (target, end) or (target, start, end)")
@@ -511,18 +513,21 @@ BUILTIN_REGISTRY["Slice"] = builtin_Slice
 
 
 def builtin_Array(current, env, evaluator):
-    if _is_int(current):
-        dims = [current]
-    elif isinstance(current, list) and all(_is_int(d) for d in current):
-        dims = list(current)
+    if _is_number(current):
+        dims = [_as_whole_int(current, "Array dimensions must be whole Num values")]
+    elif isinstance(current, list):
+        dims = [
+            _as_whole_int(d, "Array dimensions must be whole Num values")
+            for d in current
+        ]
     else:
-        _type_error("Array requires a non-negative Int or List of non-negative Ints")
+        _type_error("Array requires a non-negative whole Num or List of whole Nums")
     if not dims or any(dimension < 0 for dimension in dims):
-        _type_error("Array dimensions must be non-negative Int values")
+        _type_error("Array dimensions must be non-negative whole Num values")
 
     def make_array(dimensions):
         if len(dimensions) == 1:
-            return [0 for _ in range(dimensions[0])]
+            return [0.0 for _ in range(dimensions[0])]
         return [make_array(dimensions[1:]) for _ in range(dimensions[0])]
 
     return make_array(dims)
@@ -549,7 +554,9 @@ BUILTIN_REGISTRY["Zip"] = builtin_Zip
 
 def builtin_ToJson(current, env, evaluator):
     try:
-        return json.dumps(current, ensure_ascii=False, allow_nan=False)
+        return json.dumps(_to_json_ready(current), ensure_ascii=False, allow_nan=False)
+    except PopCornError:
+        raise
     except Exception as exc:
         raise PopCornError("TypeError", f"ToJson failed: {exc}")
 
@@ -561,7 +568,9 @@ def builtin_FromJson(current, env, evaluator):
     if not isinstance(current, str):
         _type_error("FromJson requires Str")
     try:
-        return json.loads(current)
+        return _from_json_normalize(json.loads(current))
+    except PopCornError:
+        raise
     except Exception as exc:
         raise PopCornError("RuntimeError", f"FromJson failed: {exc}")
 
@@ -575,12 +584,12 @@ BUILTIN_REGISTRY["FromJson"] = builtin_FromJson
 def builtin_Now(current, env, evaluator):
     now = datetime.datetime.now()
     return {
-        "year": now.year,
-        "month": now.month,
-        "day": now.day,
-        "hour": now.hour,
-        "minute": now.minute,
-        "second": now.second,
+        "year": float(now.year),
+        "month": float(now.month),
+        "day": float(now.day),
+        "hour": float(now.hour),
+        "minute": float(now.minute),
+        "second": float(now.second),
     }
 
 
@@ -589,11 +598,12 @@ BUILTIN_REGISTRY["Now"] = builtin_Now
 
 def builtin_Sleep(current, env, evaluator):
     if not _is_number(current):
-        _type_error("Sleep requires Int or Num")
-    if current < 0:
+        _type_error("Sleep requires Num")
+    seconds = _to_num(current)
+    if seconds < 0:
         raise PopCornError("RuntimeError", "Sleep requires a non-negative number of seconds")
-    time.sleep(current)
-    return current
+    time.sleep(seconds)
+    return seconds
 
 
 BUILTIN_REGISTRY["Sleep"] = builtin_Sleep
@@ -735,14 +745,14 @@ def builtin_HttpRequest(current, env, evaluator):
             with urllib.request.urlopen(req) as response:
                 resp_headers = {k: v for k, v in response.headers.items()}
                 return {
-                    "status": int(response.status),
+                    "status": float(response.status),
                     "headers": resp_headers,
                     "body": response.read().decode("utf-8", errors="replace"),
                 }
         except urllib.error.HTTPError as err:
             resp_headers = {k: v for k, v in err.headers.items()} if err.headers else {}
             return {
-                "status": int(err.code),
+                "status": float(err.code),
                 "headers": resp_headers,
                 "body": err.read().decode("utf-8", errors="replace"),
             }
@@ -763,7 +773,7 @@ def builtin_Return(current, env, evaluator):
         if scope.function_scope:
             raise ReturnException(current)
         scope = scope.parent
-    raise PopCornError("RuntimeError", "Return can only be used inside a new function")
+    raise PopCornError("RuntimeError", "Return can only be used inside a pop function")
 
 
 BUILTIN_REGISTRY["Return"] = builtin_Return

@@ -17,7 +17,7 @@ def test_parser_pipeline():
     assert isinstance(pipe, Pipeline)
     assert len(pipe.nodes) == 2
     assert isinstance(pipe.nodes[0], LiteralNode)
-    assert pipe.nodes[0].value == 1
+    assert pipe.nodes[0].value == 1.0
     assert isinstance(pipe.nodes[1], BindNode)
 
 
@@ -55,7 +55,7 @@ def test_pipe_extra_arguments():
 
 
 def test_standalone_function_call_without_pipe_is_rejected():
-    for bad in ("Add(1, 2).", "Split(\"a,b\", \",\").", "Display."):
+    for bad in ("Add(1, 2).", 'Split("a,b", ",").', "Display."):
         try:
             parse_code(bad)
         except ParseError:
@@ -74,21 +74,25 @@ def test_implicit_value_is_allowed_after_program_input():
 
 
 def test_reduce_accepts_initial_value_and_destructuring_alias():
-    ast = parse_code("[1, 2] >> Reduce(0) as (acc, item) (: acc + item. :)")
+    ast = parse_code("[1, 2] >> Reduce(0) as (acc, item) { acc + item. }")
     block = ast.statements[0].nodes[1]
     assert isinstance(block, StreamBlockNode)
     assert block.stream_type == "Reduce"
     assert isinstance(block.init_expr, LiteralNode)
-    assert block.init_expr.value == 0
+    assert block.init_expr.value == 0.0
     assert block.var_names == ["acc", "item"]
 
 
-def test_stream_block_rejects_old_colon_dotdot_syntax():
-    try:
-        parse_code("[1] >> Map(x): x * 2. ..")
-    except ParseError:
-        return
-    assert False, "legacy Map(x): ... .. syntax must be rejected"
+def test_stream_block_rejects_legacy_block_delimiters():
+    for legacy in (
+        "[1] >> Map(x): x * 2. ..",
+        "[1] >> Map as x (: x * 2. :)",
+    ):
+        try:
+            parse_code(legacy)
+        except ParseError:
+            continue
+        assert False, f"legacy block syntax must be rejected: {legacy}"
 
 
 def test_double_colon_rejects_numeric_list_index():
@@ -105,12 +109,16 @@ def test_brackets_accept_list_index():
 
 
 def test_fork_labeled_and_unlabeled():
-    unlabeled = parse_code("[1, 2] >> Fork as values (: values >> Sum. values >> Max. :)").statements[0].nodes[1]
+    unlabeled = parse_code(
+        "[1, 2] >> Fork as values { values >> Sum. values >> Max. }"
+    ).statements[0].nodes[1]
     assert unlabeled.var_names == ["values"]
     assert unlabeled.labeled_entries is None
     assert len(unlabeled.block.pipelines) == 2
 
-    labeled = parse_code("[1, 2] >> Fork as values (: total: values >> Sum. max: values >> Max. :)").statements[0].nodes[1]
+    labeled = parse_code(
+        "[1, 2] >> Fork as values { total: values >> Sum. max: values >> Max. }"
+    ).statements[0].nodes[1]
     assert labeled.var_names == ["values"]
     assert labeled.labeled_entries is not None
     assert [e.label for e in labeled.labeled_entries] == ["total", "max"]
@@ -118,7 +126,7 @@ def test_fork_labeled_and_unlabeled():
 
 def test_fork_rejects_mixing_labeled_and_unlabeled():
     try:
-        parse_code("[1, 2] >> Fork (: total: @ >> Sum. @ >> Max. :)")
+        parse_code("[1, 2] >> Fork { total: @ >> Sum. @ >> Max. }")
     except ParseError:
         return
     assert False, "Fork must reject mixing labeled and unlabeled branches"
@@ -126,7 +134,7 @@ def test_fork_rejects_mixing_labeled_and_unlabeled():
 
 def test_zip_is_not_a_stream_block():
     try:
-        parse_code("([1], [2]) >> Zip as row (: row. :)")
+        parse_code("([1], [2]) >> Zip as row { row. }")
     except ParseError:
         return
     assert False, "Zip must be a standard function, not a stream block"
@@ -142,8 +150,8 @@ def test_at_name_is_not_a_variable_form():
 
 def test_check_requires_when_and_else():
     for bad in (
-        '1 >> Check (: else: "no". :)',
-        '1 >> Check (: when @ == 1: "yes". :)',
+        '1 >> Check { else: "no". }',
+        '1 >> Check { when @ == 1: "yes". }',
     ):
         try:
             parse_code(bad)
@@ -152,14 +160,22 @@ def test_check_requires_when_and_else():
         assert False, f"invalid Check must be rejected: {bad}"
 
 
+def test_postfix_when_statement():
+    ast = parse_code("items >> Return when (items >> Length) <= 1.")
+    stmt = ast.statements[0]
+    assert isinstance(stmt, ConditionalStatementNode)
+    assert isinstance(stmt.pipeline, Pipeline)
+    assert isinstance(stmt.condition, ExpressionNode)
+
+
 def test_try_catch_syntax():
-    ast = parse_code('1 >> Try (: @. :) Catch as err (: err::message. :)')
+    ast = parse_code("1 >> Try { @. } Catch as err { err::message. }")
     node = ast.statements[0].nodes[1]
     assert isinstance(node, TryCatchBlock)
     assert node.catch_alias_names == ["err"]
 
     try:
-        parse_code("1 >> Try (: @. :)")
+        parse_code("1 >> Try { @. }")
     except ParseError:
         return
     assert False, "Try without Catch must be rejected"
@@ -167,7 +183,7 @@ def test_try_catch_syntax():
 
 def test_nested_function_def_is_rejected():
     try:
-        parse_code("[1] >> Map (: (x) >> new Inner (: x. :) @. :)")
+        parse_code("[1] >> Map { (x) >> pop Inner { x. } @. }")
     except ParseError:
         return
     assert False, "FunctionDefinition must only be allowed at top level"

@@ -27,14 +27,6 @@
           "match": ">>"
         },
         {
-          "name": "punctuation.section.block.begin.popcorn",
-          "match": "\\(:"
-        },
-        {
-          "name": "punctuation.section.block.end.popcorn",
-          "match": ":\\)"
-        },
-        {
           "name": "punctuation.accessor.popcorn",
           "match": "::"
         },
@@ -56,11 +48,11 @@
       "patterns": [
         {
           "name": "keyword.control.flow.popcorn",
-          "match": "\\b(when|else|as|new|not)\\b"
+          "match": "\\b(when|else|as|pop|not)\\b"
         },
         {
           "name": "support.function.builtin.popcorn",
-          "match": "\\b(Display|Input|ReadFile|WriteFile|Fetch|PostFetch|HttpRequest|Set|Remove|Keys|Values|Entries|Merge|Num|Str|Bool|List|Dict|Type|Sleep|Add|Div|Sum|Max|Min|Average|Round|Abs|Length|Reverse|Uppercase|Lowercase|Split|Replace|Join|Get|Contains|Append|Slice|Format|Now|Random|ToJson|FromJson|Int|Array|Range|Return|Break|Debug|Throw|Update|Map|Filter|Reduce|Zip|Loop|Fork|Sort|SortDesc|Group|Check|Try|Catch)\\b"
+          "match": "\\b(Display|Input|ReadFile|WriteFile|Fetch|PostFetch|HttpRequest|Set|Remove|Keys|Values|Entries|Merge|Num|Str|Bool|List|Dict|Type|Sleep|Add|Div|Sum|Max|Min|Average|Round|Abs|Length|Reverse|Uppercase|Lowercase|Split|Replace|Join|Get|Contains|Append|Slice|Format|Now|Random|ToJson|FromJson|Array|Range|Return|Break|Debug|Throw|Update|Map|Filter|Reduce|Zip|Loop|Fork|Sort|SortDesc|Group|Check|Try|Catch)\\b"
         },
         {
           "name": "constant.language.popcorn",

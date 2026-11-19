@@ -9,12 +9,13 @@ await import("./popcorn-formatter.js");
 const { formatDocument: formatInPlayground } = globalThis.PopCornFormatter;
 
 const cases = [
-  "1>>value.\n[1]>>Map as item (:\nitem>>Display.\n:)",
+  "1>>value.\n[1]>>Map as item {\nitem>>Display.\n}",
   '"a>>b"   >> Display. // >> inside a comment\n',
-  '1>>Check as value (:\nwhen value > 0:\n"yes".\nelse:\n"no".\n:)',
-  "[1, 2]\r\n    >>Map as value (:\r\nvalue*2.\r\n:)",
-  '"x">>Try (:\n@>>Int.\n:) Catch as err (:\n0.\n:)',
-  "[1, 2, 3]>>Map as x (: x * 2. :)>>doubled.",
+  '1>>Check as value {\nwhen value > 0:\n"yes".\nelse:\n"no".\n}',
+  "[1, 2]\r\n    >>Map as value {\r\nvalue*2.\r\n}",
+  '"x">>Try {\n@>>Num.\n} Catch as err {\n0.\n}',
+  "[1, 2, 3]>>Map as x { x * 2. }>>doubled.",
+  "(0, 0)>>Loop as (count, total) {\ntotal>>Break when count >= 5.\n(count + 1, total + count).\n}>>result.",
 ];
 
 for (const source of cases) {
@@ -26,16 +27,16 @@ for (const source of cases) {
 }
 
 assert.strictEqual(
-  formatInPlayground('2>>Check as value (:\nwhen value == 0:\n"zero".\nwhen value in [1, 2, 3]:\n"small".\nelse:\n"other".\n:)>>label.'),
+  formatInPlayground('2>>Check as value {\nwhen value == 0:\n"zero".\nwhen value in [1, 2, 3]:\n"small".\nelse:\n"other".\n}>>label.'),
   [
-    "2 >> Check as value (:",
+    "2 >> Check as value {",
     "    when value == 0:",
     '        "zero".',
     "    when value in [1, 2, 3]:",
     '        "small".',
     "    else:",
     '        "other".',
-    ":) >> label.",
+    "} >> label.",
   ].join("\n"),
 );
 

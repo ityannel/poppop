@@ -58,7 +58,7 @@ class Parser:
         curr = self.current()
         if not curr:
             return False
-        if curr.type == "NEW":
+        if curr.type == "POP":
             return True
         if curr.type == "LPAREN":
             p = self.pos + 1
@@ -73,7 +73,7 @@ class Parser:
                         if (
                             p + 2 < len(self.tokens)
                             and self.tokens[p + 1].type == "STREAM_OP"
-                            and self.tokens[p + 2].type == "NEW"
+                            and self.tokens[p + 2].type == "POP"
                         ):
                             return True
                         return False
@@ -100,13 +100,17 @@ class Parser:
             return self.parse_function_def()
         return self.parse_statement()
 
-    def parse_statement(self) -> Pipeline:
+    def parse_statement(self) -> ASTNode:
         if self._is_function_def():
             curr = self.current()
             raise ParseError(
                 f"Function definitions are only allowed at top level at line {curr.line}, column {curr.column}"
             )
         pipeline = self.parse_pipeline()
+        if self.match("WHEN"):
+            cond = self.parse_expression()
+            self.expect("DOT")
+            return ConditionalStatementNode(pipeline.line, pipeline.column, pipeline, cond)
         if not self._expect_dot_or_block_end(pipeline):
             self.expect("DOT")
         return pipeline
@@ -168,17 +172,17 @@ class Parser:
         if name in _SIMPLE_STREAM_NAMES:
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             return StreamBlockNode(line, col, name, alias_names, block)
 
         if name == "Loop":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             single_alias = alias_names[0] if len(alias_names) == 1 else None
             return LoopBlock(line, col, block, single_alias, alias_names)
 
@@ -189,16 +193,16 @@ class Parser:
                 init_expr = self.parse_expression()
                 self.expect("RPAREN")
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             return StreamBlockNode(line, col, "Reduce", alias_names, block, init_expr=init_expr)
 
         if name == "Fork":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            if self.current() and self.current().type == "BLOCK_CLOSE":
+            self.expect("LBRACE")
+            if self.current() and self.current().type == "RBRACE":
                 raise ParseError(
                     f"Fork requires at least one branch at line {line}, column {col}"
                 )
@@ -210,7 +214,7 @@ class Parser:
             )
             if is_labeled:
                 entries: List[ForkEntryNode] = []
-                while self.current() and self.current().type != "BLOCK_CLOSE":
+                while self.current() and self.current().type != "RBRACE":
                     tok = self.current()
                     if not (
                         tok.type == "VARIABLE"
@@ -226,7 +230,7 @@ class Parser:
                     self.advance()  # ':'
                     stmt = self.parse_statement()
                     entries.append(ForkEntryNode(entry_line, entry_col, label, stmt))
-                self.expect("BLOCK_CLOSE")
+                self.expect("RBRACE")
                 return StreamBlockNode(
                     line,
                     col,
@@ -236,8 +240,8 @@ class Parser:
                     labeled_entries=entries,
                 )
             else:
-                pipelines: List[Pipeline] = []
-                while self.current() and self.current().type != "BLOCK_CLOSE":
+                pipelines: List[ASTNode] = []
+                while self.current() and self.current().type != "RBRACE":
                     tok = self.current()
                     if (
                         tok.type == "VARIABLE"
@@ -248,7 +252,7 @@ class Parser:
                             f"Cannot mix labeled and unlabeled branches in Fork at line {tok.line}, column {tok.column}"
                         )
                     pipelines.append(self.parse_statement())
-                self.expect("BLOCK_CLOSE")
+                self.expect("RBRACE")
                 return StreamBlockNode(
                     line, col, "Fork", alias_names, BlockNode(line, col, pipelines)
                 )
@@ -256,22 +260,22 @@ class Parser:
         if name == "Update":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             return StreamBlockNode(line, col, "Update", alias_names, block)
 
         if name == "Check":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
+            self.expect("LBRACE")
             branches: List[Branch] = []
             while self.current() and self.current().type == "WHEN":
                 w_tok = self.current()
                 self.advance()
                 cond = self.parse_expression()
                 self.expect("COLON")
-                block = self.parse_block({"WHEN", "ELSE", "BLOCK_CLOSE"})
+                block = self.parse_block({"WHEN", "ELSE", "RBRACE"})
                 branches.append(Branch(w_tok.line, w_tok.column, cond, block, "predicate"))
             if not branches:
                 raise ParseError(
@@ -284,18 +288,18 @@ class Parser:
             e_tok = self.current()
             self.advance()
             self.expect("COLON")
-            else_block = self.parse_block({"BLOCK_CLOSE"})
+            else_block = self.parse_block({"RBRACE"})
             branches.append(Branch(e_tok.line, e_tok.column, None, else_block, "else"))
-            self.expect("BLOCK_CLOSE")
+            self.expect("RBRACE")
             single_alias = alias_names[0] if len(alias_names) == 1 else None
             return CheckBlock(line, col, branches, single_alias, alias_names)
 
         if name == "Try":
             self.advance()
             try_aliases = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            try_block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            try_block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             catch_tok = self.current()
             if not catch_tok or catch_tok.type != "VERB" or catch_tok.value != "Catch":
                 loc = (
@@ -306,9 +310,9 @@ class Parser:
                 raise ParseError(f"Try requires a matching Catch block {loc}")
             self.advance()
             catch_aliases = self._parse_optional_alias_clause()
-            self.expect("BLOCK_OPEN")
-            catch_block = self.parse_block({"BLOCK_CLOSE"})
-            self.expect("BLOCK_CLOSE")
+            self.expect("LBRACE")
+            catch_block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             return TryCatchBlock(
                 line, col, try_block, catch_block, try_aliases, catch_aliases
             )
@@ -565,7 +569,6 @@ class Parser:
             else:
                 first_expr = first
             if self.current() and self.current().type == "COMMA":
-                # ValueList = "(" Expression "," Expression { "," Expression } [ "," ] ")"
                 items = [first_expr]
                 while self.current() and self.current().type == "COMMA":
                     self.advance()
@@ -655,10 +658,10 @@ class Parser:
             self.expect("RPAREN")
             self.expect("STREAM_OP")
 
-        self.expect("NEW")
+        self.expect("POP")
         name = self.expect("VERB").value
-        self.expect("BLOCK_OPEN")
-        block = self.parse_block({"BLOCK_CLOSE"})
-        self.expect("BLOCK_CLOSE")
+        self.expect("LBRACE")
+        block = self.parse_block({"RBRACE"})
+        self.expect("RBRACE")
 
         return FunctionDefNode(line, col, name, params, block)
