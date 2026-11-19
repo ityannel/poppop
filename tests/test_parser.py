@@ -202,3 +202,37 @@ def test_parenthesized_pipeline_in_expression():
     expr = ast.statements[0].nodes[0]
     assert isinstance(expr, ExpressionNode)
     assert isinstance(expr.left, GroupedPipelineNode)
+
+
+def test_optional_trailing_dot_inside_blocks():
+    # Single statement in block without trailing dot
+    parse_code("[1, 2, 3] >> Map as x { x * 2 } >> doubled.")
+    # Multi-statement block: earlier statement requires dot, last omits dot
+    parse_code("[1, 2] >> Map as x { x * 2 >> y. y + 1 }")
+    # Function body omitting trailing dot
+    parse_code("(a, b) >> pop Add { a + b }")
+    # Check branches omitting trailing dot before next when / else / }
+    parse_code('2 >> Check as v { when v == 0: "zero" when v == 2: "two" else: "other" }')
+    # Fork unlabeled and labeled omitting trailing dot on last branch
+    parse_code("[1, 2] >> Fork { @ >> Sum. @ >> Max }")
+    parse_code("[1, 2] >> Fork { total: @ >> Sum. max: @ >> Max }")
+    # Update omitting trailing dot on last statement
+    parse_code('{"a": 1} >> Update as u { 2 >> u::a }')
+    # Postfix when as last statement in block omitting trailing dot
+    parse_code("0 >> Loop as x { x >> Break when x >= 5 }")
+
+    # Non-last statement inside block STILL requires dot
+    try:
+        parse_code("[1, 2] >> Map as x { x * 2 >> y\n y + 1 }")
+    except ParseError:
+        pass
+    else:
+        assert False, "non-last statement inside block must still require '.'"
+
+    # Top-level statement not ending in block STILL requires dot
+    try:
+        parse_code("42 >> answer")
+    except ParseError:
+        pass
+    else:
+        assert False, "top-level non-block statement must still require '.'"

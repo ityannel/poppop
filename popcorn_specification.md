@@ -10,7 +10,7 @@ PopCorn 1
 
 PopCorn は、値を `>>` で次の処理へ渡していくデータフロー言語です。値の加工は非破壊的で、元のリストや辞書を書き換えません。画面表示やファイル操作など外部へ作用する処理は、値の加工とは分けて扱います。
 
-改行には構文上の意味がありません。空白・改行・インデントは読みやすさのために自由に使えます。ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。
+改行には構文上の意味がありません。空白・改行・インデントは読みやすさのために自由に使えます。ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。ブロック `{ ... }` で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック `{ ... }` 内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 
 ### 言語の分類と特徴
 
@@ -301,7 +301,8 @@ arr >> Break when i >= n - 1.
 Program            = { TopLevelStatement } .
 TopLevelStatement  = FunctionDefinition | Statement .
 Statement          = Pipeline [ "when" Expression ] "." | BlockTerminatedPipeline .
-Block              = { Statement } .
+BlockTailStatement = Pipeline [ "when" Expression ] [ "." ] | BlockTerminatedPipeline .
+Block              = { Statement } [ BlockTailStatement ] .
 
 Pipeline           = Expression { ">>" PipelineStage } .
 PipelineStage      = ProcessCall | Binding | StreamBlock .
@@ -328,12 +329,14 @@ SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" | "Loop" .
 ReduceBlock        = "Reduce" [ "(" Expression ")" ] [ AliasClause ] "{" Block "}" .
 
 ForkBlock          = "Fork" [ AliasClause ] "{" ( ForkListBody | ForkDictBody ) "}" .
-ForkListBody       = Statement { Statement } .
-ForkDictBody       = ForkEntry { ForkEntry } .
+ForkListBody       = { Statement } BlockTailStatement .
+ForkDictBody       = { ForkEntry } ForkTailEntry .
 ForkEntry          = VariableName ":" Statement .
+ForkTailEntry      = VariableName ":" BlockTailStatement .
 
-UpdateBlock        = "Update" [ AliasClause ] "{" { UpdateStatement } "}" .
+UpdateBlock        = "Update" [ AliasClause ] "{" { UpdateStatement } [ UpdateTailStatement ] "}" .
 UpdateStatement    = Expression ">>" FieldTarget "." .
+UpdateTailStatement = Expression ">>" FieldTarget [ "." ] .
 FieldTarget        = ( VariableName | "@" ) "::" Identifier .
 
 CheckBlock         = "Check" [ AliasClause ] "{"
@@ -361,6 +364,7 @@ PrimaryExpr        = Literal | VariableName | "@"
 ```
 
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
+* ブロック `{ ... }` で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック `{ ... }` 内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 

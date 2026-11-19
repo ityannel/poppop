@@ -100,19 +100,44 @@ class Parser:
             return self.parse_function_def()
         return self.parse_statement()
 
-    def parse_statement(self) -> ASTNode:
+    def _is_check_branch_when(self) -> bool:
+        """Return True if the current WHEN starts a Check branch (`when <expr>:`)."""
+        saved = self.pos
+        try:
+            self.advance()  # consume WHEN
+            self.parse_expression()
+            return self.current() is not None and self.current().type == "COLON"
+        except ParseError:
+            return False
+        finally:
+            self.pos = saved
+
+    def parse_statement(self, end_tokens=None) -> ASTNode:
         if self._is_function_def():
             curr = self.current()
             raise ParseError(
                 f"Function definitions are only allowed at top level at line {curr.line}, column {curr.column}"
             )
+        end_set = end_tokens or set()
         pipeline = self.parse_pipeline()
-        if self.match("WHEN"):
-            cond = self.parse_expression()
-            self.expect("DOT")
-            return ConditionalStatementNode(pipeline.line, pipeline.column, pipeline, cond)
-        if not self._expect_dot_or_block_end(pipeline):
-            self.expect("DOT")
+        if self.current() and self.current().type == "WHEN":
+            if "WHEN" not in end_set or not self._is_check_branch_when():
+                self.advance()
+                cond = self.parse_expression()
+                if self.match("DOT"):
+                    return ConditionalStatementNode(
+                        pipeline.line, pipeline.column, pipeline, cond
+                    )
+                if self.current() and self.current().type in end_set:
+                    return ConditionalStatementNode(
+                        pipeline.line, pipeline.column, pipeline, cond
+                    )
+                self.expect("DOT")
+        if self._expect_dot_or_block_end(pipeline):
+            return pipeline
+        if self.current() and self.current().type in end_set:
+            return pipeline
+        self.expect("DOT")
         return pipeline
 
     def parse_block(self, end_tokens) -> BlockNode:
@@ -121,7 +146,7 @@ class Parser:
         line = curr.line if curr else 1
         col = curr.column if curr else 1
         while self.current() and self.current().type not in end_tokens:
-            pipelines.append(self.parse_statement())
+            pipelines.append(self.parse_statement(end_tokens))
         return BlockNode(line, col, pipelines)
 
     def _parse_optional_alias_clause(self) -> List[str]:
@@ -228,7 +253,7 @@ class Parser:
                     entry_line, entry_col = tok.line, tok.column
                     self.advance()  # label
                     self.advance()  # ':'
-                    stmt = self.parse_statement()
+                    stmt = self.parse_statement({"RBRACE"})
                     entries.append(ForkEntryNode(entry_line, entry_col, label, stmt))
                 self.expect("RBRACE")
                 return StreamBlockNode(
@@ -251,7 +276,7 @@ class Parser:
                         raise ParseError(
                             f"Cannot mix labeled and unlabeled branches in Fork at line {tok.line}, column {tok.column}"
                         )
-                    pipelines.append(self.parse_statement())
+                    pipelines.append(self.parse_statement({"RBRACE"}))
                 self.expect("RBRACE")
                 return StreamBlockNode(
                     line, col, "Fork", alias_names, BlockNode(line, col, pipelines)

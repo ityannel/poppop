@@ -170,6 +170,15 @@ assert.strictEqual(
     "文字列"
 );
 
+// Last statement inside a block may omit the trailing '.'
+const omittedDotInBlock = [
+    "[1, 2] >> Map as item {",
+    "    item >> Str",
+    "} >> labels.",
+    "labels >> Display."
+].join("\n");
+assert.ok(!analyzeDocument(omittedDotInBlock).some(d => d.kind === "missing-terminator"));
+
 assert.strictEqual(formatDocument("1>>value.\n[1]>>Map as item {\nitem>>Display.\n}"), [
     "1 >> value.",
     "[1] >> Map as item {",

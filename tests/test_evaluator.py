@@ -627,3 +627,86 @@ def test_set_is_non_destructive():
     assert run_code("[1, 2] >> Set(0, 9).") == [9, 2]
     assert run_code("[1, 2] >> original. original >> Set(0, 9). original.") == [1, 2]
     expect_error("[1, 2] >> Set(5, 9).", "IndexError")
+
+
+def test_optional_trailing_dot_in_blocks_evaluates():
+    assert run_code("[1, 2, 3] >> Map as x { x * 2 }") == [2, 4, 6]
+    assert run_code("[1, 2, 3] >> Map as x { x * 2 >> y. y + 1 }") == [3, 5, 7]
+    assert (
+        run_code(
+            """
+            (a, b) >> pop Add {
+                a + b
+            }
+            10 >> Add(20).
+            """
+        )
+        == 30
+    )
+    assert (
+        run_code(
+            """
+            2 >> Check as v {
+                when v == 0:
+                    "zero"
+                when v in [1, 2, 3]:
+                    "small"
+                else:
+                    "other"
+            }
+            """
+        )
+        == "small"
+    )
+    # Postfix when inside a Check branch followed by another Check branch
+    assert (
+        run_code(
+            """
+            (n) >> pop Classify {
+                n >> Check {
+                    when @ > 0:
+                        "huge" >> Return when @ > 100.
+                        "positive"
+                    when @ == 0:
+                        "zero"
+                    else:
+                        "negative"
+                }
+            }
+            [200, 5, 0, -3] >> Map as x { x >> Classify }
+            """
+        )
+        == ["huge", "positive", "zero", "negative"]
+    )
+    assert (
+        run_code(
+            """
+            [1, 2, 3] >> Fork as xs {
+                total: xs >> Sum.
+                max: xs >> Max
+            }
+            """
+        )
+        == {"total": 6, "max": 3}
+    )
+    assert (
+        run_code(
+            """
+            {"score": 10} >> Update as u {
+                u::score + 5 >> u::score
+            }
+            """
+        )
+        == {"score": 15}
+    )
+    assert (
+        run_code(
+            """
+            (0, 0) >> Loop as (count, total) {
+                total >> Break when count >= 5.
+                (count + 1, total + count)
+            }
+            """
+        )
+        == 10
+    )

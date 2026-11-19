@@ -874,7 +874,9 @@ function analyzeDocument(text) {
     }
 
     const implicitScopes = findImplicitVariableScopeRanges(text);
-    scanLines(text, ({ code, lineStart }) => {
+    const scannedLines = [];
+    scanLines(text, info => scannedLines.push(info));
+    scannedLines.forEach(({ code, lineStart }, lineIndex) => {
         const trimmed = code.trim();
         for (let index = 0; index < code.length; index += 1) {
             if (code[index] === "@") {
@@ -895,12 +897,23 @@ function analyzeDocument(text) {
         if (PIPELINE_OPERATOR.test(code)) {
             PIPELINE_OPERATOR.lastIndex = 0;
             const end = lastNonWhitespaceIndex(code);
+            let nextTrimmed = "";
+            for (let nextIndex = lineIndex + 1; nextIndex < scannedLines.length; nextIndex += 1) {
+                const candidate = scannedLines[nextIndex].code.trim();
+                if (candidate) {
+                    nextTrimmed = candidate;
+                    break;
+                }
+            }
+            const followedByBlockEnd = /^\}/.test(nextTrimmed)
+                || /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(nextTrimmed);
             if (
                 end !== -1
                 && code[end] !== "."
                 && !trimmed.endsWith("{")
                 && !trimmed.endsWith("}")
                 && !trimmed.endsWith(":")
+                && !followedByBlockEnd
             ) {
                 diagnostics.push({
                     kind: "missing-terminator",
