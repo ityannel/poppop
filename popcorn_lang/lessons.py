@@ -141,26 +141,31 @@ LESSONS = (
         "goal": "数字の2を、文字列のsmallに分類してください。",
         "starter": (
             "2 >> Check as value {\n"
-            "    when value == 0:\n"
+            "    when value == 0 {\n"
             '        "zero".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "unknown".\n'
+            "    }\n"
             "} >> label.\n\n"
             "label >> Display."
         ),
         "solution": (
             "2 >> Check as value {\n"
-            "    when value == 0:\n"
+            "    when value == 0 {\n"
             '        "zero".\n'
-            "    when value in [1, 2, 3]:\n"
+            "    }\n"
+            "    when value in [1, 2, 3] {\n"
             '        "small".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "large".\n'
+            "    }\n"
             "} >> label.\n\n"
             "label >> Display."
         ),
         "hints": (
-            "`when value in [1, 2, 3]:` なら、1、2、3のどれかに合うか調べられます。",
+            "`when value in [1, 2, 3] { … }` なら、1、2、3のどれかに合うか調べられます。",
             '新しいwhenの中に文字列の`"small"`を書いてみよう。',
         ),
         "expected": "small",

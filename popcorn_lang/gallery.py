@@ -49,14 +49,18 @@ GALLERY = (
         "code": (
             "(1, 30) >> Range >> Map as number {\n"
             "    number >> Check as value {\n"
-            "        when value % 15 == 0:\n"
+            "        when value % 15 == 0 {\n"
             '            "FizzBuzz".\n'
-            "        when value % 3 == 0:\n"
+            "        }\n"
+            "        when value % 3 == 0 {\n"
             '            "Fizz".\n'
-            "        when value % 5 == 0:\n"
+            "        }\n"
+            "        when value % 5 == 0 {\n"
             '            "Buzz".\n'
-            "        else:\n"
+            "        }\n"
+            "        else {\n"
             "            value >> Str.\n"
+            "        }\n"
             "    }\n"
             "} >> fizzbuzz.\n\n"
             "fizzbuzz >> Display."
@@ -86,10 +90,12 @@ GALLERY = (
             "(1, 10) >> Random >> secret.\n"
             '"1から10までの数字を当ててね: " >> Input >> Num >> guess.\n\n'
             "guess >> Check {\n"
-            "    when @ == secret:\n"
+            "    when @ == secret {\n"
             '        "大正解！".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "おしい！ 正解は {secret} でした。".\n'
+            "    }\n"
             "} >> message.\n\n"
             "message >> Display."
         ),
@@ -106,10 +112,12 @@ GALLERY = (
             "(0, 2) >> Random >> robot_index.\n"
             "hands >> Get(robot_index) >> robot.\n\n"
             "choice >> Check {\n"
-            "    when @ == robot:\n"
+            "    when @ == robot {\n"
             '        "あいこです！ あなたもロボット君も{choice}。".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "あなたは{choice}、ロボット君は{robot}でした！".\n'
+            "    }\n"
             "} >> result.\n\n"
             "result >> Display."
         ),
@@ -124,12 +132,15 @@ GALLERY = (
             "(1, 6) >> Random >> player.\n"
             "(1, 6) >> Random >> robot.\n\n"
             "player >> Check {\n"
-            "    when @ > robot:\n"
+            "    when @ > robot {\n"
             '        "あなたの勝ち！ {player} 対 {robot}".\n'
-            "    when @ == robot:\n"
+            "    }\n"
+            "    when @ == robot {\n"
             '        "引き分け！ どちらも {player}".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "ロボット君の勝ち！ {player} 対 {robot}".\n'
+            "    }\n"
             "} >> result.\n\n"
             "result >> Display."
         ),
@@ -143,10 +154,12 @@ GALLERY = (
         "code": (
             '"日本の首都は？ " >> Input >> answer.\n\n'
             "answer >> Check {\n"
-            '    when @ == "東京":\n'
+            '    when @ == "東京" {\n'
             '        "正解です！".\n'
-            "    else:\n"
+            "    }\n"
+            "    else {\n"
             '        "残念。正解は東京です。".\n'
+            "    }\n"
             "} >> result.\n\n"
             "result >> Display."
         ),

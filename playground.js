@@ -2087,7 +2087,7 @@ doubled >> Display.`;
           "あなたはPopCorn言語のやさしい先生です。",
           "基礎8問を終えた学習者向けの、少し発展的な練習問題を1つ作ってください。",
           "PopCornは `>>` で値を流し、通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。関数定義は `pop` を使います。数値型は `Num` のみです。",
-          "使えるもの: Display, Map as name {, Filter as name {, Reduce(0) as (acc, item) {, SortDesc as name {, Check as name { when ...: ... else: }, Update as name {, Fork as name {, Try { ... } Catch as err {, 後置 `when 条件.`, Range, Sum, Length, Random, Get。",
+          "使えるもの: Display, Map as name {, Filter as name {, Reduce(0) as (acc, item) {, SortDesc as name {, Check as name { when 条件 { ... } else { ... } }, Update as name {, Fork as name {, Try { ... } Catch as err {, 後置 `when 条件.`, Range, Sum, Length, Random, Get。",
           "標準関数を `>>` なしで `Range(1, 6)` や `Sum()` のように単独呼び出ししてはいけません。",
           "標準関数は `(1, 6) >> Range >> values.`、`values >> Sum >> total.`、`items >> Get(0)` のように、必ず `>>` の右側に書いてください。",
           "ブロックは提示した `Map as name { ... }` などの形を崩さないでください。",
@@ -2487,7 +2487,16 @@ doubled >> Display.`;
 
   // ===== サンプル: 例は、samples フォルダーのファイルとして格納する。「例」のタブは、それを開くだけ =====
   const SAMPLES_DIR = "samples";
-  const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v3";
+  const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v3"; // 古い記録（パスの一覧）。いまは「消した」の判定にだけ使う
+  const SAMPLES_HASH_KEY = "popcorn.playground.samples.hash.v4";     // { パス: 入れたときの内容の指紋 }
+  const CHECK_BACKUP_KEY = "popcorn.playground.fs.backup.check-braces";
+
+  // 内容の指紋（短い文字列）。同じ内容なら、同じ値になる
+  function hashText(text) {
+    let h = 5381;
+    for (let i = 0; i < text.length; i += 1) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+    return `${h.toString(36)}-${text.length.toString(36)}`;
+  }
 
   function sampleFileName(title) {
     const name = String(title).split("｜").at(-1).trim().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
@@ -2506,21 +2515,41 @@ doubled >> Display.`;
     });
   }
 
-  // はじめて見た例だけ、ファイルを作る（消したファイルが、読み込みのたびに戻ってこないように）
+  // 例を samples に入れる。
+  //  - はじめて見た例だけ、ファイルを作る（消したファイルが、読み込みのたびに戻ってこないように）
+  //  - 例の内容が変わったとき、まだ編集していないファイル（入れたときの指紋と同じ）だけ、新しい内容に入れ替える
+  //  - 自分で編集したファイルは、そのまま残す
   function seedSamples() {
     assignSamplePaths();
-    let seeded = [];
-    try { seeded = JSON.parse(localStorage.getItem(SAMPLES_SEEDED_KEY) || "[]"); } catch {}
+    let hashes = {};
+    let legacy = [];
+    try { hashes = JSON.parse(localStorage.getItem(SAMPLES_HASH_KEY) || "{}") || {}; } catch {}
+    try { legacy = JSON.parse(localStorage.getItem(SAMPLES_SEEDED_KEY) || "[]") || []; } catch {}
     let changed = false;
     examples.forEach((item) => {
-      if (seeded.includes(item.samplePath)) return;
-      seeded.push(item.samplePath);
-      files[item.samplePath] = item.code;
-      if (activeFile === item.samplePath) setSource(item.code, { markChanged: false, focus: false });
-      changed = true;
+      const path = item.samplePath;
+      const want = hashText(item.code);
+      const have = files[path];
+      if (have === undefined) {
+        if (path in hashes || legacy.includes(path)) return; // 消したファイルは、戻さない
+        files[path] = item.code;
+        hashes[path] = want;
+        changed = true;
+        return;
+      }
+      if (have === item.code) {
+        if (hashes[path] !== want) { hashes[path] = want; changed = true; }
+        return;
+      }
+      if (path in hashes && hashText(have) === hashes[path]) { // 編集していない古い例 → 新しい内容へ
+        files[path] = item.code;
+        hashes[path] = want;
+        changed = true;
+        if (activeFile === path) setSource(item.code, { markChanged: false, focus: false });
+      }
     });
     if (!changed) return;
-    try { localStorage.setItem(SAMPLES_SEEDED_KEY, JSON.stringify(seeded)); } catch {}
+    try { localStorage.setItem(SAMPLES_HASH_KEY, JSON.stringify(hashes)); } catch {}
     persistFiles();
     renderExplorer();
   }
@@ -2538,11 +2567,25 @@ doubled >> Display.`;
     localStorage.setItem(FS_KEY, JSON.stringify({ files, folders, openTabs, expanded, selected, active: activeFile }));
   }
 
+  // 保存してあるコードに、旧形式の Check（`when 条件:` / `else:`）があれば、新しい書き方（{ }）へ直す。
+  // 直す前の保存データは、一度だけバックアップする
+  let migratedCheckCount = 0;
+  function migrateStoredCheckSyntax(saved) {
+    const formatter = window.PopCornFormatter;
+    if (!formatter?.hasOldCheckSyntax) return;
+    const stale = Object.keys(files).filter((path) => typeof files[path] === "string" && formatter.hasOldCheckSyntax(files[path]));
+    if (!stale.length) return;
+    try { if (!localStorage.getItem(CHECK_BACKUP_KEY)) localStorage.setItem(CHECK_BACKUP_KEY, JSON.stringify(saved)); } catch {}
+    stale.forEach((path) => { files[path] = formatter.migrateOldCheckSyntax(files[path]); });
+    migratedCheckCount = stale.length;
+  }
+
   function loadFileStore() {
     try {
       const saved = JSON.parse(localStorage.getItem(FS_KEY) || "null");
       if (saved && saved.files && Object.keys(saved.files).length) {
         files = saved.files;
+        migrateStoredCheckSyntax(saved);
         folders = saved.folders || [];
         openTabs = (saved.openTabs || []).filter((path) => files[path] !== undefined);
         expanded = saved.expanded || [];
@@ -2550,6 +2593,10 @@ doubled >> Display.`;
         selected = saved.selected || activeFile;
         if (!openTabs.includes(activeFile)) openTabs.push(activeFile);
         setSource(files[activeFile], { markChanged: false, focus: false });
+        if (migratedCheckCount) {
+          persistFiles();
+          setTimeout(() => showToast(`保存してあった ${migratedCheckCount} 個のコードの Check を、新しい書き方（{ }）に直しました`), 1200);
+        }
         return;
       }
     } catch {}

@@ -980,14 +980,7 @@ function formatDocument(text, indentSize = 4) {
 
         const trimmedCode = maskNonCode(trimmed, state);
         const startsWithClose = /^\}/.test(trimmedCode);
-        const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
-
-        if (startsWithClose) {
-            if (stack.at(-1) === "branch") stack.pop();
-            if (stack.at(-1) === "block") stack.pop();
-        } else if (isBranchHeader && stack.at(-1) === "branch") {
-            stack.pop();
-        }
+        if (startsWithClose) stack.pop();
 
         const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
         const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
@@ -999,12 +992,7 @@ function formatDocument(text, indentSize = 4) {
         if (netOpens > 0) {
             for (let i = 0; i < netOpens; i += 1) stack.push("block");
         } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) {
-                if (stack.at(-1) === "branch") stack.pop();
-                if (stack.at(-1) === "block") stack.pop();
-            }
-        } else if (isBranchHeader) {
-            stack.push("branch");
+            for (let i = 0; i < -netOpens; i += 1) stack.pop();
         }
 
         return line;

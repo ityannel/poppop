@@ -22,5 +22,13 @@ assert.equal(
   "文法エラー: 関数「Add」は >> の右側で呼び出してください。（3行目）",
 );
 assert.equal(errorLine("ParseError: something at line 14, column 3"), 14);
+assert.equal(
+  localizeError("SyntaxError: Check branches use braces: write 'when <condition> { ... }' instead of ':' at line 2, column 9"),
+  "文法エラー: Check の分岐は波括弧で書きます。「when <condition> { ... }」の形にしてください（「:」は使えません）。（2行目）",
+);
+assert.equal(
+  localizeError("SyntaxError: Check branches use braces: write 'else { ... }' instead of ':' at line 4, column 5"),
+  "文法エラー: Check の分岐は波括弧で書きます。「else { ... }」の形にしてください（「:」は使えません）。（4行目）",
+);
 
 console.log("Playground Japanese localization tests passed.");

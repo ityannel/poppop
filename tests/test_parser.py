@@ -150,8 +150,8 @@ def test_at_name_is_not_a_variable_form():
 
 def test_check_requires_when_and_else():
     for bad in (
-        '1 >> Check { else: "no". }',
-        '1 >> Check { when @ == 1: "yes". }',
+        '1 >> Check { else { "no". } }',
+        '1 >> Check { when @ == 1 { "yes". } }',
     ):
         try:
             parse_code(bad)
@@ -212,7 +212,7 @@ def test_optional_trailing_dot_inside_blocks():
     # Function body omitting trailing dot
     parse_code("(a, b) >> pop Add { a + b }")
     # Check branches omitting trailing dot before next when / else / }
-    parse_code('2 >> Check as v { when v == 0: "zero" when v == 2: "two" else: "other" }')
+    parse_code('2 >> Check as v { when v == 0 { "zero" } when v == 2 { "two" } else { "other" } }')
     # Fork unlabeled and labeled omitting trailing dot on last branch
     parse_code("[1, 2] >> Fork { @ >> Sum. @ >> Max }")
     parse_code("[1, 2] >> Fork { total: @ >> Sum. max: @ >> Max }")

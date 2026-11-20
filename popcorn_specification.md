@@ -40,7 +40,7 @@ answer >> Display.
 
 | 分類 | 記号 |
 |---|---|
-| 文とブロック | `.`、`{ }`、`:` |
+| 文とブロック | `.`、`{ }` |
 | パイプ | `>>` |
 | グループ | `( )`、`[ ]`、`{ }` |
 | 区切り | `,` |
@@ -335,14 +335,14 @@ ForkEntry          = VariableName ":" Statement .
 ForkTailEntry      = VariableName ":" BlockTailStatement .
 
 UpdateBlock        = "Update" [ AliasClause ] "{" { UpdateStatement } [ UpdateTailStatement ] "}" .
-UpdateStatement    = Expression ">>" FieldTarget "." .
-UpdateTailStatement = Expression ">>" FieldTarget [ "." ] .
+UpdateStatement    = Expression { ">>" PipelineStage } ">>" FieldTarget "." .
+UpdateTailStatement = Expression { ">>" PipelineStage } ">>" FieldTarget [ "." ] .
 FieldTarget        = ( VariableName | "@" ) "::" Identifier .
 
 CheckBlock         = "Check" [ AliasClause ] "{"
                      WhenBranch { WhenBranch } ElseBranch "}" .
-WhenBranch         = "when" Expression ":" Block .
-ElseBranch         = "else" ":" Block .
+WhenBranch         = "when" Expression "{" Block "}" .
+ElseBranch         = "else" "{" Block "}" .
 
 TryBlock           = "Try" [ AliasClause ] "{" Block "}"
                      "Catch" [ AliasClause ] "{" Block "}" .
@@ -448,6 +448,22 @@ and  or
 * 整数どうしの割り算（小数点以下切り捨て）をしたいときは標準関数 `Div` を使います（例: `7 >> Div(2)` は `3`）。
 * `0` での割り算（`/`、`Div`）と剰余（`%`）は `RuntimeError` です。
 * `+` は数値の足し算だけでなく、`Str` どうしや `List` どうしの連結にも使えます。連結結果は新しい値として作られます。
+
+### 剰余（`%`）の符号
+
+`a % b` の結果の符号は、割られる数 `a` と同じです（C や JavaScript と同じ方式です）。`Div` が `0` の方向へ切り捨てるので、`a` が整数のとき、`(a, b) >> Div` に `b` を掛けて `a % b` を足すと、いつでも `a` に戻ります。
+
+| 式 | 結果 |
+|---|---|
+| `7 % 3` | `1` |
+| `-7 % 3` | `-1` |
+| `7 % -3` | `1` |
+| `-7 % -3` | `-1` |
+
+負の数では結果が負になります（Python とは違います）。次の書き方をおすすめします。
+
+* 奇数かどうかは、`n % 2 == 1` ではなく `n % 2 != 0` で調べます（`-3 % 2` は `-1` です）。
+* `0` 以上に収めたいとき（ぐるぐる回る添字など）は、`((i % n) + n) % n` と書きます。
 
 ### 比較と `in` 演算子
 
@@ -586,13 +602,23 @@ stats::total >> Display.
 
 ### `Update`
 
-`Update` は `Dict` を非破壊的に更新します。`UpdateBlock` の中では `Expression >> target::field.` の形で、トップレベルのフィールドを追加・上書きします。書いた順に反映されるため、後ろの行から直前に更新したフィールドを参照できます。
+`Update` は `Dict` を非破壊的に更新します。`UpdateBlock` の中では、`>>` で好きな段数のパイプラインをつないで、最後を `>> target::field.` にします。トップレベルのフィールドを追加・上書きします。書いた順に反映されるため、後ろの行から直前に更新したフィールドを参照できます。
 
 ```
 {"name": "Ada", "score": 10} >> Update as user {
     15 >> user::score.
     true >> user::active.
 } >> updated.
+```
+
+左辺はパイプラインでもかまいません。自分のフィールドを加工して、そのフィールドへ書き戻せます。
+
+```
+{"name": "ada", "score": 1} >> Update as user {
+    user::name >> Uppercase >> user::name.
+    user::score >> Add(10) >> user::score.
+} >> updated.
+// updated は {"name": "ADA", "score": 11}
 ```
 
 更新後は新しい外側の `Dict` が作られ、触っていない入れ子の値はそのまま残ります。キーを削除したいときは `Remove` を使ってください。
@@ -615,16 +641,32 @@ stats::total >> Display.
 
 ```
 2 >> Check as value {
-    when value == 0:
+    when value == 0 {
         "zero".
-    when value in [1, 2, 3]:
+    }
+    when value in [1, 2, 3] {
         "small".
-    when value >= 4:
+    }
+    when value >= 4 {
         "large".
-    else:
+    }
+    else {
         value >> Str.
+    }
 } >> label.
 ```
+
+分岐は、ほかのブロックと同じように、必ず `{ }` で囲みます。ブロックの最後の文の `.` は省略できるので、1行でも書けます。
+
+```
+x >> Check {
+    when @ < 0 { "negative" }
+    when @ == 0 { "zero" }
+    else { "positive" }
+} >> sign.
+```
+
+`when 条件:` のように `:` を使う古い書き方は使えません（「Check の分岐は波括弧で書きます」というエラーになります）。波括弧にしたのは、文の最後に添える後置の `when`（「条件付き実行」）と、`Check` の分岐の `when` を、はっきり区別するためです。
 
 ## 11. `Loop` と `Break`
 
@@ -694,12 +736,15 @@ stats::total >> Display.
 ```
 (value, min, max) >> pop Clamp {
     value >> Check {
-        when @ < min:
+        when @ < min {
             min >> Return.
-        when @ > max:
+        }
+        when @ > max {
             max >> Return.
-        else:
+        }
+        else {
             @.
+        }
     }
 }
 

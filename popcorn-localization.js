@@ -61,7 +61,9 @@
     ]);
     if (exact.has(message)) return exact.get(message);
 
-    let match = message.match(/^Variable '([^']+)' is not defined\.?$/);
+    let match = message.match(/^Check branches use braces: write '(.+)' instead of ':'$/);
+    if (match) return `Check の分岐は波括弧で書きます。「${match[1]}」の形にしてください（「:」は使えません）。`;
+    match = message.match(/^Variable '([^']+)' is not defined\.?$/);
     if (match) return `変数「${match[1]}」は定義されていません。`;
     match = message.match(/^Function '([^']+)' is not defined\.?$/);
     if (match) return `関数「${match[1]}」は定義されていません。`;

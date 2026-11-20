@@ -525,7 +525,9 @@ class Evaluator:
                 raise PopCornError("TypeError", "% requires Num values")
             if float(right) == 0.0:
                 raise PopCornError("RuntimeError", "Modulo by zero")
-            return _to_num(float(left) % float(right))
+            # 符号は、割られる数に合わせる（C・JS 方式）。`Div` が 0 の方向へ切り捨てるので、
+            # a == Div(a, b) * b + a % b が、いつでも成り立つ。`+ 0.0` は、-0.0 を 0.0 にするため。
+            return _to_num(math.fmod(float(left), float(right)) + 0.0)
         if op in (">", "<", ">=", "<="):
             comparable = (_is_number(left) and _is_number(right)) or (
                 isinstance(left, str) and isinstance(right, str)

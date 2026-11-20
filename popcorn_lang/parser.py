@@ -149,6 +149,17 @@ class Parser:
             pipelines.append(self.parse_statement(end_tokens))
         return BlockNode(line, col, pipelines)
 
+    def _expect_branch_open(self, kind: str) -> None:
+        """Check の分岐は `when 条件 { … }` / `else { … }`。旧形式の `:` には、書き方を教える。"""
+        curr = self.current()
+        if curr and curr.type == "COLON":
+            shape = "when <condition> { ... }" if kind == "when" else "else { ... }"
+            raise ParseError(
+                f"Check branches use braces: write '{shape}' instead of ':' "
+                f"at line {curr.line}, column {curr.column}"
+            )
+        self.expect("LBRACE")
+
     def _parse_optional_alias_clause(self) -> List[str]:
         if not self.match("AS"):
             return []
@@ -299,8 +310,9 @@ class Parser:
                 w_tok = self.current()
                 self.advance()
                 cond = self.parse_expression()
-                self.expect("COLON")
-                block = self.parse_block({"WHEN", "ELSE", "RBRACE"})
+                self._expect_branch_open("when")
+                block = self.parse_block({"RBRACE"})
+                self.expect("RBRACE")
                 branches.append(Branch(w_tok.line, w_tok.column, cond, block, "predicate"))
             if not branches:
                 raise ParseError(
@@ -312,8 +324,9 @@ class Parser:
                 )
             e_tok = self.current()
             self.advance()
-            self.expect("COLON")
+            self._expect_branch_open("else")
             else_block = self.parse_block({"RBRACE"})
+            self.expect("RBRACE")
             branches.append(Branch(e_tok.line, e_tok.column, None, else_block, "else"))
             self.expect("RBRACE")
             single_alias = alias_names[0] if len(alias_names) == 1 else None

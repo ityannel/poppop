@@ -65,14 +65,7 @@
 
       const trimmedCode = maskNonCode(trimmed);
       const startsWithClose = /^\}/.test(trimmedCode);
-      const isBranchHeader = /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(trimmedCode.trim());
-
-      if (startsWithClose) {
-        if (stack.at(-1) === "branch") stack.pop();
-        if (stack.at(-1) === "block") stack.pop();
-      } else if (isBranchHeader && stack.at(-1) === "branch") {
-        stack.pop();
-      }
+      if (startsWithClose) stack.pop();
 
       const line = " ".repeat(stack.length * indentSize)
         + normalizePipelineSpacing(trimmed, trimmedCode);
@@ -86,12 +79,7 @@
       if (netOpens > 0) {
         for (let i = 0; i < netOpens; i += 1) stack.push("block");
       } else if (netOpens < 0) {
-        for (let i = 0; i < -netOpens; i += 1) {
-          if (stack.at(-1) === "branch") stack.pop();
-          if (stack.at(-1) === "block") stack.pop();
-        }
-      } else if (isBranchHeader) {
-        stack.push("branch");
+        for (let i = 0; i < -netOpens; i += 1) stack.pop();
       }
 
       return line;
@@ -99,5 +87,36 @@
     return formatted.join(eol);
   }
 
-  return Object.freeze({ formatDocument });
+  // ---- 旧形式の Check（`when 条件:` / `else:`）を、新しい書き方（{ }）へ直す ----
+  const OLD_CHECK_HEADER = /^(\s*)(when\b.*|else)\s*:\s*$/;
+
+  function hasOldCheckSyntax(code) {
+    return String(code).split(/\r?\n/).some((line) => OLD_CHECK_HEADER.test(line));
+  }
+
+  // 分岐の見出しの字下げより深い行を、その分岐の本体とみなして、`{` と `}` で囲む（1行で書いた旧形式は、直さない）
+  function migrateOldCheckSyntax(code) {
+    const eol = String(code).includes("\r\n") ? "\r\n" : "\n";
+    const lines = String(code).replace(/\r\n/g, "\n").split("\n");
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const match = OLD_CHECK_HEADER.exec(lines[i]);
+      if (!match) { out.push(lines[i]); i += 1; continue; }
+      const depth = match[1].length;
+      out.push(`${match[1]}${match[2]} {`);
+      i += 1;
+      while (i < lines.length && (!lines[i].trim() || lines[i].length - lines[i].trimStart().length > depth)) {
+        out.push(lines[i]);
+        i += 1;
+      }
+      const tail = [];
+      while (out.length && !out[out.length - 1].trim()) tail.push(out.pop());
+      out.push(`${" ".repeat(depth)}}`);
+      out.push(...tail.reverse());
+    }
+    return out.join(eol);
+  }
+
+  return Object.freeze({ formatDocument, hasOldCheckSyntax, migrateOldCheckSyntax });
 });

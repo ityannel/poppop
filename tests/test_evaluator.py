@@ -312,7 +312,7 @@ def test_in_operator_and_strict_bool():
     expect_error("1 and true.", "TypeError")
     expect_error("not 0.", "TypeError")
     expect_error("[1] >> Filter { @. }", "TypeError")
-    expect_error('1 >> Check { when @: "yes". else: "no". }', "TypeError")
+    expect_error('1 >> Check { when @ { "yes". } else { "no". } }', "TypeError")
 
 
 def test_new_collection_builtins():
@@ -392,14 +392,18 @@ def test_check_block():
         run_code(
             """
             2 >> Check as value {
-                when value == 0:
+                when value == 0 {
                     "zero".
-                when value in [1, 2, 3]:
+                }
+                when value in [1, 2, 3] {
                     "small".
-                when value >= 4:
+                }
+                when value >= 4 {
                     "large".
-                else:
+                }
+                else {
                     value >> Str.
+                }
             }
             """
         )
@@ -510,12 +514,15 @@ def test_functions_closures_mutual_recursion_and_return():
             """
             (value, min, max) >> pop Clamp {
                 value >> Check {
-                    when @ < min:
+                    when @ < min {
                         min >> Return.
-                    when @ > max:
+                    }
+                    when @ > max {
                         max >> Return.
-                    else:
+                    }
+                    else {
                         @.
+                    }
                 }
             }
             150 >> Clamp(0, 100).
@@ -647,12 +654,15 @@ def test_optional_trailing_dot_in_blocks_evaluates():
         run_code(
             """
             2 >> Check as v {
-                when v == 0:
+                when v == 0 {
                     "zero"
-                when v in [1, 2, 3]:
+                }
+                when v in [1, 2, 3] {
                     "small"
-                else:
+                }
+                else {
                     "other"
+                }
             }
             """
         )
@@ -664,13 +674,16 @@ def test_optional_trailing_dot_in_blocks_evaluates():
             """
             (n) >> pop Classify {
                 n >> Check {
-                    when @ > 0:
+                    when @ > 0 {
                         "huge" >> Return when @ > 100.
                         "positive"
-                    when @ == 0:
+                    }
+                    when @ == 0 {
                         "zero"
-                    else:
+                    }
+                    else {
                         "negative"
+                    }
                 }
             }
             [200, 5, 0, -3] >> Map as x { x >> Classify }
@@ -710,3 +723,66 @@ def test_optional_trailing_dot_in_blocks_evaluates():
         )
         == 10
     )
+
+
+def test_modulo_sign_follows_the_dividend():
+    assert run_code("7 % 3.") == 1
+    assert run_code("-7 % 3.") == -1
+    assert run_code("7 % -3.") == 1
+    assert run_code("-7 % -3.") == -1
+    assert run_code("5.5 % 2.") == 1.5
+    assert run_code("-5.5 % 2.") == -1.5
+
+
+def test_modulo_never_returns_negative_zero():
+    import math
+    res = run_code("-6 % 3.")
+    assert res == 0 and math.copysign(1.0, res) == 1.0
+
+
+def test_modulo_by_zero_is_a_runtime_error():
+    expect_error("5 % 0.", "RuntimeError")
+
+
+def test_modulo_and_div_keep_the_division_identity():
+    for a, b in [(7, 3), (-7, 3), (7, -3), (-7, -3), (6, 3), (-6, 3), (0, 5)]:
+        code = f"(({a}), ({b})) >> Div >> q. (q * ({b})) + (({a}) % ({b}))."
+        assert run_code(code) == a, (a, b)
+
+
+def test_odd_check_and_wraparound_idioms_with_negative_numbers():
+    assert run_code("-3 % 2 != 0.") is True
+    assert run_code("((-1 % 5) + 5) % 5.") == 4
+
+
+def test_update_accepts_a_pipeline_on_the_left_side():
+    assert run_code('{"name": "ada", "score": 1} >> Update as user { user::name >> Uppercase >> user::name. } >> u. u.') == {"name": "ADA", "score": 1}
+    assert run_code('{"name": "ada"} >> Update { @::name >> Uppercase >> @::name. } >> u. u.') == {"name": "ADA"}
+    assert run_code('{"n": 2} >> Update as d { d::n >> Add(5) >> d::n. d::n >> Add(1) >> d::n. } >> u. u.') == {"n": 8}
+    assert run_code('{"score": 1} >> Update as user { 15 >> user::score. } >> u. u.') == {"score": 15}
+
+
+def test_update_rejects_a_target_that_is_not_a_field():
+    expect_error('{"n": 1} >> Update as d { 5 >> d. } >> u.', "RuntimeError")
+
+
+def test_check_branches_use_braces():
+    code = """
+    2 >> Check as value {
+        when value == 0 { "zero". }
+        when value in [1, 2, 3] { "small" }
+        else { "large" }
+    } >> label.
+    label.
+    """
+    assert run_code(code) == "small"
+
+
+def test_check_with_the_old_colon_form_explains_the_new_shape():
+    for code in ('1 >> Check { when @ == 1: "yes". else { "no". } }', '1 >> Check { when @ == 1 { "yes". } else: "no". }'):
+        try:
+            run_code(code)
+        except Exception as exc:
+            assert "Check branches use braces" in str(exc), str(exc)
+        else:
+            raise AssertionError("old Check form must be rejected")
