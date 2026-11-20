@@ -40,7 +40,7 @@ answer >> Display.
 
 | 分類 | 記号 |
 |---|---|
-| 文とブロック | `.`、`{ }` |
+| 文とブロック | `.`、`{ }`、`:` |
 | パイプ | `>>` |
 | グループ | `( )`、`[ ]`、`{ }` |
 | 区切り | `,` |
@@ -77,7 +77,7 @@ when  else  as  pop  true  false  null  and  or  not  in
 | 表記 | 役割 | 例 |
 |---|---|---|
 | 先頭が小文字または `_` | 値の名前、引数、別名、ラベル | `score`、`user_name`、`_temporary` |
-| 先頭が大文字 | 標準処理またはユーザー関数 | `Map`、`AddTwo` |
+| 先頭が大文字 | 標準処理またはユーザー関数（`>>` の右側のほか、処理名だけでも書けます） | `Map`、`AddTwo`、`Pi` |
 | `@` | 現在値 | `@ * 2` |
 
 ## 3. 値と型
@@ -209,10 +209,22 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 数値 | `Min` | 比較できる値の空でない `List` | 最小値を返します。空 `List` は `RuntimeError`。 |
 | 数値 | `Round` | `Num` | いちばん近い整数値の `Num` を返します。中間値（`.5`）は 0 から遠い方向へ丸めます（四捨五入）。 |
 | 数値 | `Abs` | `Num` | 絶対値の `Num` を返します。 |
+| 数値 | `Floor` | `Num` | 小数点以下を負の方向へ切り捨てた、整数値の `Num` を返します（`-3.2` は `-4`）。 |
+| 数値 | `Ceil` | `Num` | 小数点以下を正の方向へ切り上げた、整数値の `Num` を返します（`-3.7` は `-3`）。 |
+| 数値 | `Sqrt` | `Num`（0 以上） | 平方根の `Num` を返します。負の値は `RuntimeError`。 |
+| 数値 | `Pow` | `(base, exponent)` | `base` の `exponent` 乗の `Num` を返します。結果が定まらないとき（負の数の小数乗、`0` の負の累乗）や、大きすぎるときは `RuntimeError`。 |
+| 数値 | `Exp` | `Num` | `e` の累乗（自然指数関数）の `Num` を返します。大きすぎるときは `RuntimeError`。 |
+| 数値 | `Log` | `Num`（0 より大きい）または `(x, base)` | 自然対数の `Num` を返します。`x >> Log(base)` と書くと、`base` を底にした対数です。`x` が 0 以下のとき、`base` が 0 以下か 1 のときは `RuntimeError`。 |
+| 数値 | `Sin` | `Num`（ラジアン） | 正弦の `Num` を返します。 |
+| 数値 | `Cos` | `Num`（ラジアン） | 余弦の `Num` を返します。 |
+| 数値 | `Tan` | `Num`（ラジアン） | 正接の `Num` を返します。 |
+| 数値 | `Pi` | 入力は使いません | 円周率 `3.14159…` の `Num` を返します。`Pi * 2` のように、処理名だけで書けます。 |
+| 数値 | `E` | 入力は使いません | ネイピア数 `2.71828…` の `Num` を返します。処理名だけで書けます。 |
 | 数値 | `Random` | `(minimum, maximum)` の 2つの整数値（`Num`） | 両端を含む範囲からランダムな整数値の `Num` を返します。`minimum > maximum` は `RuntimeError`。外部効果あり。 |
 | 数値 | `Range` | `(start, end)` の 2つの整数値（`Num`） | `start` から `end` まで（両端を含む）の `Num` の `List` を返します。`start > end` なら空 `List` `[]`。 |
 | 文字列 | `Uppercase` | `Str` | 大文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Lowercase` | `Str` | 小文字にした新しい `Str` を返します。非破壊。 |
+| 文字列 | `Trim` | `Str` | 前後の空白（全角の空白も）を取り除いた新しい `Str` を返します。非破壊。 |
 | 文字列 | `Split` | `(text, delimiter)` | 区切り文字で分けた `Str` の `List` を返します。 |
 | 文字列 | `Replace` | `(text, old, new)` | 置換後の新しい `Str` を返します。非破壊。 |
 | 文字列 | `Join` | `(items, delimiter)` | `List` の各要素を `Str` 変換してつないだ `Str` を返します。 |
@@ -231,9 +243,14 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | コレクション | `Slice` | `(target, end)` または `(target, start, end)` | 範囲を切り出した新しい `List` または `Str`（コードポイント単位）を返します。終端 `end` は含みません。負の添字・`start > end`・範囲外は `IndexError`。 |
 | コレクション | `Array` | 非負の整数値（`Num`）の `size` またはサイズの `List` | 指定した各次元を `0` で埋めた新しい `List` を返します。 |
 | コレクション | `Zip` | 空でない `List` 群（値リスト） | 同じ位置の要素どうしを `List` にまとめた `List` を返します。いちばん短い入力の長さで止まります。 |
+| コレクション | `Unique` | `List` | 同じ値（`==` で等しい値）の 2 つ目以降を取り除いた、新しい `List` を返します。最初に現れた順を保ちます。非破壊。 |
+| コレクション | `Flatten` | `List` | 要素が `List` のものを 1 段だけ展開した、新しい `List` を返します（`[[1, 2], 3]` は `[1, 2, 3]`）。`List` でない要素は、そのまま残ります。非破壊。 |
+| コレクション | `Enumerate` | `List` | 0 から数えた番号つきの `[index, item]` の `List` を返します。 |
+| コレクション | `FromEntries` | `[key, value]` の `List` | `Entries` の逆です。`Dict` を返します。`key` は `Str`。同じ `key` が複数あるときは、後のものが勝ちます。 |
+| コレクション | `GetPath` | `(target, path)` または `(target, path, default)` | 深い `Dict` / `List` の中身を、`path`（`Str` のキーと整数値の添字の `List`）でたどって返します。途中で見つからなければ、エラーにせず `default`（なければ `null`）を返します。 |
 | JSON | `ToJson` | JSON にできる値 | JSON 文字列を返します。 |
 | JSON | `FromJson` | JSON 文字列 | JSON を PopCorn の値に変換します。壊れた JSON は `RuntimeError`。 |
-| 時間 | `Now` | 任意の値 | 現在日時を `year`・`month`・`day`・`hour`・`minute`・`second` を持つ `Dict` で返します。外部効果あり。 |
+| 時間 | `Now` | 入力は使いません | 現在日時を `year`・`month`・`day`・`hour`・`minute`・`second` を持つ `Dict` で返します。外部効果あり。 |
 | 時間 | `Sleep` | 秒数を表す `Num` | 指定した秒数だけ待ってから、入力値をそのまま返します。負の値は `RuntimeError`。外部効果あり。 |
 | 入出力 | `Display` | 任意の値 | 値を `Str` 変換して表示し、元の値をそのまま返します。外部効果あり。 |
 | 入出力 | `Input` | 表示するプロンプト（`Str`） | ユーザーが入力した `Str` を返します。外部効果あり。 |
@@ -241,6 +258,8 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 入出力 | `ReadFile` | ファイルパスを表す `Str` | ローカルファイルの中身を UTF-8 の `Str` で返します。失敗時は `IOError`。外部効果あり。 |
 | 入出力 | `WriteFile` | `(content, path)` | 内容をファイルへ書き込み、`content` をそのまま返します。失敗時は `IOError`。外部効果あり。 |
 | 入出力 | `Fetch` | URL を表す `Str` | HTTP GET の応答本文を `Str` で返します。通信失敗や 4xx/5xx は `NetworkError`。外部効果あり。 |
+| 入出力 | `Env` | 環境変数の名前（`Str`） | その値の `Str` を返します。設定されていなければ `null`。ブラウザの Playground には環境変数がないので、いつも `null` です。外部効果あり。 |
+| 入出力 | `Args` | 入力は使いません | コマンドラインで、ファイル名のあとに書いた引数の `Str` の `List` を返します（`popcorn script.pop a b` なら `["a", "b"]`）。Playground では、いつも `[]` です。外部効果あり。 |
 | 入出力 | `PostFetch` | `(body, url)` または `(body, url, headers)` | HTTP POST を送り、応答本文を `Str` で返します。`headers` を省くと `{}` になります。通信失敗や 4xx/5xx は `NetworkError`。外部効果あり。 |
 | 入出力 | `HttpRequest` | `(method, url, headers, body)` | 任意の HTTP リクエストを送り、`{"status": Num, "headers": Dict, "body": Str}` を返します。通信できないときだけ `NetworkError`。外部効果あり。 |
 | 制御 | `Return` | 任意の値 | いちばん内側の `pop` 関数を終わらせ、入力値を関数の結果にします。関数外では `RuntimeError`。 |
@@ -286,7 +305,23 @@ x >> Func(y, z)
 {"ok": true} >> ToJson >> PostFetch("https://example.com/api") >> response.
 ```
 
-**注意点:** `Func(x, y)` のように `>>` なしで関数だけを単独で呼ぶことはできません（`SyntaxError` になります）。関数のメインの入力は、いつも左側のパイプから渡します。
+**注意点:** `Func(x, y)` のように `>>` なしで書くと、`@ >> Func(x, y)`（つまり `(@, x, y) >> Func`）の意味になります。次の「処理名だけで書く」を参照してください。
+
+### 処理名だけで書く（`@` に適用）
+
+式の中や文の先頭に、処理名だけを書くと、`@`（いまの値）を入力にして呼び出したものとして扱います。入力を使わない処理（`Pi`、`E`、`Now`、`Args`）を、`null >> Now` のように書かなくても、使えるようになります。
+
+```
+Pi * 2 >> Display.                       // (@ >> Pi) * 2
+Now::year >> Display.                    // (@ >> Now)::year
+Args >> Length >> count.                 // 引数の数
+[[1, 2], [3]] >> Map { Length + 1. }     // 各要素の長さ + 1  →  [3, 2]
+Break when i >= n.                       // @ >> Break when …
+```
+
+* ブロックの中や関数の中では、`@` は、そのブロックや関数が受け取った入力値です。プログラムの最初の `@` は `null` です。
+* `Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように、`{ }` が必要な処理は、この書き方では使えません。`>>` の右側に、ブロックつきで書きます（書くと「`>>` の右側で呼び出してください」というエラーです）。
+* 入力が必要な処理の、値の書き忘れ（たとえば `Display.`）は、構文エラーにならず、`@` を入力にして実行されます。プログラムの最初で `Display.` と書くと、`null` を表示します。入力が必要な処理は、`>>` で入力を見せて書くことをおすすめします（付録 A）。
 
 ### 条件付き実行（後置 `when`）
 
@@ -363,13 +398,15 @@ AddExpr            = MulExpr { ( "+" | "-" ) MulExpr } .
 MulExpr            = UnaryExpr { ( "*" | "/" | "%" ) UnaryExpr } .
 UnaryExpr          = ( "-" | "not" ) UnaryExpr | PostfixExpr .
 PostfixExpr        = PrimaryExpr { "[" Expression "]" | "::" Identifier } .
-PrimaryExpr        = Literal | VariableName | "@"
+PrimaryExpr        = Literal | VariableName | "@" | InlineProcessCall
                    | "(" Pipeline ")" | ValueList | ListLiteral | DictLiteral .
+InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省いた書き方 *)
 ```
 
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
 * ブロック `{ ... }` で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック `{ ... }` 内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
+* `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように `{ }` が必要な処理は、この形では書けません。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 
 ### パイプラインの評価
@@ -841,6 +878,7 @@ PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スク�
 
 * **ブロック `{ }` の書き分け:** 1文だけの短い処理は `[1, 2, 3] >> Map as x { x * 2. }` のように 1 行で書き、複数行になるときは閉じ `}` を単独行か `} >> 次段階.` の行頭に揃えると見やすくなります。
 * **対等なペア引数の書き方:** `Random` の `(minimum, maximum)` や `Zip` の複数 `List` のように、引数が対等な関数は `(1, 6) >> Random` のように値リストで渡すのがおすすめです。
+* **処理名だけで書くのは、入力を使わない処理だけ:** `Pi * 2` や `Now::year` のように、入力を使わない処理（`Pi`、`E`、`Now`、`Args`）は、処理名だけで書けます。入力を使う処理（`Display`、`Length`、`Sum` など）は、`value >> Length` のように、`>>` で入力を見せて書くと、書き忘れに気づけます。
 * **長いパイプラインの改行:** 3 段階以上つながるパイプラインは、`>>` の前で改行して縦に揃えると読みやすくなります。
 
 ## 付録 B. 参考にした仕様書の構成

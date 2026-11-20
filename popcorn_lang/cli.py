@@ -34,8 +34,10 @@ def get_warnings(source: str) -> list[str]:
     return list(lexer.warnings)
 
 
-async def evaluate(source: str, evaluator: Evaluator | None = None):
+async def evaluate(source: str, evaluator: Evaluator | None = None, args: list[str] | None = None):
     runtime = evaluator or Evaluator()
+    if args is not None:
+        runtime.script_args = list(args)  # 標準関数 Args が返す
     return await runtime.eval(parse_source(source), runtime.global_env)
 
 
@@ -89,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run a PopCorn source file or start the interactive REPL.",
     )
     parser.add_argument("file", nargs="?", type=Path, help="a .pop or .popcorn file")
+    parser.add_argument("args", nargs="*", help="arguments for the program (read them with Args)")
     parser.add_argument("--ast", action="store_true", help="print the parsed AST as JSON")
     parser.add_argument(
         "--version", action="version", version=DISPLAY_VERSION
@@ -106,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.ast:
             print(get_ast_json(source))
         else:
-            asyncio.run(evaluate(source))
+            asyncio.run(evaluate(source, args=args.args))
         return 0
     except (OSError, LexerError, ParseError, PopCornError, EvaluatorError) as exc:
         print(format_error(exc))

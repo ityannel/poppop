@@ -38,6 +38,9 @@
       ["Check requires a final else branch", "Check の最後には else が必要です。"],
       ["Check requires at least one 'when' branch", "Check には少なくとも 1 つの when 分岐が必要です。"],
       ["Check requires an else branch", "Check には else が必要です。"],
+      ["Sqrt requires a non-negative Num", "Sqrt には 0 以上の数を渡してください。"],
+      ["Log requires a positive Num", "Log には 0 より大きい数を渡してください。"],
+      ["Log base must be positive and not 1", "Log の底は、0 より大きく、1 以外の数にしてください。"],
       [
         "Single-quoted strings do not interpolate; use a double-quoted string to insert values",
         "単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 \" の文字列を使います。",
@@ -64,6 +67,9 @@
       ["Unclosed interpolation", "文字列補間の { が閉じられていません。"],
     ]);
     if (exact.has(message)) return exact.get(message);
+
+    const undefinedMath = message.match(/^(Pow|Exp) is undefined for this value$/);
+    if (undefinedMath) return `「${undefinedMath[1]}」は、この値では計算できません。`;
 
     let match = message.match(/^Check branches use braces: write '(.+)' instead of ':'$/);
     if (match) return `Check の分岐は波括弧で書きます。「${match[1]}」の形にしてください（「:」は使えません）。`;

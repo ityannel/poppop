@@ -2,6 +2,8 @@
 import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import json
+import math
+import os
 import random
 import re
 import sys
@@ -17,6 +19,7 @@ from .evaluator import (
     _contains_value,
     _is_number,
     _to_num,
+    _values_equal,
     format_popcorn_str,
     popcorn_type_name,
 )
@@ -796,3 +799,175 @@ def builtin_Throw(current, env, evaluator):
 
 
 BUILTIN_REGISTRY["Throw"] = builtin_Throw
+# ================================================================
+# 数学・文字列・コレクション・環境の標準関数（PopCorn 1 の追加分）
+# ================================================================
+
+def _num_input(current, name: str) -> float:
+    if not _is_number(current):
+        _type_error(f"{name} requires Num")
+    return _to_num(current)
+
+
+def _math_result(name: str, compute):
+    """計算が定まらない・大きすぎるときは、RuntimeError にする。"""
+    try:
+        return _to_num(compute())
+    except OverflowError:
+        raise PopCornError("RuntimeError", "Numeric result is NaN or Infinity")
+    except (ValueError, ZeroDivisionError):
+        raise PopCornError("RuntimeError", f"{name} is undefined for this value")
+
+
+def builtin_Floor(current, env, evaluator):
+    return _to_num(math.floor(_num_input(current, "Floor")))
+
+
+def builtin_Ceil(current, env, evaluator):
+    return _to_num(math.ceil(_num_input(current, "Ceil")))
+
+
+def builtin_Sqrt(current, env, evaluator):
+    x = _num_input(current, "Sqrt")
+    if x < 0:
+        raise PopCornError("RuntimeError", "Sqrt requires a non-negative Num")
+    return _to_num(math.sqrt(x))
+
+
+def builtin_Pow(current, env, evaluator):
+    if isinstance(current, tuple) and len(current) == 2 and all(_is_number(v) for v in current):
+        base, exponent = (_to_num(v) for v in current)
+        return _math_result("Pow", lambda: math.pow(base, exponent))
+    _type_error("Pow requires (base, exponent) of two Num values")
+
+
+def builtin_Exp(current, env, evaluator):
+    x = _num_input(current, "Exp")
+    return _math_result("Exp", lambda: math.exp(x))
+
+
+def builtin_Log(current, env, evaluator):
+    if isinstance(current, tuple) and len(current) == 2 and all(_is_number(v) for v in current):
+        x, base = (_to_num(v) for v in current)
+        if x <= 0:
+            raise PopCornError("RuntimeError", "Log requires a positive Num")
+        if base <= 0 or base == 1:
+            raise PopCornError("RuntimeError", "Log base must be positive and not 1")
+        return _to_num(math.log(x) / math.log(base))
+    x = _num_input(current, "Log")
+    if x <= 0:
+        raise PopCornError("RuntimeError", "Log requires a positive Num")
+    return _to_num(math.log(x))
+
+
+def builtin_Sin(current, env, evaluator):
+    return _to_num(math.sin(_num_input(current, "Sin")))
+
+
+def builtin_Cos(current, env, evaluator):
+    return _to_num(math.cos(_num_input(current, "Cos")))
+
+
+def builtin_Tan(current, env, evaluator):
+    return _to_num(math.tan(_num_input(current, "Tan")))
+
+
+def builtin_Pi(current, env, evaluator):
+    return math.pi  # 入力は使わない
+
+
+def builtin_E(current, env, evaluator):
+    return math.e  # 入力は使わない
+
+
+def builtin_Trim(current, env, evaluator):
+    if isinstance(current, str):
+        return current.strip()  # 全角の空白も取り除く
+    _type_error("Trim requires Str")
+
+
+def builtin_Unique(current, env, evaluator):
+    if isinstance(current, (list, tuple)):
+        result = []
+        for item in current:
+            if not any(_values_equal(item, seen) for seen in result):
+                result.append(item)
+        return result
+    _type_error("Unique requires List")
+
+
+def builtin_Flatten(current, env, evaluator):
+    if isinstance(current, (list, tuple)):
+        result = []
+        for item in current:
+            if isinstance(item, (list, tuple)):
+                result.extend(item)
+            else:
+                result.append(item)
+        return result
+    _type_error("Flatten requires List")
+
+
+def builtin_Enumerate(current, env, evaluator):
+    if isinstance(current, (list, tuple)):
+        return [[_to_num(index), item] for index, item in enumerate(current)]
+    _type_error("Enumerate requires List")
+
+
+def builtin_FromEntries(current, env, evaluator):
+    if isinstance(current, (list, tuple)):
+        result = {}
+        for entry in current:
+            if not (isinstance(entry, (list, tuple)) and len(entry) == 2):
+                _type_error("FromEntries requires a List of [key, value] pairs")
+            key, value = entry
+            if not isinstance(key, str):
+                _type_error("FromEntries keys must be Str")
+            result[key] = value
+        return result
+    _type_error("FromEntries requires a List of [key, value] pairs")
+
+
+def builtin_GetPath(current, env, evaluator):
+    if isinstance(current, tuple) and len(current) in (2, 3):
+        target, path = current[0], current[1]
+        default = current[2] if len(current) == 3 else None
+        if not isinstance(path, (list, tuple)):
+            _type_error("GetPath requires (target, path) where path is a List of keys and indices")
+        node = target
+        for key in path:
+            if isinstance(node, dict) and isinstance(key, str) and key in node:
+                node = node[key]
+            elif isinstance(node, (list, tuple)) and _is_number(key):
+                index = _to_num(key)
+                if index.is_integer() and 0 <= index < len(node):
+                    node = node[int(index)]
+                else:
+                    return default
+            else:
+                return default
+        return node
+    _type_error("GetPath requires (target, path) or (target, path, default)")
+
+
+def builtin_Env(current, env, evaluator):
+    if not isinstance(current, str):
+        _type_error("Env requires Str (the variable name)")
+    if sys.platform == "emscripten":  # ブラウザの Playground には、環境変数がない
+        return None
+    return os.environ.get(current)
+
+
+def builtin_Args(current, env, evaluator):
+    return list(getattr(evaluator, "script_args", []))  # 入力は使わない
+
+
+for _name, _fn in (
+    ("Floor", builtin_Floor), ("Ceil", builtin_Ceil), ("Sqrt", builtin_Sqrt), ("Pow", builtin_Pow),
+    ("Exp", builtin_Exp), ("Log", builtin_Log), ("Sin", builtin_Sin), ("Cos", builtin_Cos),
+    ("Tan", builtin_Tan), ("Pi", builtin_Pi), ("E", builtin_E), ("Trim", builtin_Trim),
+    ("Unique", builtin_Unique), ("Flatten", builtin_Flatten), ("Enumerate", builtin_Enumerate),
+    ("FromEntries", builtin_FromEntries), ("GetPath", builtin_GetPath), ("Env", builtin_Env),
+    ("Args", builtin_Args),
+):
+    BUILTIN_REGISTRY[_name] = _fn

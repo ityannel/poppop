@@ -36,4 +36,17 @@ assert.equal(
   `注意: 単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 " の文字列を使います。（3行目）`,
 );
 
+assert.equal(
+  localizeError("RuntimeError: Sqrt requires a non-negative Num"),
+  "実行時エラー: Sqrt には 0 以上の数を渡してください。",
+);
+assert.equal(
+  localizeError("RuntimeError: Pow is undefined for this value"),
+  "実行時エラー: 「Pow」は、この値では計算できません。",
+);
+assert.equal(
+  localizeError("RuntimeError: Log base must be positive and not 1"),
+  "実行時エラー: Log の底は、0 より大きく、1 以外の数にしてください。",
+);
+
 console.log("Playground Japanese localization tests passed.");

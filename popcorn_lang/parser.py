@@ -1,6 +1,6 @@
 ﻿from typing import List, Optional
 from .lexer import Lexer, Token
-from .language_meta import KEYWORDS
+from .language_meta import KEYWORDS, SPECIAL_FORMS
 from .ast_nodes import *
 
 _KEYWORD_TOKEN_TYPES = {kw.upper() for kw in KEYWORDS}
@@ -624,8 +624,19 @@ class Parser:
                 return first_expr
 
         if curr.type == "VERB":
-            raise ParseError(
-                f"Cannot call '{curr.value}' without '>>' at line {line}, column {col}"
+            # ブロックの形が必要な処理（Map、Check、Loop、Try など）は、`>>` の右側に、ブロックつきで書く
+            if curr.value in SPECIAL_FORMS:
+                raise ParseError(
+                    f"Cannot call '{curr.value}' without '>>' at line {line}, column {col}"
+                )
+            # 統一規則: 処理名だけを書くと、`@`（いまの値）を入力にして呼び出す。
+            #   Pi * 2          →  (@ >> Pi) * 2
+            #   Now::year       →  (@ >> Now)::year
+            #   Break when …    →  (@ >> Break) when …
+            stage = self._parse_stream_block_or_call()
+            implicit = ImplicitVariableNode(line, col, "@")
+            return GroupedPipelineNode(
+                line, col, Pipeline(line, col, [implicit, stage], [">>"])
             )
 
         raise ParseError(

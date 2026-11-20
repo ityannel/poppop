@@ -54,13 +54,19 @@ def test_pipe_extra_arguments():
     assert len(nodes[2].args) == 1
 
 
-def test_standalone_function_call_without_pipe_is_rejected():
-    for bad in ("Add(1, 2).", 'Split("a,b", ",").', "Display."):
+def test_block_forms_cannot_stand_alone_without_a_pipe():
+    for bad in ("Map.", "Filter.", "Check.", "Loop.", "Try.", "Update."):
         try:
             parse_code(bad)
         except ParseError:
             continue
-        assert False, f"standalone call must be rejected: {bad}"
+        assert False, f"block form must be rejected without '>>': {bad}"
+
+
+def test_plain_process_name_can_start_an_expression_or_a_statement():
+    # 処理名だけを書くと、`@` を入力にして呼び出す（統一規則）
+    for good in ("Display.", "Add(1, 2).", "Pi * 2 >> Display.", "Now::year.", "Length + 1.", "Break when true."):
+        parse_code(good)
 
 
 def test_implicit_value_is_allowed_as_program_input():

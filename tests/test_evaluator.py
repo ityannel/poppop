@@ -794,3 +794,149 @@ def test_the_three_string_kinds_in_programs():
     assert run_code('"{{literal}} {1 + 2}".') == "{literal} 3"
     assert run_code("'{{x}}'.") == "{{x}}"
     assert run_code(r"`a\nb` >> Length.") == 4
+def test_process_name_alone_applies_to_the_current_value():
+    # ブロックの中では、@ はその値。文の先頭に処理名だけを書くと、@ に適用される
+    assert run_code('[[1, 2], [3]] >> Map { Length. }') == [2, 1]
+    # 式の中でも、同じ（(@ >> Length) + 1）
+    assert run_code('[[1, 2], [3]] >> Map { Length + 1. }') == [3, 2]
+    assert run_code('["a", "bb"] >> Map { Length * 10. }') == [10, 20]
+    # プログラムの最初の @ は null
+    assert run_code("Type.") == "Null"
+    # 補間の中でも
+    assert run_code('["ab"] >> Map { "{Length}". }') == ["2"]
+
+
+def test_return_and_break_can_stand_alone_with_when():
+    code = """
+    pop First {
+        Return when @ == 0.
+        99.
+    }
+    0 >> First >> a.
+    5 >> First >> b.
+    [a, b].
+    """
+    assert run_code(code) == [0, 99]
+    assert run_code("0 >> Loop as n { Break when n >= 3. n + 1. }") == 3
+
+
+def test_block_forms_still_need_the_pipe_and_a_block():
+    import pytest
+    from popcorn_lang.parser import ParseError
+    for source in ("Map.", "Check.", "Loop.", "Try."):
+        with pytest.raises(ParseError):
+            run_code(source)
+
+
+def test_user_defined_process_can_stand_alone_too():
+    code = """
+    pop Double { @ * 2. }
+    [1, 2, 3] >> Map { Double. }
+    """
+    assert run_code(code) == [2, 4, 6]
+def test_math_standard_functions():
+    import math
+    assert run_code("3.7 >> Floor.") == 3
+    assert run_code("-3.2 >> Floor.") == -4
+    assert run_code("3.2 >> Ceil.") == 4
+    assert run_code("-3.7 >> Ceil.") == -3
+    assert run_code("16 >> Sqrt.") == 4
+    assert run_code("(2, 10) >> Pow.") == 1024
+    assert run_code("2 >> Pow(3).") == 8
+    assert run_code("0 >> Exp.") == 1
+    assert run_code("1 >> Log.") == 0
+    assert math.isclose(run_code("(8, 2) >> Log."), 3)
+    assert math.isclose(run_code("8 >> Log(2)."), 3)
+    assert math.isclose(run_code("Pi * 2."), 2 * math.pi)
+    assert math.isclose(run_code("E."), math.e)
+    assert math.isclose(run_code("Pi / 2 >> Sin."), 1)
+    assert math.isclose(run_code("0 >> Cos."), 1)
+    assert math.isclose(run_code("0 >> Tan."), 0, abs_tol=1e-12)
+    assert run_code("-3.2 >> Ceil >> Str.") == "-3"  # -0 は出ない
+
+
+def test_math_standard_functions_report_domain_errors():
+    expect_error("-1 >> Sqrt.", "RuntimeError")
+    expect_error("0 >> Log.", "RuntimeError")
+    expect_error("-1 >> Log.", "RuntimeError")
+    expect_error("(8, 1) >> Log.", "RuntimeError")
+    expect_error("(8, 0) >> Log.", "RuntimeError")
+    expect_error("(-8, 0.5) >> Pow.", "RuntimeError")
+    expect_error("(0, -1) >> Pow.", "RuntimeError")
+    expect_error("(10, 1000) >> Pow.", "RuntimeError")
+    expect_error("1000 >> Exp.", "RuntimeError")
+    expect_error('"a" >> Floor.', "TypeError")
+    expect_error("(1, 2, 3) >> Pow.", "TypeError")
+
+
+def test_trim_unique_flatten_enumerate():
+    assert run_code('"  hi  " >> Trim.') == "hi"
+    assert run_code('"\u3000こんにちは\u3000" >> Trim.') == "こんにちは"
+    expect_error("1 >> Trim.", "TypeError")
+    assert run_code('[1, 1.0, 2, [1], [1.0], true, true, null, null, "a", "a"] >> Unique.') == [1, 2, [1], True, None, "a"]
+    assert run_code("[1, true] >> Unique.") == [1, True]  # 1 と true は、別の値
+    assert run_code("[[1, 2], 3, [4], []] >> Flatten.") == [1, 2, 3, 4]
+    assert run_code("[[1, [2]]] >> Flatten.") == [1, [2]]  # 1 段だけ
+    assert run_code('["a", "b"] >> Enumerate.') == [[0, "a"], [1, "b"]]
+    assert run_code("[] >> Enumerate.") == []
+    expect_error("1 >> Unique.", "TypeError")
+    expect_error('"a" >> Flatten.', "TypeError")
+
+
+def test_from_entries_is_the_inverse_of_entries():
+    assert run_code('[["a", 1], ["b", 2]] >> FromEntries.') == {"a": 1, "b": 2}
+    assert run_code('{"a": 1, "b": 2} >> Entries >> FromEntries.') == {"a": 1, "b": 2}
+    assert run_code('[["a", 1], ["a", 2]] >> FromEntries.') == {"a": 2}
+    assert run_code("[] >> FromEntries.") == {}
+    expect_error('[["a"]] >> FromEntries.', "TypeError")
+    expect_error("[[1, 2]] >> FromEntries.", "TypeError")
+    expect_error("1 >> FromEntries.", "TypeError")
+
+
+def test_get_path_never_fails_on_missing_keys():
+    data = '{"user": {"tags": ["x", "y"], "name": "Ada"}}'
+    assert run_code(f'({data}, ["user", "tags", 1]) >> GetPath.') == "y"
+    assert run_code(f'({data}, ["user", "name"]) >> GetPath.') == "Ada"
+    assert run_code(f'({data}, ["user", "missing"]) >> GetPath.') is None
+    assert run_code(f'({data}, ["user", "tags", 5], "none") >> GetPath.') == "none"
+    assert run_code(f'({data}, ["user", "tags", -1], "none") >> GetPath.') == "none"
+    assert run_code(f'({data}, ["user", "tags", 0.5], "none") >> GetPath.') == "none"
+    assert run_code(f'({data}, ["user", 0], "none") >> GetPath.') == "none"
+    assert run_code(f'({data}, ["user", "name", "x"], "none") >> GetPath.') == "none"
+    assert run_code(f'({data}, []) >> GetPath.') == {"user": {"tags": ["x", "y"], "name": "Ada"}}
+    assert run_code(f'{data} >> GetPath(["user", "name"]).') == "Ada"
+    expect_error(f'({data}, "user") >> GetPath.', "TypeError")
+    expect_error("1 >> GetPath.", "TypeError")
+
+
+def test_env_reads_environment_variables():
+    import os
+    os.environ["POPCORN_TEST_VAR"] = "hello"
+    try:
+        assert run_code('"POPCORN_TEST_VAR" >> Env.') == "hello"
+    finally:
+        del os.environ["POPCORN_TEST_VAR"]
+    assert run_code('"POPCORN_SURELY_UNSET_VARIABLE" >> Env.') is None
+    expect_error("1 >> Env.", "TypeError")
+
+
+def test_args_returns_the_script_arguments():
+    assert run_code("Args.") == []
+    assert run_code("Args >> Length.") == 0
+    evaluator = Evaluator()
+    evaluator.script_args = ["a", "b"]
+    ast = Parser(Lexer("Args.").tokenize()).parse()
+    assert asyncio.run(evaluator.eval(ast, Environment())) == ["a", "b"]
+
+
+def test_new_standard_functions_are_documented():
+    from pathlib import Path
+    from popcorn_lang.pop_builtins import BUILTIN_REGISTRY
+    root = Path(__file__).resolve().parents[1]
+    spec = (root / "popcorn_specification.md").read_text(encoding="utf-8")
+    hover = (root / "vscode-popcorn" / "language-features.js").read_text(encoding="utf-8")
+    new_names = ("Floor Ceil Sqrt Pow Exp Log Sin Cos Tan Pi E Trim Unique Flatten Enumerate FromEntries GetPath Env Args").split()
+    for name in new_names:
+        assert name in BUILTIN_REGISTRY, name
+        assert f"| `{name}` |" in spec, f"{name} is missing from the spec table"
+        assert f"    {name}: {{ description:" in hover, f"{name} is missing from the editor hover table"

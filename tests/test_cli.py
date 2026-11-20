@@ -21,3 +21,11 @@ def test_evaluate_returns_last_value():
 
 def test_missing_file_returns_error(tmp_path):
     assert main([str(tmp_path / "missing.pop")]) == 1
+def test_script_arguments_reach_the_args_function(tmp_path, capsys):
+    from popcorn_lang.cli import main
+    script = tmp_path / "args.pop"
+    script.write_text('Args >> Display.', encoding="utf-8")
+    assert main([str(script), "a", "b"]) == 0
+    assert capsys.readouterr().out.strip() == '["a", "b"]'
+    assert main([str(script)]) == 0
+    assert capsys.readouterr().out.strip() == "[]"
