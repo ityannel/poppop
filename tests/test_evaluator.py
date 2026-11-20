@@ -940,3 +940,24 @@ def test_new_standard_functions_are_documented():
         assert name in BUILTIN_REGISTRY, name
         assert f"| `{name}` |" in spec, f"{name} is missing from the spec table"
         assert f"    {name}: {{ description:" in hover, f"{name} is missing from the editor hover table"
+def test_retry_recipe_from_the_spec_works():
+    # 仕様書の「やり直す」と同じ形（通信の代わりに、2 回失敗してから成功する処理）
+    recipe = '''
+    (0, null) >> Loop as (attempt, last) {
+        last >> Break when last != null.
+        null >> Break when attempt >= LIMIT.
+        attempt >> Try {
+            @ >> Check as n {
+                when n < FAILS { "boom" >> Throw. }
+                else { "ok". }
+            }
+        } Catch {
+            null.
+        } >> response.
+        (attempt + 1, response).
+    } >> result.
+    result.
+    '''
+    assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "2")) == "ok"      # 2 回失敗して、3 回目で成功
+    assert run_code(recipe.replace("LIMIT", "2").replace("FAILS", "5")) is None      # 上限に達して、あきらめる
+    assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "0")) == "ok"      # 1 回目で成功

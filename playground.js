@@ -2664,8 +2664,9 @@ doubled >> Display.`;
 
   // Markdown を、読みやすい形に整える（見出し・段落・箇条書き・表・コード・`コード`・**太字**）
   function renderMarkdown(md) {
+    // `コード` と、バッククォートそのものを含む `` `コード` ``（二重のバッククォートで囲む）の、両方を 1 回で置き換える
     const inline = (t) => escapeHtml(t)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/``\s+(.+?)\s+``|`([^`]+)`/g, (_, double, single) => `<code>${double ?? single}</code>`)
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     const lines = md.replace(/\r\n/g, "\n").split("\n");
     const html = [];
