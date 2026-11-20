@@ -268,7 +268,7 @@ def test_unified_num_type_str_and_json():
     assert run_code('"Ada" >> person. "Hello, {person}!".') == "Hello, Ada!"
     assert run_code('"{{name}}".') == "{name}"
     assert run_code('7 >> value. "{{Value: {value}}}".') == "{Value: 7}"
-    assert run_code('\'Dict: { {"a": 1}::a }\'.') == "Dict: 1"
+    assert run_code('"Dict: { {"a": 1}::a }".') == "Dict: 1"
     assert run_code('"{true} {null} {1.0}".') == "true null 1"
     expect_error('"Hello, {missing}.".', "NameError")
 
@@ -786,3 +786,11 @@ def test_check_with_the_old_colon_form_explains_the_new_shape():
             assert "Check branches use braces" in str(exc), str(exc)
         else:
             raise AssertionError("old Check form must be rejected")
+def test_the_three_string_kinds_in_programs():
+    assert run_code('"Ada" >> name. "Hi {name}!".') == "Hi Ada!"
+    assert run_code("'Hi {name}!'.") == "Hi {name}!"
+    assert run_code(r"`C:\temp\new`.") == r"C:\temp\new"
+    assert run_code(r"'tab\there'.") == "tab\there"
+    assert run_code('"{{literal}} {1 + 2}".') == "{literal} 3"
+    assert run_code("'{{x}}'.") == "{{x}}"
+    assert run_code(r"`a\nb` >> Length.") == 4

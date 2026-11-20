@@ -17,6 +17,17 @@
         break;
       }
 
+      if (line[index] === "`") {
+        characters[index] = " ";
+        index += 1;
+        while (index < line.length) {
+          characters[index] = " ";
+          if (line[index] === "`") break;
+          index += 1;
+        }
+        continue;
+      }
+
       if (line[index] === "\"" || line[index] === "'") {
         const quote = line[index];
         characters[index] = " ";

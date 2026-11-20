@@ -24,6 +24,16 @@ def get_ast_json(source: str) -> str:
         return json.dumps({"error": str(exc)}, ensure_ascii=False)
 
 
+def get_warnings(source: str) -> list[str]:
+    """文法は正しいが、注意したほうがよい点（いまは、単一引用符の文字列の中の {…}）。"""
+    try:
+        lexer = Lexer(source)
+        lexer.tokenize()
+    except LexerError:
+        return []
+    return list(lexer.warnings)
+
+
 async def evaluate(source: str, evaluator: Evaluator | None = None):
     runtime = evaluator or Evaluator()
     return await runtime.eval(parse_source(source), runtime.global_env)

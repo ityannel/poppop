@@ -15,6 +15,9 @@ const cases = [
   "[1, 2]\r\n    >>Map as value {\r\nvalue*2.\r\n}",
   '"x">>Try {\n@>>Num.\n} Catch as err {\n0.\n}',
   "[1, 2, 3]>>Map as x { x * 2. }>>doubled.",
+  "`a>>b {` >> Display.",
+  "'a>>b {' >> Display.",
+  "`x`>>Map as v {\nv.\n}",
   '1>>Check {\nwhen @ == 1 { "one" }\nelse { "other" }\n}>>r.',
   '1>>Check {\nwhen @ == 1 {\n"one".\n} else {\n"other".\n}\n}>>r.',
   "(0, 0)>>Loop as (count, total) {\ntotal>>Break when count >= 5.\n(count + 1, total + count).\n}>>result.",
@@ -87,5 +90,16 @@ assert.strictEqual(
   "文字列・コメント・後置 when は、旧形式ではない",
 );
 assert.strictEqual(migrateOldCheckSyntax("1 >> Display."), "1 >> Display.");
+
+assert.strictEqual(
+  formatInPlayground("`a>>b`   >> Display."),
+  "`a>>b` >> Display.",
+  "生文字列の中の >> は、整形で触らない",
+);
+assert.strictEqual(
+  formatInPlayground("'{'>>Display.\n'}'>>Display."),
+  "'{' >> Display.\n'}' >> Display.",
+  "文字列の中の波括弧は、字下げに数えない",
+);
 
 console.log("Playground formatter parity tests passed.");

@@ -163,14 +163,19 @@ async function analyzeProgram(source, requestId) {
   runtime.globals.set("__popcorn_source", source);
   const payload = JSON.parse(runtime.runPython(`
 import json
-from popcorn_lang.cli import get_ast_json
-get_ast_json(__popcorn_source)
+from popcorn_lang.cli import get_ast_json, get_warnings
+json.dumps({
+    "ast": json.loads(get_ast_json(__popcorn_source)),
+    "warnings": get_warnings(__popcorn_source),
+}, ensure_ascii=False)
 `));
-  if (payload.error) {
+  const ast = payload.ast;
+  if (ast.error) {
     self.postMessage({
       type: "analysis",
       requestId,
-      diagnostics: [payload.error],
+      diagnostics: [ast.error],
+      warnings: [],
       ast: null,
     });
   } else {
@@ -178,7 +183,8 @@ get_ast_json(__popcorn_source)
       type: "analysis",
       requestId,
       diagnostics: [],
-      ast: payload,
+      warnings: payload.warnings ?? [],
+      ast,
     });
   }
 }

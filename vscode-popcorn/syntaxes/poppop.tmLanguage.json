@@ -113,16 +113,13 @@
             {
               "name": "constant.character.escape.popcorn",
               "match": "\\\\."
-            },
-            {
-              "name": "constant.character.escape.brace.popcorn",
-              "match": "\\{\\{|\\}\\}"
-            },
-            {
-              "name": "variable.other.interpolated.popcorn",
-              "match": "\\{[^\\}]+\\}"
             }
           ]
+        },
+        {
+          "name": "string.quoted.other.raw.popcorn",
+          "begin": "`",
+          "end": "`|$"
         }
       ]
     },

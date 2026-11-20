@@ -495,3 +495,5 @@ body:not(.is-running) #stopButton { display: none; }
 /* エディタのタブ列の、横スクロールバーは見せない（はみ出したら、ホイールで動かせる） */
 .editor-tabs { scrollbar-width: none; }
 .editor-tabs::-webkit-scrollbar { display: none; }
+/* 診断の「注意」（警告）は、エラーと区別して、黄色っぽく */
+.diagnostic-item.warning .diagnostic-location { color: #d29922; }

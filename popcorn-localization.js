@@ -38,6 +38,10 @@
       ["Check requires a final else branch", "Check の最後には else が必要です。"],
       ["Check requires at least one 'when' branch", "Check には少なくとも 1 つの when 分岐が必要です。"],
       ["Check requires an else branch", "Check には else が必要です。"],
+      [
+        "Single-quoted strings do not interpolate; use a double-quoted string to insert values",
+        "単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 \" の文字列を使います。",
+      ],
       ["Check predicate must return Bool", "Check の when 条件は Bool を返す必要があります。"],
       ["Filter block must return Bool", "Filter のブロックは Bool を返す必要があります。"],
       ["Map stream requires a list", "Map にはリストを渡してください。"],
@@ -100,6 +104,12 @@
     if (prefix) {
       title = ERROR_NAMES.get(prefix[1]) || "エラー";
       text = text.slice(prefix[0].length);
+    }
+
+    const warning = text.match(/^Warning:\s*/);
+    if (warning) {
+      title = "注意";
+      text = text.slice(warning[0].length);
     }
 
     const translated = translateMessage(text);

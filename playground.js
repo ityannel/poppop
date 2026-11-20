@@ -186,7 +186,7 @@ doubled >> Display.`;
         this.$rules = {
           start: [
             { token: "comment", regex: "\\/\\/.*$" },
-            { token: "string", regex: '"(?:\\\\.|[^"\\\\])*"|\\\'(?:\\\\.|[^\\\'\\\\])*\\\'' },
+            { token: "string", regex: '"(?:\\\\.|[^"\\\\])*"|\\\'(?:\\\\.|[^\\\'\\\\])*\\\'|`[^`\\n]*`' },
             {
               token: ["keyword.operator", "text", "variable.assignment.final"],
               regex: "(>>)(\\s*)(\\(\\s*[a-z_][a-zA-Z0-9_]*\\s*(?:,\\s*[a-z_][a-zA-Z0-9_]*\\s*)+\\))(?=\\s*\\.\\s*(?://.*)?$)",
@@ -727,7 +727,7 @@ doubled >> Display.`;
     }
     if (message.type === "analysis" && message.requestId === latestAnalysis) {
       currentAst = message.ast;
-      showDiagnostics(message.diagnostics ?? []);
+      showDiagnostics(message.diagnostics ?? [], message.warnings ?? []);
       renderAst(currentAst);
       return;
     }
@@ -920,8 +920,11 @@ doubled >> Display.`;
     });
   }
 
-  function showDiagnostics(diagnostics) {
-    const items = (diagnostics ?? []).filter(Boolean);
+  function showDiagnostics(diagnostics, warnings = []) {
+    const errorItems = (diagnostics ?? []).filter(Boolean);
+    const warningItems = (warnings ?? []).filter(Boolean);
+    const items = [...errorItems, ...warningItems];
+    const kinds = items.map((_, index) => (index < errorItems.length ? "error" : "warning"));
     const localizedItems = items.map(localizeError);
     elements.diagnosticCount.textContent = String(items.length);
     elements.diagnosticsPanel.replaceChildren();
@@ -935,7 +938,7 @@ doubled >> Display.`;
         );
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "diagnostic-item";
+        button.className = kinds[index] === "warning" ? "diagnostic-item warning" : "diagnostic-item";
         button.setAttribute("aria-label", `${line}行目へ移動: ${localizedItems[index]}`);
         const location = document.createElement("span");
         location.className = "diagnostic-location";
@@ -948,7 +951,7 @@ doubled >> Display.`;
         elements.diagnosticsPanel.append(button);
       });
     }
-    elements.diagnosticsPanel.classList.toggle("error", items.length > 0);
+    elements.diagnosticsPanel.classList.toggle("error", errorItems.length > 0);
     if (editor) {
       editor.session.setAnnotations(items.map((item, index) => {
         const line = window.PopCornLocalization?.errorLine(item);
@@ -956,7 +959,7 @@ doubled >> Display.`;
           row: Math.max(0, Number(line ?? 1) - 1),
           column: 0,
           text: localizedItems[index],
-          type: "error",
+          type: kinds[index],
         };
       }));
     }

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any, List
 
@@ -15,6 +16,10 @@ class Token:
 class LexerError(Exception):
     pass
 
+
+# 単一引用符の文字列に、{識別子} のような形があるとき（補間されないことを知らせる注意のため）。
+# `{{name}}` のような二重の波括弧は、テンプレートとして、わざと書くことがあるので、対象にしない。
+_LOOKS_INTERPOLATED = re.compile(r"(?<!\{)\{\s*[@A-Za-z_(][^{}\n]*\}(?!\})")
 
 _ESCAPE_MAP = {
     "n": "\n",
@@ -40,6 +45,7 @@ class Lexer:
         self.line_offset = line_offset
         self.col_offset = col_offset
         self.tokens: List[Token] = []
+        self.warnings: List[str] = []
 
     def tokenize(self) -> List[Token]:
         code = self.code
@@ -63,7 +69,7 @@ class Lexer:
             advance_char()  # opening quote
             while i < n:
                 c = code[i]
-                if c == "\\":
+                if c == "\\" and quote != "`":
                     advance_char()
                     if i >= n:
                         raise LexerError(
@@ -73,6 +79,8 @@ class Lexer:
                 elif c == quote:
                     advance_char()
                     return
+                elif quote == "`" and c == "\n":
+                    break  # 生文字列は、同じ行の中で閉じる
                 else:
                     advance_char()
             raise LexerError(
@@ -137,7 +145,7 @@ class Lexer:
                             if depth == 0:
                                 break
                             advance_char()
-                        elif c in ('"', "'"):
+                        elif c in ('"', "'", "`"):
                             scan_nested_string(c, line, col)
                         elif c == "/" and i + 1 < n and code[i + 1] == "/":
                             while i < n and code[i] != "\n":
@@ -169,6 +177,59 @@ class Lexer:
                 f"Unclosed string literal at line {start_line}, column {start_col}"
             )
 
+        def scan_plain_string() -> Token:
+            """'…': 補間なし。エスケープ（バックスラッシュ）だけ使える。{ と } は、ただの文字。"""
+            start_line, start_col = line, col
+            quote = advance_char()
+            buf: List[str] = []
+            while i < n:
+                ch = code[i]
+                if ch == quote:
+                    advance_char()
+                    text = "".join(buf)
+                    if _LOOKS_INTERPOLATED.search(text):
+                        self.warnings.append(
+                            "Warning: Single-quoted strings do not interpolate; "
+                            "use a double-quoted string to insert values "
+                            f"at line {start_line}, column {start_col}"
+                        )
+                    return Token("STRING", text, start_line, start_col)
+                if ch == "\\":
+                    esc_line, esc_col = line, col
+                    advance_char()
+                    if i >= n:
+                        raise LexerError(
+                            f"Unclosed string literal at line {start_line}, column {start_col}"
+                        )
+                    esc = advance_char()
+                    if esc not in _ESCAPE_MAP:
+                        raise LexerError(
+                            f"Unknown escape sequence '\\{esc}' at line {esc_line}, column {esc_col}"
+                        )
+                    buf.append(_ESCAPE_MAP[esc])
+                    continue
+                buf.append(advance_char())
+            raise LexerError(
+                f"Unclosed string literal at line {start_line}, column {start_col}"
+            )
+
+        def scan_raw_string() -> Token:
+            """`…`: そのままの文字列。補間もエスケープもなし。同じ行の中で閉じる。バッククォートは入れられない。"""
+            start_line, start_col = line, col
+            advance_char()  # 開きの `
+            buf: List[str] = []
+            while i < n:
+                ch = code[i]
+                if ch == "`":
+                    advance_char()
+                    return Token("STRING", "".join(buf), start_line, start_col)
+                if ch == "\n":
+                    break
+                buf.append(advance_char())
+            raise LexerError(
+                f"Unclosed string literal at line {start_line}, column {start_col}"
+            )
+
         while i < n:
             ch = code[i]
 
@@ -186,8 +247,14 @@ class Lexer:
             start_line, start_col = line, col
 
             # String literals
-            if ch in ('"', "'"):
+            if ch == '"':
                 self.tokens.append(scan_string())
+                continue
+            if ch == "'":
+                self.tokens.append(scan_plain_string())
+                continue
+            if ch == "`":
+                self.tokens.append(scan_raw_string())
                 continue
 
             # Numbers (all numeric values are IEEE 754 Num)

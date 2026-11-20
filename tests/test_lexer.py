@@ -42,7 +42,7 @@ def test_lowercase_type_words_are_plain_variables():
 
 
 def test_nested_braces_and_strings_in_interpolation():
-    tokens = Lexer('\'val: { {"a": 1}::a }\'').tokenize()
+    tokens = Lexer('"val: { {"a": 1}::a }"').tokenize()
     assert len(tokens) == 1
     assert tokens[0].type == "INTERP_STRING"
     assert tokens[0].value[0] == ("text", "val: ")
@@ -83,3 +83,50 @@ def test_symbolic_logical_operators_are_rejected():
         raise AssertionError(
             f"symbolic logical operator must not be accepted: {source}"
         )
+def test_single_quoted_strings_do_not_interpolate():
+    tokens = Lexer("'Hello {name}!'").tokenize()
+    assert [(t.type, t.value) for t in tokens] == [("STRING", "Hello {name}!")]
+
+
+def test_single_quoted_strings_keep_braces_as_plain_characters():
+    tokens = Lexer("""'{"a": 1} {{x}} }'""").tokenize()
+    assert [(t.type, t.value) for t in tokens] == [("STRING", '{"a": 1} {{x}} }')]
+
+
+def test_single_quoted_strings_still_use_escapes():
+    tokens = Lexer(r"'a\nb\'c\\d'").tokenize()
+    assert tokens[0].value == "a\nb'c\\d"
+
+
+def test_raw_strings_have_no_escapes_and_no_interpolation():
+    tokens = Lexer(r"`C:\temp\new {x} \n`").tokenize()
+    assert [(t.type, t.value) for t in tokens] == [("STRING", r"C:\temp\new {x} \n")]
+
+
+def test_raw_strings_must_close_on_the_same_line():
+    for source in ("`abc", "`abc\ndef`"):
+        try:
+            Lexer(source).tokenize()
+        except LexerError as exc:
+            assert "Unclosed string literal" in str(exc)
+        else:
+            raise AssertionError(f"raw string must be rejected: {source!r}")
+
+
+def test_double_quoted_strings_still_interpolate_and_escape_braces():
+    tokens = Lexer('"a{b}c {{d}}"').tokenize()
+    assert tokens[0].type == "INTERP_STRING"
+    assert Lexer('"{{d}}"').tokenize()[0].value == "{d}"
+
+
+def test_raw_string_inside_an_interpolation_expression():
+    tokens = Lexer('"x{ `}` }y"').tokenize()
+    assert tokens[0].type == "INTERP_STRING"
+
+
+def test_warning_for_interpolation_looking_text_in_single_quotes():
+    lexer = Lexer("""'Hello {name}' 'plain' '{"a": 1}' '{{x}}'""")
+    lexer.tokenize()
+    assert len(lexer.warnings) == 1
+    assert "do not interpolate" in lexer.warnings[0]
+    assert "line 1, column 1" in lexer.warnings[0]
