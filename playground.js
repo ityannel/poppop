@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // 計測（itya.site の /t.js）。書いたコード・出力・質問の文章は、送らない。「種類」と「回数」だけ
+  const track = (name, v) => {
+    try { window.itya?.track(name, v === undefined ? undefined : { v: String(v).slice(0, 60) }); } catch { /* 計測で、動作を止めない */ }
+  };
+
   const STORAGE = {
     source: "popcorn.playground.source.v4",
     theme: "popcorn.playground.theme",
@@ -758,6 +763,7 @@ doubled >> Display.`;
       currentAst = message.ast;
       renderAst(currentAst);
       showDiagnostics(message.ok ? [] : [message.error]);
+      track(message.ok ? "pc_ok" : "pc_error", message.elapsedMs < 50 ? "<50ms" : message.elapsedMs < 500 ? "<500ms" : message.elapsedMs < 3000 ? "<3s" : "3s+");
       if (message.ok) {
         elements.runState.textContent = "完了";
         setRunFeedback("success", "できました", 1800);
@@ -810,6 +816,7 @@ doubled >> Display.`;
   function startRun() {
     if (!runtimeReady || running) return;
     if (activeFile === SPEC_FILE) { showToast("仕様書は、実行できません"); return; }
+    track("pc_run", currentSidePanel === "lesson" && activeLessonId ? "lesson" : String(activeFile || "").startsWith("samples/") ? "sample" : "own");
     running = true;
     document.body.classList.add("is-running");
     sourceChanged = false;
@@ -840,6 +847,7 @@ doubled >> Display.`;
 
   function stopRun() {
     if (!worker) return;
+    track("pc_stop");
     worker.terminate();
     worker = null;
     elements.terminalInputForm.hidden = true;
@@ -1711,6 +1719,7 @@ doubled >> Display.`;
   }
 
   async function showLessonHint() {
+    track("pc_hint", currentLesson()?.dynamic ? "ai" : activeLessonId);
     const lesson = currentLesson();
     if (!lesson || activeLessonId !== lesson.id) return;
     const hints = lesson.hints ?? [];
@@ -1725,6 +1734,7 @@ doubled >> Display.`;
   }
 
   async function showLessonAnswer() {
+    track("pc_answer", currentLesson()?.dynamic ? "ai" : activeLessonId);
     const lesson = currentLesson();
     if (!lesson || activeLessonId !== lesson.id) return;
     recordLearning("answer", lesson.id, "完成例を表示");
@@ -1772,6 +1782,7 @@ doubled >> Display.`;
   }
 
   async function callGeminiOnce(promptText, jsonMode = false, task = "chat") {
+    track("pc_ai_call", task);
     const proxyResponse = await fetch("api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2187,6 +2198,7 @@ doubled >> Display.`;
   }
 
   async function createAiLesson() {
+    track("pc_ai_lesson");
     const sourceBeforeGeneration = getSource();
     const editorWasReadOnly = editor?.getReadOnly?.() || false;
     elements.advanceLessonButton.hidden = true;
@@ -2418,6 +2430,7 @@ doubled >> Display.`;
   }
 
   function checkOrAdvanceLesson() {
+    track("pc_lesson_check", currentLesson()?.dynamic ? "ai" : activeLessonId);
     const lesson = currentLesson();
     const canAdvance = lesson &&
       (completedLessons.has(lesson.id) || lesson.passed);
@@ -2441,6 +2454,7 @@ doubled >> Display.`;
   }
 
   function formatSource() {
+    track("pc_format");
     if (activeFile === SPEC_FILE) { showToast("仕様書は、整形できません"); return; }
     const formatter = window.PopCornFormatter;
     if (!formatter) {
@@ -2733,6 +2747,7 @@ doubled >> Display.`;
   }
 
   async function openSpec() {
+    track("pc_spec");
     if (!specText) await loadSpecification();
     if (!specText) { showToast("仕様書を読み込めませんでした"); return; }
     openFile(SPEC_FILE);
@@ -2768,6 +2783,7 @@ doubled >> Display.`;
   }
 
   function newFile() {
+    track("pc_new_file");
     const folder = targetFolder();
     const path = uniquePath(joinPath(folder, "untitled.pop"));
     files[path] = "";
@@ -2831,6 +2847,7 @@ doubled >> Display.`;
   }
 
   async function uploadFiles(fileList) {
+    track("pc_upload");
     const folder = targetFolder();
     let last = null;
     for (const file of Array.from(fileList || [])) {
@@ -2886,6 +2903,7 @@ doubled >> Display.`;
   }
 
   function downloadSource() {
+    track("pc_download");
     const blob = new Blob([getSource()], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -2902,6 +2920,7 @@ doubled >> Display.`;
   }
 
   async function shareSource() {
+    track("pc_share");
     const url = new URL(location.href);
     url.hash = `code=${encodeSource(getSource())}`;
     history.replaceState(null, "", url);
@@ -2935,6 +2954,7 @@ doubled >> Display.`;
   }
 
   function toggleTheme() {
+    track("pc_theme", document.documentElement.dataset.theme === "light" ? "dark" : "light");
     applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
     closeToolMenu();
   }

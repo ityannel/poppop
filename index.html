@@ -45,6 +45,8 @@
   <!-- アクセス数（Vercel Analytics）: itya.site/popcorn/ で開いたとき、itya.site の計測に入る。Cookie は使わない -->
   <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
   <script defer src="/_vercel/insights/script.js"></script>
+  <!-- 計測（itya.site の中でだけ）: Cookie なし・書いたコードは送らない。見るのは itya.site/analytics -->
+  <script>if (/(^|\.)itya\.site$/.test(location.hostname)) { var s = document.createElement("script"); s.src = "/t.js"; s.defer = true; document.head.appendChild(s); }</script>
 </head>
 <body>
   <a class="skip-link" href="#editor">エディターへ移動</a>
