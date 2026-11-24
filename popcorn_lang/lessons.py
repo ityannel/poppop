@@ -91,14 +91,14 @@ LESSONS = (
         "intro": "Reduceは、これまでの結果と次の値を使って一つの答えを作るよ。",
         "goal": "[1, 2, 3, 4] を順番に足して、10にしてください。",
         "starter": (
-            "[1, 2, 3, 4] >> Reduce(1) as (acc, item):\n"
+            "[1, 2, 3, 4] >> Reduce from 1 as (acc, item):\n"
             "    acc * item.\n"
             ">> total.\n"
             "\n"
             "total >> Display."
         ),
         "solution": (
-            "[1, 2, 3, 4] >> Reduce(0) as (acc, item):\n"
+            "[1, 2, 3, 4] >> Reduce from 0 as (acc, item):\n"
             "    acc + item.\n"
             ">> total.\n"
             "\n"
@@ -106,7 +106,7 @@ LESSONS = (
         ),
         "hints": (
             "`acc`はこれまでの結果、`item`は次の数字です。初期値も0にしよう。",
-            "`Reduce(1)` を `Reduce(0)` に、`acc * item` を `acc + item` に変えてみよう。",
+            "`Reduce from 1` を `Reduce from 0` に、`acc * item` を `acc + item` に変えてみよう。",
         ),
         "expected": 10.0,
         "required": ("Reduce", "+", "Display"),

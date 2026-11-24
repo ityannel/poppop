@@ -89,8 +89,8 @@ def test_filter_pipeline():
 
 
 def test_reduce_with_and_without_initial_value():
-    assert run_code("[1, 2, 3, 4] >> Reduce(0) as (acc, item):\n    acc + item.") == 10
-    assert run_code("[] >> Reduce(42) as (acc, item):\n    acc + item.") == 42
+    assert run_code("[1, 2, 3, 4] >> Reduce from 0 as (acc, item):\n    acc + item.") == 10
+    assert run_code("[] >> Reduce from 42 as (acc, item):\n    acc + item.") == 42
     assert run_code("[1, 2, 3, 4] >> Reduce as (acc, item):\n    acc + item.") == 10
     assert run_code("[1, 2, 3, 4] >> Reduce:\n    @[0] + @[1].") == 10
     expect_error("[] >> Reduce as (acc, item):\n    acc + item.", "RuntimeError")
@@ -972,7 +972,35 @@ def test_short_stream_bodies():
     assert run_code("[[1, 2], [3]] >> Map Length.") == [2, 1]
     assert run_code('["b", "C", "a"] >> Sort Lowercase.') == ["a", "b", "C"]
     assert run_code("[1, 2, 3] >> Reduce Add.") == 6
-    assert run_code("[1, 2, 3] >> Reduce(10) Add.") == 16
+    assert run_code("[1, 2, 3] >> Reduce from 10 Add.") == 16
+    assert run_code("[1, 2, 3] >> Reduce (@[0] * @[1]).") == 6
+    assert run_code("[1, 2, 3] >> Reduce from 10 (@[0] + @[1]).") == 16
+    assert run_code("[] >> Reduce from -1 Add.") == -1
+    assert run_code("5 >> s.\n[1] >> Reduce from s + 1 Add.") == 7
+    assert run_code("[[1], [2]] >> Reduce from [0] as (acc, x):\n    acc >> Append(x[0]).") == [0, 1, 2]
+
+
+def test_reduce_initial_value_in_parentheses_is_the_old_form():
+    for code in (
+        "[1, 2, 3] >> Reduce(10) Add.",
+        "[1, 2, 3] >> Reduce (0) as (acc, x):\n    acc + x.",
+        "[1, 2, 3] >> Reduce(0):\n    @[0] + @[1].",
+    ):
+        try:
+            run_code(code)
+        except Exception as exc:
+            assert "Write the initial value of Reduce with 'from': 'Reduce from" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"old Reduce(initial) must be rejected: {code}")
+
+
+def test_from_is_reserved():
+    try:
+        run_code("1 >> from.")
+    except Exception:
+        pass
+    else:
+        raise AssertionError("'from' must not be a variable name")
 
 
 def test_process_name_body_rejects_block_forms():
@@ -997,7 +1025,7 @@ def test_colon_bodies_for_every_block_form():
 def test_colon_body_ends_at_a_shallower_line_and_inside_brackets():
     code = """
 (xs) >> pop Total:
-    xs >> Reduce(0) as (acc, x):
+    xs >> Reduce from 0 as (acc, x):
         acc + x
 
 [
@@ -1038,6 +1066,11 @@ def test_migrate_keeps_the_meaning():
     old = '"x" >> Try {\n    @ >> Num.\n} Catch as err {\n    0.\n} >> r.'
     assert migrate_braces(old) == '"x" >> Try:\n    @ >> Num.\nCatch as err:\n    0.\n>> r.'
     assert migrate_braces("1 >> x.") == "1 >> x."
+    assert migrate_braces("[1, 2] >> Reduce(10) Add >> t.") == "[1, 2] >> Reduce from 10 Add >> t."
+    old = "xs >> Reduce( a + 1 ) as (acc, x) { acc + x. } >> t."
+    assert migrate_braces(old) == "xs >> Reduce from a + 1 as (acc, x):\n    acc + x.\n>> t."
+    keep = '[1, 2] >> Reduce (@[0] + @[1]) >> t.\n{"a": 1} >> d.'
+    assert migrate_braces(keep) == keep
 
 
 def test_count_returns_how_many_items_match():

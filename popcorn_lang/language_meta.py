@@ -12,6 +12,7 @@ KEYWORDS = (
     "or",
     "not",
     "in",
+    "from",
 )
 STREAM_BLOCKS = (
     "Map",

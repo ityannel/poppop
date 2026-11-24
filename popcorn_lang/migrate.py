@@ -1,4 +1,5 @@
 """旧形式の `{ … }` ブロックを、`:` と字下げのブロックへ書きかえる。
+旧形式の `Reduce(初期値)` も `Reduce from 初期値` に書きかえる。
 
     x >> Map as v { v * 2. } >> d.        x >> Map as v:
                                     →         v * 2.
@@ -67,18 +68,22 @@ def has_brace_blocks(code: str) -> bool:
         _, parser, _ = _legacy_parse(code)
     except Exception:
         return False
-    return bool(parser.brace_blocks)
+    return bool(parser.brace_blocks or parser.legacy_reduce_inits)
 
 
 def migrate_braces(code: str, *, verify: bool = True) -> str:
-    """`{ … }` のブロックを `:` と字下げに書きかえた文字列を返す。ブロックがなければ、そのまま返す。"""
+    """`{ … }` のブロックを `:` と字下げに、`Reduce(初期値)` を `Reduce from 初期値` に書きかえた文字列を返す。
+    書きかえるところがなければ、そのまま返す。"""
     tokens, parser, before = _legacy_parse(code)
-    if not parser.brace_blocks:
+    if not parser.brace_blocks and not parser.legacy_reduce_inits:
         return code
 
     offsets = _offsets(code, tokens)
     opens = {open_pos: close_pos for open_pos, close_pos in parser.brace_blocks}
     closes = {close_pos for _, close_pos in parser.brace_blocks}
+    # Reduce(初期値) の丸括弧は外す。初期値の式のあとには `as`・`:`・処理名しか来ないので、外しても意味は変わらない
+    reduce_opens = {open_pos for open_pos, _ in parser.legacy_reduce_inits}
+    reduce_closes = {close_pos for _, close_pos in parser.legacy_reduce_inits}
 
     out: List[str] = [code[: offsets[0]] if tokens else code]
     stack: List[int] = []  # 開いているブロックの、見出しの行の字下げ
@@ -118,6 +123,14 @@ def migrate_braces(code: str, *, verify: bool = True) -> str:
             else:
                 pending_indent = header
             skip_dot = True
+            continue
+
+        if index in reduce_opens:
+            out[:] = [text().rstrip(" \t"), " from "]
+            continue
+
+        if index in reduce_closes:
+            out[:] = [text().rstrip(" \t"), gap]
             continue
 
         if skip_dot and tok.type == "DOT":

@@ -184,7 +184,7 @@ GALLERY = (
         "description": "Reduceで商品の価格を足し合わせます。",
         "interactive": False,
         "code": (
-            "[120, 250, 80, 300] >> Reduce(0) as (acc, price):\n"
+            "[120, 250, 80, 300] >> Reduce from 0 as (acc, price):\n"
             "    acc + price.\n"
             ">> total.\n"
             "\n"

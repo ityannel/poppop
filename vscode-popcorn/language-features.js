@@ -6,9 +6,9 @@ const { findImplicitVariableScopeRanges, findVariableReferenceOffsets, variableA
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
 const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
-const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
+const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s+from\s+[^\n]*?)?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
-    "and", "as", "else", "false", "in", "not", "null", "or", "pop", "true", "when"
+    "and", "as", "else", "false", "from", "in", "not", "null", "or", "pop", "true", "when"
 ]);
 
 // PopCorn 1 本体に実装されている標準関数と、エディター上での説明です。
@@ -110,7 +110,8 @@ const SYSTEM_KEYWORDS = Object.freeze({
     and: "Bool の短絡論理積です。",
     or: "Bool の短絡論理和です。",
     not: "Bool を否定します。",
-    in: "要素・キー・部分文字列の含有判定（Bool）を行います。"
+    in: "要素・キー・部分文字列の含有判定（Bool）を行います。",
+    from: "Reduce の初期値を書きます（例: Reduce from 0 Add）。"
 });
 
 function scanLines(text, callback) {
@@ -212,7 +213,7 @@ function findStreamParameterDefinitions(text, name) {
     scanLines(text, ({ code, lineNumber, lineStart }) => {
         for (const stream of code.matchAll(STREAM_ALIAS_PATTERN)) {
             const parameterText = stream[1] || stream[2] || "";
-            const asIndex = stream[0].indexOf("as");
+            const asIndex = stream[0].search(/\bas\b/);
             const parameterStart = stream.index + stream[0].indexOf(parameterText, asIndex + 2);
             for (const parameter of parameterText.matchAll(/[a-z_][a-zA-Z0-9_]*/g)) {
                 if (parameter[0] !== name) continue;
@@ -505,7 +506,7 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s+from\s+[^\n{]*?)?(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
     if (!match) return undefined;
     const stream = match[1] || match[2];
     const paramText = match[3] || match[4] || "";

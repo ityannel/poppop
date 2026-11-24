@@ -31,6 +31,11 @@ assert.equal(
   "文法エラー: 「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（function 'F'）。（1行目）",
 );
 assert.equal(
+  localizeError("SyntaxError: Write the initial value of Reduce with 'from': 'Reduce from 10' at line 1, column 17"),
+  "文法エラー: Reduce の初期値は from で書きます。「Reduce from 10」のように書いてください。（1行目）",
+);
+
+assert.equal(
   localizeError("SyntaxError: 'Map Check' is not allowed as a process-name body; write a block: 'Map:' at line 1, column 12"),
   "文法エラー: 「Check」は処理名渡しでは書けません。「Map:」のようにブロックで書いてください。（1行目）",
 );

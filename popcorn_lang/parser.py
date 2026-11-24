@@ -20,6 +20,7 @@ class Parser:
         # legacy_braces: 旧形式の `{ … }` ブロックも読む（`popcorn migrate` が、書きかえ位置を知るためだけに使う）
         self.legacy_braces = legacy_braces
         self.brace_blocks: List[tuple] = []  # (開き `{` の位置, 閉じ `}` の位置)
+        self.legacy_reduce_inits: List[tuple] = []  # 旧形式 `Reduce(初期値)` の (`(` の位置, `)` の位置)
         self._brace_stack: List[int] = []
         # 字下げブロック（`:` のあとに書く本体）のための情報。
         #   _line_starts:  行の最初のトークンの位置
@@ -313,7 +314,7 @@ class Parser:
         )
 
     def _parse_short_body(
-        self, name: str, alias_names: List[str], allow_paren: bool = True
+        self, name: str, alias_names: List[str]
     ) -> Optional[BlockNode]:
         """ブロックを短く書く2つの形。当てはまらなければ None。
 
@@ -325,7 +326,7 @@ class Parser:
         if curr is None:
             return None
         line, col = curr.line, curr.column
-        if allow_paren and curr.type == "LPAREN":
+        if curr.type == "LPAREN":
             expr = self._parse_base_primary()
             return BlockNode(line, col, [Pipeline(line, col, [expr], [])])
         if curr.type == "VERB" and not alias_names:
@@ -340,6 +341,49 @@ class Parser:
                 line, col, [Pipeline(line, col, [implicit, stage], [">>"])]
             )
         return None
+
+    def _matching_rparen(self, open_pos: int) -> Optional[int]:
+        depth = 0
+        for index in range(open_pos, len(self.tokens)):
+            kind = self.tokens[index].type
+            if kind == "LPAREN":
+                depth += 1
+            elif kind == "RPAREN":
+                depth -= 1
+                if depth == 0:
+                    return index
+        return None
+
+    def _is_legacy_reduce_init(self) -> bool:
+        """`Reduce(10) as …` のような旧形式の初期値か。
+
+        いまの `Reduce (式)` は式渡しの本体なので、そのあとに本体は続かない。
+        閉じかっこのすぐあとに `as`・`:`・`{`・処理名が続くときだけ、旧形式の初期値とみなす。
+        """
+        curr = self.current()
+        if curr is None or curr.type != "LPAREN":
+            return False
+        close = self._matching_rparen(self.pos)
+        if close is None or close + 1 >= len(self.tokens):
+            return False
+        after = self.tokens[close + 1]
+        return after.type in ("AS", "COLON", "LBRACE", "VERB")
+
+    def _source_text(self, start: int, end: int) -> str:
+        """トークン start から end の手前までを、空白でつないだ文字列（エラーメッセージ用）。"""
+        parts = []
+        for tok in self.tokens[start:end]:
+            if tok.type == "STRING":
+                parts.append('"' + str(tok.value) + '"')
+            else:
+                value = tok.value
+                if isinstance(value, float) and value.is_integer():
+                    value = int(value)
+                parts.append(str(value))
+        text = " ".join(parts)
+        for a, b in (("( ", "("), (" )", ")"), ("[ ", "["), (" ]", "]"), (" ,", ",")):
+            text = text.replace(a, b)
+        return text
 
     def _parse_stream_block_or_call(self) -> ASTNode:
         curr = self.current()
@@ -365,11 +409,25 @@ class Parser:
         if name == "Reduce":
             self.advance()
             init_expr = None
-            if self.match("LPAREN"):
+            if self.current() is not None and self.current().type == "FROM":
+                self.advance()
                 init_expr = self.parse_expression()
+            elif self._is_legacy_reduce_init():
+                open_pos = self.pos
+                if not self.legacy_braces:
+                    init_tok = self.tokens[open_pos + 1]
+                    raise ParseError(
+                        f"Write the initial value of Reduce with 'from': "
+                        f"'Reduce from {self._source_text(open_pos + 1, self._matching_rparen(open_pos))}' "
+                        f"at line {init_tok.line}, column {init_tok.column}"
+                    )
+                self.advance()
+                init_expr = self.parse_expression()
+                close_pos = self.pos
                 self.expect("RPAREN")
+                self.legacy_reduce_inits.append((open_pos, close_pos))
             alias_names = self._parse_optional_alias_clause()
-            block = self._parse_short_body("Reduce", alias_names, allow_paren=False)
+            block = self._parse_short_body("Reduce", alias_names)
             if block is None:
                 block = self._parse_body("Reduce")
             return StreamBlockNode(line, col, "Reduce", alias_names, block, init_expr=init_expr)

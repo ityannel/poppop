@@ -67,7 +67,7 @@ Break  Return  Zip  Bool  Str  List  Dict  Num  Type
 次の語は小文字の予約語です。
 
 ```
-when  else  as  pop  true  false  null  and  or  not  in
+when  else  as  pop  true  false  null  and  or  not  in  from
 ```
 
 予約語になるのは、上と完全に同じ綴りだけです。
@@ -192,7 +192,7 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 型 | `Bool` | `true`、`false`、`0`、`1` | 厳格な `Bool` 変換を行います。それ以外は `TypeError`。 |
 | ストリーム | `Map` | `List` と要素用ブロック | 各要素にブロックを適用した新しい `List` を返します。 |
 | ストリーム | `Filter` | `List` と `Bool` 用ブロック | ブロックが `true` を返した要素だけを集めた新しい `List` を返します。 |
-| ストリーム | `Reduce` | `List`、任意の初期値、集約用ブロック | 初期値があれば空 `List` で初期値を返します。初期値がなければ先頭要素を初期値とし、空 `List` は `RuntimeError`。 |
+| ストリーム | `Reduce` | `List`、任意の初期値（`from`）、集約用ブロック | 初期値があれば空 `List` で初期値を返します。初期値がなければ先頭要素を初期値とし、空 `List` は `RuntimeError`。 |
 | ストリーム | `Sort` | `List` とキー用ブロック | キーを使って昇順で安定ソートした新しい `List` を返します。 |
 | ストリーム | `SortDesc` | `List` とキー用ブロック | キーを使って降順で安定ソートした新しい `List` を返します。 |
 | ストリーム | `Group` | `List` と `Str` キー用ブロック | キーごとの `List` をまとめた `Dict` を返します。 |
@@ -402,7 +402,8 @@ SimpleStreamBlock  = SimpleStreamName [ AliasClause ] ( Body | "(" Pipeline ")" 
                    | "Loop" [ AliasClause ] Body .
 SimpleStreamName   = "Map" | "Filter" | "Count" | "Sort" | "SortDesc" | "Group" .
 
-ReduceBlock        = "Reduce" [ "(" Expression ")" ] ( [ AliasClause ] Body | ProcessCall ) .
+ReduceBlock        = "Reduce" [ "from" Expression ]
+                     ( [ AliasClause ] ( Body | "(" Pipeline ")" ) | ProcessCall ) .
 
 ForkBlock          = "Fork" [ AliasClause ] ":" ( ForkListBody | ForkDictBody ) .
 ForkListBody       = { Statement } BlockTailStatement .
@@ -668,13 +669,15 @@ value in [1, 3, 5] >> matched.
 users >> Map Get("name") >> names.
 words >> Sort Lowercase >> sorted.
 [1, 2, 3] >> Reduce Add >> total.                  // 6
-[1, 2, 3] >> Reduce(10) Add >> total2.             // 16
+[1, 2, 3] >> Reduce from 10 Add >> total2.         // 16
+[1, 2, 3] >> Reduce (@[0] * @[1]) >> product.      // 6（@ は (acc, item) の値リスト）
 ```
 
 * 処理名渡しは、「処理名だけで書く（`@` に適用）」（4章）を、`Map:` の本体に当てはめたものです。新しい規則ではありません。
 * 処理名渡しで書けるのは、ふつうの処理（標準関数と `pop` で定義した関数）だけです。`Check`、`Map`、`Loop`、`Return`、`Break` などは書けません（`Map:` のように、ブロックで書きます）。
 * `as` をつけたときは、処理名渡しは使えません。式渡しか `:` のブロックで書きます。
-* `Reduce(初期値)` の丸括弧は初期値なので、`Reduce` は式渡しを持ちません（処理名渡しは使えます）。
+* `Reduce` の初期値は `from` で書きます（`Reduce from 10 Add`）。ストリーム名のあとの丸括弧は、`Reduce` でも、いつも式渡しの本体です。
+* 以前の `Reduce(10)` の書き方は文法エラーになり、`Reduce from 10` と書くように案内されます。`popcorn migrate` は `Reduce(10)` を `Reduce from 10` に書きかえます。
 * `Loop`、`Fork`、`Update`、`Check`、`Try` は、式渡しも処理名渡しも持ちません。
 
 ### `Map`
@@ -712,13 +715,13 @@ words >> Count as w:
 
 ### `Reduce`
 
-`Reduce` は `List` を 1 つの値にまとめます。初期値を `Reduce(initial)` で渡せます。各反復では `(accumulator, item)` の値リストが流れてくるので、`as (acc, item)` でそのまま受け取れます。
+`Reduce` は `List` を 1 つの値にまとめます。初期値を `Reduce from 初期値` で渡せます。各反復では `(accumulator, item)` の値リストが流れてくるので、`as (acc, item)` でそのまま受け取れます。
 
 * 初期値を指定したとき、空 `List` ならブロックを実行せず初期値をそのまま返します。
 * 初期値を省いたときは先頭要素が初期 `accumulator` になり、空 `List` は `RuntimeError` です。
 
 ```
-[1, 2, 3, 4] >> Reduce(0) as (acc, item):
+[1, 2, 3, 4] >> Reduce from 0 as (acc, item):
     acc + item.
 >> total.
 
@@ -726,7 +729,13 @@ words >> Count as w:
 [1, 2, 3, 4] >> Reduce as (acc, item):
     acc + item.
 >> total2.
+
+// 短い本体と組み合わせる
+[1, 2, 3, 4] >> Reduce from 10 Add >> total3.        // 20
+[1, 2, 3, 4] >> Reduce from 1 (@[0] * @[1]) >> p.    // 24
 ```
+
+* `from` のあとには式を 1 つ書きます（`Reduce from count + 1 Add` のように演算も書けます）。式は `as`、`:`、`(`、処理名の手前で終わります。
 
 ### `Sort` と `SortDesc`
 

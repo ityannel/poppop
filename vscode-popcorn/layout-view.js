@@ -12,7 +12,7 @@ function maskNonCode(line, state) {
     return require("./assignment-targets").maskNonCode(line, state);
 }
 
-const KEYWORDS = new Set(["when", "else", "as", "pop", "true", "false", "null", "and", "or", "not", "in"]);
+const KEYWORDS = new Set(["when", "else", "as", "pop", "true", "false", "null", "and", "or", "not", "in", "from"]);
 const IDENTITY = Object.freeze({ inserts: [] });
 
 function isForkLabelColon(code, colonIndex) {

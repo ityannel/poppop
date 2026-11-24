@@ -233,7 +233,7 @@ json.dumps(__payload, ensure_ascii=False, default=str)
   });
 }
 
-// 保存してあるコードの、旧形式の { } ブロックを、`:` と字下げに書きかえる（意味が変わらないときだけ）
+// 保存してあるコードの、旧形式の { } ブロックを `:` と字下げに、Reduce(初期値) を Reduce from 初期値 に書きかえる（意味が変わらないときだけ）
 async function migrateFiles(files) {
   const runtime = await readyPromise;
   runtime.globals.set("__popcorn_files", JSON.stringify(files));
@@ -243,7 +243,7 @@ from popcorn_lang.migrate import migrate_braces
 
 __changed = {}
 for __path, __source in json.loads(__popcorn_files).items():
-    if not isinstance(__source, str) or "{" not in __source:
+    if not isinstance(__source, str) or ("{" not in __source and "Reduce" not in __source):
         continue
     try:
         __migrated = migrate_braces(__source)
