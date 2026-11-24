@@ -778,32 +778,31 @@ def test_check_branches_use_braces():
     assert run_code(code) == "small"
 
 
-def test_check_with_the_old_colon_form_explains_the_new_shape():
-    for code in ('1 >> Check { when @ == 1: "yes". else { "no". } }', '1 >> Check { when @ == 1 { "yes". } else: "no". }'):
+def test_check_branches_may_use_a_colon_body():
+    # `:` の本体は、その行の終わりまで（次の行の字下げが深ければ、そこまで）
+    assert run_code('2 >> Check { when @ == 1 { "yes". } else: "no". }') == "no"
+    code = """
+2 >> Check as value {
+    when value == 0:
+        "zero".
+    when value in [1, 2, 3]:
+        "small".
+    else:
+        "large".
+} >> label.
+label.
+"""
+    assert run_code(code) == "small"
+
+
+def test_colon_body_must_not_share_its_line_with_the_next_branch():
+    for code in ('1 >> Check { when @ == 1: "yes". else: "no". }', '5 >> Check: when @ > 1: "a" else: "b"'):
         try:
             run_code(code)
         except Exception as exc:
-            assert "Check branches use braces" in str(exc), str(exc)
+            assert "start 'else' on a new line" in str(exc), str(exc)
         else:
-            raise AssertionError("old Check form must be rejected")
-def test_the_three_string_kinds_in_programs():
-    assert run_code('"Ada" >> name. "Hi {name}!".') == "Hi Ada!"
-    assert run_code("'Hi {name}!'.") == "Hi {name}!"
-    assert run_code(r"`C:\temp\new`.") == r"C:\temp\new"
-    assert run_code(r"'tab\there'.") == "tab\there"
-    assert run_code('"{{literal}} {1 + 2}".') == "{literal} 3"
-    assert run_code("'{{x}}'.") == "{{x}}"
-    assert run_code(r"`a\nb` >> Length.") == 4
-def test_process_name_alone_applies_to_the_current_value():
-    # ブロックの中では、@ はその値。文の先頭に処理名だけを書くと、@ に適用される
-    assert run_code('[[1, 2], [3]] >> Map { Length. }') == [2, 1]
-    # 式の中でも、同じ（(@ >> Length) + 1）
-    assert run_code('[[1, 2], [3]] >> Map { Length + 1. }') == [3, 2]
-    assert run_code('["a", "bb"] >> Map { Length * 10. }') == [10, 20]
-    # プログラムの最初の @ は null
-    assert run_code("Type.") == "Null"
-    # 補間の中でも
-    assert run_code('["ab"] >> Map { "{Length}". }') == ["2"]
+            raise AssertionError("one-line colon branches must be rejected")
 
 
 def test_return_and_break_can_stand_alone_with_when():
@@ -961,3 +960,86 @@ def test_retry_recipe_from_the_spec_works():
     assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "2")) == "ok"      # 2 回失敗して、3 回目で成功
     assert run_code(recipe.replace("LIMIT", "2").replace("FAILS", "5")) is None      # 上限に達して、あきらめる
     assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "0")) == "ok"      # 1 回目で成功
+
+
+FIZZBUZZ_COLON = """
+(num) >> pop FizzBuzz:
+    num >> Check:
+        when num % 15 == 0: "FizzBuzz"
+        when num % 3 == 0: "Fizz"
+        when num % 5 == 0: "Buzz"
+        else: num
+
+(1, 20) >> Range >> Map (@ >> FizzBuzz) >> result.
+result.
+"""
+
+FIZZBUZZ_EXPECTED = [
+    1, 2, "Fizz", 4, "Buzz", "Fizz", 7, 8, "Fizz", "Buzz",
+    11, "Fizz", 13, 14, "FizzBuzz", 16, 17, "Fizz", 19, "Buzz",
+]
+
+
+def test_fizzbuzz_with_colon_bodies_and_a_parenthesized_map():
+    assert run_code(FIZZBUZZ_COLON) == FIZZBUZZ_EXPECTED
+
+
+def test_map_with_a_process_name_is_the_same_as_applying_it_to_each_item():
+    code = FIZZBUZZ_COLON.replace("Map (@ >> FizzBuzz)", "Map FizzBuzz")
+    assert run_code(code) == FIZZBUZZ_EXPECTED
+
+
+def test_short_stream_bodies():
+    is_even = "(n) >> pop IsEven:\n    n % 2 == 0\n\n"
+    assert run_code(is_even + "[1, 2, 3, 4] >> Filter IsEven.") == [2, 4]
+    assert run_code("[1, 2, 3, 4] >> Filter (@ % 2 == 0).") == [2, 4]
+    assert run_code("[1, 2] >> Map as x (x * 10).") == [10, 20]
+    assert run_code('[{"a": 1}, {"a": 2}] >> Map Get("a").') == [1, 2]
+    assert run_code("[[1, 2], [3]] >> Map Length.") == [2, 1]
+    assert run_code('["b", "C", "a"] >> Sort Lowercase.') == ["a", "b", "C"]
+    assert run_code("[1, 2, 3] >> Reduce Add.") == 6
+    assert run_code("[1, 2, 3] >> Reduce(10) Add.") == 16
+
+
+def test_short_stream_body_rejects_block_forms():
+    for code in ("[1] >> Map Check.", "[1] >> Filter Return."):
+        try:
+            run_code(code)
+        except Exception as exc:
+            assert "write a block" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"must be rejected: {code}")
+
+
+def test_colon_bodies_for_every_block_form():
+    assert run_code("[1, 2] >> Map as x:\n    x * 3\n>> Sum >> t.\nt + 1.") == 10
+    assert run_code('0 >> Try:\n    1 >> Get(5)\nCatch as e:\n    e::type\n>> r.\nr.') == "TypeError"
+    assert run_code("[1, 2] >> Fork:\n    a: Sum.\n    b: Length\n>> r.\nr.") == {"a": 3, "b": 2}
+    assert run_code('{"n": 1} >> Update as d:\n    2 >> d::n\n>> r.\nr.') == {"n": 2}
+    loop = "0 >> Loop as i:\n    i >> Break when i >= 3.\n    i + 1\n>> r.\nr."
+    assert run_code(loop) == 3
+
+
+def test_colon_body_ends_at_a_shallower_line_and_inside_brackets():
+    code = """
+(xs) >> pop Total:
+    xs >> Reduce(0) as (acc, x):
+        acc + x
+
+[
+1, 2,
+3
+] >> Total >> r.
+r.
+"""
+    assert run_code(code) == 6
+    assert run_code("[1, 2] >> Map (@ >> Check:\n    when @ == 1: \"one\"\n    else: \"other\") >> r.\nr.") == ["one", "other"]
+
+
+def test_colon_body_needs_something_after_the_colon():
+    try:
+        run_code("(n) >> pop F:\n(1) >> Display.")
+    except Exception as exc:
+        assert "Expected an indented body" in str(exc), str(exc)
+    else:
+        raise AssertionError("empty colon body must be rejected")

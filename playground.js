@@ -2506,7 +2506,6 @@ doubled >> Display.`;
   const SAMPLES_DIR = "samples";
   const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v3"; // 古い記録（パスの一覧）。いまは「消した」の判定にだけ使う
   const SAMPLES_HASH_KEY = "popcorn.playground.samples.hash.v4";     // { パス: 入れたときの内容の指紋 }
-  const CHECK_BACKUP_KEY = "popcorn.playground.fs.backup.check-braces";
 
   // 内容の指紋（短い文字列）。同じ内容なら、同じ値になる
   function hashText(text) {
@@ -2584,25 +2583,11 @@ doubled >> Display.`;
     localStorage.setItem(FS_KEY, JSON.stringify({ files, folders, openTabs, expanded, selected, active: activeFile }));
   }
 
-  // 保存してあるコードに、旧形式の Check（`when 条件:` / `else:`）があれば、新しい書き方（{ }）へ直す。
-  // 直す前の保存データは、一度だけバックアップする
-  let migratedCheckCount = 0;
-  function migrateStoredCheckSyntax(saved) {
-    const formatter = window.PopCornFormatter;
-    if (!formatter?.hasOldCheckSyntax) return;
-    const stale = Object.keys(files).filter((path) => typeof files[path] === "string" && formatter.hasOldCheckSyntax(files[path]));
-    if (!stale.length) return;
-    try { if (!localStorage.getItem(CHECK_BACKUP_KEY)) localStorage.setItem(CHECK_BACKUP_KEY, JSON.stringify(saved)); } catch {}
-    stale.forEach((path) => { files[path] = formatter.migrateOldCheckSyntax(files[path]); });
-    migratedCheckCount = stale.length;
-  }
-
   function loadFileStore() {
     try {
       const saved = JSON.parse(localStorage.getItem(FS_KEY) || "null");
       if (saved && saved.files && Object.keys(saved.files).length) {
         files = saved.files;
-        migrateStoredCheckSyntax(saved);
         folders = saved.folders || [];
         openTabs = (saved.openTabs || []).filter((path) => files[path] !== undefined);
         expanded = saved.expanded || [];
@@ -2610,10 +2595,6 @@ doubled >> Display.`;
         selected = saved.selected || activeFile;
         if (!openTabs.includes(activeFile)) openTabs.push(activeFile);
         setSource(files[activeFile], { markChanged: false, focus: false });
-        if (migratedCheckCount) {
-          persistFiles();
-          setTimeout(() => showToast(`保存してあった ${migratedCheckCount} 個のコードの Check を、新しい書き方（{ }）に直しました`), 1200);
-        }
         return;
       }
     } catch {}

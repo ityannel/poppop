@@ -71,8 +71,14 @@
     const undefinedMath = message.match(/^(Pow|Exp) is undefined for this value$/);
     if (undefinedMath) return `「${undefinedMath[1]}」は、この値では計算できません。`;
 
-    let match = message.match(/^Check branches use braces: write '(.+)' instead of ':'$/);
-    if (match) return `Check の分岐は波括弧で書きます。「${match[1]}」の形にしてください（「:」は使えません）。`;
+    let match = message.match(/^A ':' body runs to the end of its line; start '([^']+)' on a new line, or write the branches with braces$/);
+    if (match) return `「:」のあとの本体は、その行の終わりまでです。「${match[1]}」は次の行に書くか、分岐を { } で書いてください。`;
+    match = message.match(/^Expected an indented body after ':' in (.+)$/);
+    if (match) return `「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（${match[1]}）。`;
+    match = message.match(/^Expected '\{' or ':' to start (.+?), but got (.+)$/);
+    if (match) return `${match[1]} の本体は「{ … }」か「:」で始めてください（「${match[2]}」が見つかりました）。`;
+    match = message.match(/^'(\w+) (\w+)' is not allowed; write a block: '.+'$/);
+    if (match) return `「${match[1]} ${match[2]}」とは書けません。「${match[1]} { … }」のようにブロックで書いてください。`;
     match = message.match(/^Variable '([^']+)' is not defined\.?$/);
     if (match) return `変数「${match[1]}」は定義されていません。`;
     match = message.match(/^Function '([^']+)' is not defined\.?$/);

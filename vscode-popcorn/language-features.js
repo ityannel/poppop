@@ -992,14 +992,22 @@ function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
     const state = { inBlockComment: false };
+    // "block" は { }、数は `:` の字下げブロック（見出しの行の、元の字下げ）
     const stack = [];
+    const popBrace = () => {
+        while (stack.length && stack[stack.length - 1] !== "block") stack.pop();
+        stack.pop();
+    };
     const formatted = rawLines.map(rawLine => {
         const trimmed = rawLine.trim();
         if (!trimmed) return "";
 
         const trimmedCode = maskNonCode(trimmed, state);
+        // `:` で始めた字下げブロックは、元の字下げが見出しの行と同じか浅くなったら閉じる
+        const rawIndent = rawLine.length - rawLine.trimStart().length;
+        while (stack.length && stack[stack.length - 1] !== "block" && rawIndent <= stack[stack.length - 1]) stack.pop();
         const startsWithClose = /^\}/.test(trimmedCode);
-        if (startsWithClose) stack.pop();
+        if (startsWithClose) popBrace();
 
         const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
         const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
@@ -1011,8 +1019,9 @@ function formatDocument(text, indentSize = 4) {
         if (netOpens > 0) {
             for (let i = 0; i < netOpens; i += 1) stack.push("block");
         } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) stack.pop();
+            for (let i = 0; i < -netOpens; i += 1) popBrace();
         }
+        if (/:\s*$/.test(lineCode)) stack.push(rawIndent);
 
         return line;
     });

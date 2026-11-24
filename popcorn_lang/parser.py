@@ -5,6 +5,8 @@ from .ast_nodes import *
 
 _KEYWORD_TOKEN_TYPES = {kw.upper() for kw in KEYWORDS}
 _SIMPLE_STREAM_NAMES = {"Map", "Filter", "Sort", "SortDesc", "Group"}
+# `Map Name` の省略形で、処理名として書けない名前（ブロックや制御の形をもつもの）
+_NOT_SHORTHAND_NAMES = set(SPECIAL_FORMS) | {"Return", "Break"}
 
 
 class ParseError(Exception):
@@ -15,11 +17,92 @@ class Parser:
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.pos = 0
+        # 字下げブロック（`:` のあとに書く本体）のための情報。
+        #   _line_starts:  行の最初のトークンの位置
+        #   _line_indent:  行ごとの、最初のトークンの列
+        #   _layouts:      開いている字下げブロックの、見出し行の列（None は { } や ( ) の中で、字下げを見ない印）
+        self._line_starts = set()
+        self._line_indent = {}
+        prev_line = None
+        for index, tok in enumerate(tokens):
+            if tok.line != prev_line:
+                self._line_starts.add(index)
+                self._line_indent.setdefault(tok.line, tok.column)
+            prev_line = tok.line
+        self._layouts: List[Optional[int]] = []
+
+    def _dedent_at(self, index: int) -> Optional[Token]:
+        """字下げブロックの外に出た行の先頭なら、仮の DEDENT トークンを返す。"""
+        if not self._layouts or self._layouts[-1] is None:
+            return None
+        tok = self.tokens[index]
+        # 閉じかっこは、文の始まりにならないので、行の途中でも字下げブロックを閉じる
+        #   Check { when x: "a". }   /   Map (@ >> Check: …)
+        if tok.type in ("RBRACE", "RPAREN", "RBRACKET"):
+            return Token("DEDENT", "", tok.line, tok.column)
+        if index not in self._line_starts:
+            return None
+        for indent in reversed(self._layouts):
+            if indent is None:
+                break
+            if tok.column <= indent:
+                return Token("DEDENT", "", tok.line, tok.column)
+        return None
 
     def current(self) -> Optional[Token]:
         if self.pos < len(self.tokens):
+            dedent = self._dedent_at(self.pos)
+            if dedent is not None:
+                return dedent
             return self.tokens[self.pos]
         return None
+
+    def _at_end(self, end_set) -> bool:
+        curr = self.current()
+        if curr is None:
+            return "DEDENT" in end_set
+        return curr.type in end_set
+
+    # ---- ブロックの本体: `{ … }` または `:` と字下げ ----
+    def _open_body(self, what: str) -> str:
+        """本体を開く。`{` なら "brace"、`:` なら "layout" を返す。"""
+        curr = self.current()
+        if curr is not None and curr.type == "COLON":
+            self.advance()
+            self._layouts.append(self._line_indent.get(curr.line, curr.column))
+            nxt = self.current()
+            if nxt is None or nxt.type == "DEDENT":
+                raise ParseError(
+                    f"Expected an indented body after ':' in {what} at line {curr.line}, column {curr.column}"
+                )
+            return "layout"
+        if curr is None or curr.type != "LBRACE":
+            loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
+            got = curr.type if curr else "EOF"
+            raise ParseError(f"Expected '{{' or ':' to start {what}, but got {got} {loc}")
+        self.advance()
+        return "brace"
+
+    def _close_body(self, kind: str) -> None:
+        if kind == "brace":
+            self.expect("RBRACE")
+            return
+        curr = self.current()
+        if curr is not None and curr.type != "DEDENT":
+            raise ParseError(
+                f"Unexpected token {curr.type} ({curr.value}) at line {curr.line}, column {curr.column}"
+            )
+        self._layouts.pop()
+
+    @staticmethod
+    def _body_end(kind: str) -> set:
+        return {"RBRACE"} if kind == "brace" else {"DEDENT"}
+
+    def _parse_body(self, what: str) -> BlockNode:
+        kind = self._open_body(what)
+        block = self.parse_block(self._body_end(kind))
+        self._close_body(kind)
+        return block
 
     def peek(self, offset: int = 1) -> Optional[Token]:
         if self.pos + offset < len(self.tokens):
@@ -27,6 +110,14 @@ class Parser:
         return None
 
     def advance(self):
+        # かっこの中では、字下げブロックの終わりを見ない（開きかっこで印を積み、閉じかっこで外す）
+        if self.pos < len(self.tokens):
+            tok_type = self.tokens[self.pos].type
+            if tok_type in ("LPAREN", "LBRACKET", "LBRACE"):
+                self._layouts.append(None)
+            elif tok_type in ("RPAREN", "RBRACKET", "RBRACE") and None in self._layouts:
+                while self._layouts and self._layouts.pop() is not None:
+                    pass
         self.pos += 1
 
     def match(self, token_type: str) -> bool:
@@ -100,18 +191,6 @@ class Parser:
             return self.parse_function_def()
         return self.parse_statement()
 
-    def _is_check_branch_when(self) -> bool:
-        """Return True if the current WHEN starts a Check branch (`when <expr>:`)."""
-        saved = self.pos
-        try:
-            self.advance()  # consume WHEN
-            self.parse_expression()
-            return self.current() is not None and self.current().type == "COLON"
-        except ParseError:
-            return False
-        finally:
-            self.pos = saved
-
     def parse_statement(self, end_tokens=None) -> ASTNode:
         if self._is_function_def():
             curr = self.current()
@@ -121,24 +200,33 @@ class Parser:
         end_set = end_tokens or set()
         pipeline = self.parse_pipeline()
         if self.current() and self.current().type == "WHEN":
-            if "WHEN" not in end_set or not self._is_check_branch_when():
-                self.advance()
-                cond = self.parse_expression()
-                if self.match("DOT"):
-                    return ConditionalStatementNode(
-                        pipeline.line, pipeline.column, pipeline, cond
-                    )
-                if self.current() and self.current().type in end_set:
-                    return ConditionalStatementNode(
-                        pipeline.line, pipeline.column, pipeline, cond
-                    )
-                self.expect("DOT")
+            self.advance()
+            cond = self.parse_expression()
+            if self.match("DOT"):
+                return ConditionalStatementNode(
+                    pipeline.line, pipeline.column, pipeline, cond
+                )
+            if end_set and self._at_end(end_set):
+                return ConditionalStatementNode(
+                    pipeline.line, pipeline.column, pipeline, cond
+                )
+            self.expect("DOT")
         if self._expect_dot_or_block_end(pipeline):
             return pipeline
-        if self.current() and self.current().type in end_set:
+        if end_set and self._at_end(end_set):
             return pipeline
+        self._reject_branch_on_body_line(end_set)
         self.expect("DOT")
         return pipeline
+
+    def _reject_branch_on_body_line(self, end_tokens, kinds=("ELSE",)) -> None:
+        """`when a: 1 else: 2` のように、`:` の本体と同じ行に次の分岐を書いたときの案内。"""
+        tok = self.current()
+        if "DEDENT" in end_tokens and tok is not None and tok.type in kinds:
+            raise ParseError(
+                f"A ':' body runs to the end of its line; start '{tok.value}' on a new line, "
+                f"or write the branches with braces at line {tok.line}, column {tok.column}"
+            )
 
     def parse_block(self, end_tokens) -> BlockNode:
         pipelines = []
@@ -146,19 +234,9 @@ class Parser:
         line = curr.line if curr else 1
         col = curr.column if curr else 1
         while self.current() and self.current().type not in end_tokens:
+            self._reject_branch_on_body_line(end_tokens, ("WHEN", "ELSE"))
             pipelines.append(self.parse_statement(end_tokens))
         return BlockNode(line, col, pipelines)
-
-    def _expect_branch_open(self, kind: str) -> None:
-        """Check の分岐は `when 条件 { … }` / `else { … }`。旧形式の `:` には、書き方を教える。"""
-        curr = self.current()
-        if curr and curr.type == "COLON":
-            shape = "when <condition> { ... }" if kind == "when" else "else { ... }"
-            raise ParseError(
-                f"Check branches use braces: write '{shape}' instead of ':' "
-                f"at line {curr.line}, column {curr.column}"
-            )
-        self.expect("LBRACE")
 
     def _parse_optional_alias_clause(self) -> List[str]:
         if not self.match("AS"):
@@ -199,6 +277,35 @@ class Parser:
             f"Expected alias variable name or '(a, b)' after 'as', got {curr.type} at line {curr.line}, column {curr.column}"
         )
 
+    def _parse_short_body(
+        self, name: str, alias_names: List[str], allow_paren: bool = True
+    ) -> Optional[BlockNode]:
+        """ブロックを短く書く2つの形。当てはまらなければ None。
+
+        * `Map (式)`   は `Map { 式 }` と同じ（式の中の `@` が、各要素）
+        * `Map Name`   は `Map { Name }`、つまり `Map { @ >> Name }` と同じ
+                       （`Map Get("x")` のように補助引数も書ける）
+        """
+        curr = self.current()
+        if curr is None:
+            return None
+        line, col = curr.line, curr.column
+        if allow_paren and curr.type == "LPAREN":
+            expr = self._parse_base_primary()
+            return BlockNode(line, col, [Pipeline(line, col, [expr], [])])
+        if curr.type == "VERB" and not alias_names:
+            if curr.value in _NOT_SHORTHAND_NAMES:
+                raise ParseError(
+                    f"'{name} {curr.value}' is not allowed; write a block: "
+                    f"'{name} {{ ... }}' at line {line}, column {col}"
+                )
+            stage = self._parse_stream_block_or_call()
+            implicit = ImplicitVariableNode(line, col, "@")
+            return BlockNode(
+                line, col, [Pipeline(line, col, [implicit, stage], [">>"])]
+            )
+        return None
+
     def _parse_stream_block_or_call(self) -> ASTNode:
         curr = self.current()
         line, col = curr.line, curr.column
@@ -208,17 +315,15 @@ class Parser:
         if name in _SIMPLE_STREAM_NAMES:
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            block = self._parse_short_body(name, alias_names)
+            if block is None:
+                block = self._parse_body(name)
             return StreamBlockNode(line, col, name, alias_names, block)
 
         if name == "Loop":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            block = self._parse_body("Loop")
             single_alias = alias_names[0] if len(alias_names) == 1 else None
             return LoopBlock(line, col, block, single_alias, alias_names)
 
@@ -229,16 +334,17 @@ class Parser:
                 init_expr = self.parse_expression()
                 self.expect("RPAREN")
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            block = self._parse_short_body("Reduce", alias_names, allow_paren=False)
+            if block is None:
+                block = self._parse_body("Reduce")
             return StreamBlockNode(line, col, "Reduce", alias_names, block, init_expr=init_expr)
 
         if name == "Fork":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            if self.current() and self.current().type == "RBRACE":
+            kind = self._open_body("Fork")
+            end = self._body_end(kind)
+            if self._at_end(end):
                 raise ParseError(
                     f"Fork requires at least one branch at line {line}, column {col}"
                 )
@@ -250,7 +356,7 @@ class Parser:
             )
             if is_labeled:
                 entries: List[ForkEntryNode] = []
-                while self.current() and self.current().type != "RBRACE":
+                while not self._at_end(end) and self.current() is not None:
                     tok = self.current()
                     if not (
                         tok.type == "VARIABLE"
@@ -264,9 +370,9 @@ class Parser:
                     entry_line, entry_col = tok.line, tok.column
                     self.advance()  # label
                     self.advance()  # ':'
-                    stmt = self.parse_statement({"RBRACE"})
+                    stmt = self.parse_statement(end)
                     entries.append(ForkEntryNode(entry_line, entry_col, label, stmt))
-                self.expect("RBRACE")
+                self._close_body(kind)
                 return StreamBlockNode(
                     line,
                     col,
@@ -277,7 +383,7 @@ class Parser:
                 )
             else:
                 pipelines: List[ASTNode] = []
-                while self.current() and self.current().type != "RBRACE":
+                while not self._at_end(end) and self.current() is not None:
                     tok = self.current()
                     if (
                         tok.type == "VARIABLE"
@@ -287,8 +393,8 @@ class Parser:
                         raise ParseError(
                             f"Cannot mix labeled and unlabeled branches in Fork at line {tok.line}, column {tok.column}"
                         )
-                    pipelines.append(self.parse_statement({"RBRACE"}))
-                self.expect("RBRACE")
+                    pipelines.append(self.parse_statement(end))
+                self._close_body(kind)
                 return StreamBlockNode(
                     line, col, "Fork", alias_names, BlockNode(line, col, pipelines)
                 )
@@ -296,23 +402,19 @@ class Parser:
         if name == "Update":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            block = self._parse_body("Update")
             return StreamBlockNode(line, col, "Update", alias_names, block)
 
         if name == "Check":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
+            kind = self._open_body("Check")
             branches: List[Branch] = []
             while self.current() and self.current().type == "WHEN":
                 w_tok = self.current()
                 self.advance()
                 cond = self.parse_expression()
-                self._expect_branch_open("when")
-                block = self.parse_block({"RBRACE"})
-                self.expect("RBRACE")
+                block = self._parse_body("a when branch")
                 branches.append(Branch(w_tok.line, w_tok.column, cond, block, "predicate"))
             if not branches:
                 raise ParseError(
@@ -324,20 +426,16 @@ class Parser:
                 )
             e_tok = self.current()
             self.advance()
-            self._expect_branch_open("else")
-            else_block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            else_block = self._parse_body("the else branch")
             branches.append(Branch(e_tok.line, e_tok.column, None, else_block, "else"))
-            self.expect("RBRACE")
+            self._close_body(kind)
             single_alias = alias_names[0] if len(alias_names) == 1 else None
             return CheckBlock(line, col, branches, single_alias, alias_names)
 
         if name == "Try":
             self.advance()
             try_aliases = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            try_block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            try_block = self._parse_body("Try")
             catch_tok = self.current()
             if not catch_tok or catch_tok.type != "VERB" or catch_tok.value != "Catch":
                 loc = (
@@ -348,9 +446,7 @@ class Parser:
                 raise ParseError(f"Try requires a matching Catch block {loc}")
             self.advance()
             catch_aliases = self._parse_optional_alias_clause()
-            self.expect("LBRACE")
-            catch_block = self.parse_block({"RBRACE"})
-            self.expect("RBRACE")
+            catch_block = self._parse_body("Catch")
             return TryCatchBlock(
                 line, col, try_block, catch_block, try_aliases, catch_aliases
             )
@@ -565,6 +661,32 @@ class Parser:
             self.advance()
             return ImplicitVariableNode(line, col, curr.value)
 
+        if curr.type in ("LBRACKET", "LBRACE", "LPAREN"):
+            return self._parse_bracketed_primary(curr)
+
+        if curr.type == "VERB":
+            # ブロックの形が必要な処理（Map、Check、Loop、Try など）は、`>>` の右側に、ブロックつきで書く
+            if curr.value in SPECIAL_FORMS:
+                raise ParseError(
+                    f"Cannot call '{curr.value}' without '>>' at line {line}, column {col}"
+                )
+            # 統一規則: 処理名だけを書くと、`@`（いまの値）を入力にして呼び出す。
+            #   Pi * 2          →  (@ >> Pi) * 2
+            #   Now::year       →  (@ >> Now)::year
+            #   Break when …    →  (@ >> Break) when …
+            stage = self._parse_stream_block_or_call()
+            implicit = ImplicitVariableNode(line, col, "@")
+            return GroupedPipelineNode(
+                line, col, Pipeline(line, col, [implicit, stage], [">>"])
+            )
+
+        raise ParseError(
+            f"Unexpected token {curr.type} ({curr.value}) at line {line}, column {col}"
+        )
+
+    def _parse_bracketed_primary(self, curr: Token) -> ASTNode:
+        """[ … ]、{ … }（Dict）、( … )。"""
+        line, col = curr.line, curr.column
         if curr.type == "LBRACKET":
             self.advance()
             items = []
@@ -622,22 +744,6 @@ class Parser:
             else:
                 self.expect("RPAREN")
                 return first_expr
-
-        if curr.type == "VERB":
-            # ブロックの形が必要な処理（Map、Check、Loop、Try など）は、`>>` の右側に、ブロックつきで書く
-            if curr.value in SPECIAL_FORMS:
-                raise ParseError(
-                    f"Cannot call '{curr.value}' without '>>' at line {line}, column {col}"
-                )
-            # 統一規則: 処理名だけを書くと、`@`（いまの値）を入力にして呼び出す。
-            #   Pi * 2          →  (@ >> Pi) * 2
-            #   Now::year       →  (@ >> Now)::year
-            #   Break when …    →  (@ >> Break) when …
-            stage = self._parse_stream_block_or_call()
-            implicit = ImplicitVariableNode(line, col, "@")
-            return GroupedPipelineNode(
-                line, col, Pipeline(line, col, [implicit, stage], [">>"])
-            )
 
         raise ParseError(
             f"Unexpected token {curr.type} ({curr.value}) at line {line}, column {col}"
@@ -709,8 +815,6 @@ class Parser:
 
         self.expect("POP")
         name = self.expect("VERB").value
-        self.expect("LBRACE")
-        block = self.parse_block({"RBRACE"})
-        self.expect("RBRACE")
+        block = self._parse_body(f"function '{name}'")
 
         return FunctionDefNode(line, col, name, params, block)

@@ -23,12 +23,16 @@ assert.equal(
 );
 assert.equal(errorLine("ParseError: something at line 14, column 3"), 14);
 assert.equal(
-  localizeError("SyntaxError: Check branches use braces: write 'when <condition> { ... }' instead of ':' at line 2, column 9"),
-  "文法エラー: Check の分岐は波括弧で書きます。「when <condition> { ... }」の形にしてください（「:」は使えません）。（2行目）",
+  localizeError("SyntaxError: A ':' body runs to the end of its line; start 'else' on a new line, or write the branches with braces at line 2, column 9"),
+  "文法エラー: 「:」のあとの本体は、その行の終わりまでです。「else」は次の行に書くか、分岐を { } で書いてください。（2行目）",
 );
 assert.equal(
-  localizeError("SyntaxError: Check branches use braces: write 'else { ... }' instead of ':' at line 4, column 5"),
-  "文法エラー: Check の分岐は波括弧で書きます。「else { ... }」の形にしてください（「:」は使えません）。（4行目）",
+  localizeError("SyntaxError: Expected an indented body after ':' in function 'F' at line 1, column 13"),
+  "文法エラー: 「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（function 'F'）。（1行目）",
+);
+assert.equal(
+  localizeError("SyntaxError: 'Map Check' is not allowed; write a block: 'Map { ... }' at line 1, column 12"),
+  "文法エラー: 「Map Check」とは書けません。「Map { … }」のようにブロックで書いてください。（1行目）",
 );
 
 assert.equal(

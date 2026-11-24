@@ -10,7 +10,7 @@ PopCorn 1
 
 PopCorn は、値を `>>` で次の処理へ渡していくデータフロー言語です。値の加工は非破壊的で、元のリストや辞書を書き換えません。画面表示やファイル操作など外部へ作用する処理は、値の加工とは分けて扱います。
 
-改行には構文上の意味がありません。空白・改行・インデントは読みやすさのために自由に使えます。ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。ブロック `{ ... }` で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック `{ ... }` 内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
+ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。`{ }` を使うかぎり、改行には構文上の意味がなく、空白・改行・インデントは読みやすさのために自由に使えます。ブロックは `{ }` の代わりに `:` と字下げでも書けます。その場合だけ、字下げがブロックの終わりを決めます（4章「`:` と字下げで書くブロック」）。ブロックで終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 
 ### 言語の分類と特徴
 
@@ -332,6 +332,35 @@ items >> Return when (items >> Length) <= 1.
 arr >> Break when i >= n - 1.
 ```
 
+### `:` と字下げで書くブロック
+
+ブロックの `{ … }` は、どこでも `:` と字下げに置きかえられます（関数定義、`Check` とその分岐、`Map` などのストリーム処理、`Loop`、`Try` / `Catch`、`Fork`、`Update`）。
+
+```
+(num) >> pop FizzBuzz:
+    num >> Check:
+        when num % 15 == 0: "FizzBuzz"
+        when num % 3 == 0: "Fizz"
+        when num % 5 == 0: "Buzz"
+        else: num
+
+(1, 20) >> Range >> Map (@ >> FizzBuzz) >> Display.
+```
+
+* `:` のブロックは、`:` のある行（見出しの行）の最初のトークンより、深く字下げされた行が続くあいだ続きます。見出しの行と同じか浅い行が来たところで、終わります。
+* `:` のすぐあと、同じ行に本体を書いてもかまいません（`else: num`）。その場合も、次の行が見出しより深ければ、本体はそこまで続きます。
+* ブロックの最後の文の `.` は、`{ }` のときと同じように省略できます。最後以外の文には `.` が必要です。
+* 丸括弧、角括弧、`{ }` の中では、行の字下げを見ません（複数行のリストや値リストは、自由に字下げできます）。閉じかっこが来ると、その中で開いた `:` のブロックは終わります。
+* `}` のあとと同じように、ブロックのあとの行を `>>` で始めると、外側のパイプラインが続きます。
+
+```
+[1, 2, 3] >> Map as x:
+    x * 2
+>> doubled.
+```
+
+* 1 つのプログラムの中で、`{ }` と `:` を混ぜてもかまいません。
+
 ### 構文記法（EBNF）
 
 以下の構文ルールでは、`=` の左側が構文要素の名前、引用符の中がソースにそのまま書く文字、`|` が選択、`[ ]` が省略可能、`{ }` が 0 回以上の繰り返しを表します。
@@ -362,32 +391,38 @@ StreamBlock        = SimpleStreamBlock
 AliasClause        = "as" ( VariableName
                      | "(" VariableName "," VariableName { "," VariableName } ")" ) .
 
-SimpleStreamBlock  = SimpleStreamName [ AliasClause ] "{" Block "}" .
-SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" | "Loop" .
+Body               = "{" Block "}"
+                   | ":" Block .   (* 字下げで終わる。「`:` と字下げで書くブロック」を参照 *)
 
-ReduceBlock        = "Reduce" [ "(" Expression ")" ] [ AliasClause ] "{" Block "}" .
+SimpleStreamBlock  = SimpleStreamName [ AliasClause ] ( Body | "(" Pipeline ")" )
+                   | SimpleStreamName ProcessCall
+                   | "Loop" [ AliasClause ] Body .
+SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" .
 
-ForkBlock          = "Fork" [ AliasClause ] "{" ( ForkListBody | ForkDictBody ) "}" .
+ReduceBlock        = "Reduce" [ "(" Expression ")" ] ( [ AliasClause ] Body | ProcessCall ) .
+
+ForkBlock          = "Fork" [ AliasClause ] ( "{" ( ForkListBody | ForkDictBody ) "}"
+                                          | ":" ( ForkListBody | ForkDictBody ) ) .
 ForkListBody       = { Statement } BlockTailStatement .
 ForkDictBody       = { ForkEntry } ForkTailEntry .
 ForkEntry          = VariableName ":" Statement .
 ForkTailEntry      = VariableName ":" BlockTailStatement .
 
-UpdateBlock        = "Update" [ AliasClause ] "{" { UpdateStatement } [ UpdateTailStatement ] "}" .
+UpdateBlock        = "Update" [ AliasClause ] ( "{" UpdateBody "}" | ":" UpdateBody ) .
+UpdateBody         = { UpdateStatement } [ UpdateTailStatement ] .
 UpdateStatement    = Expression { ">>" PipelineStage } ">>" FieldTarget "." .
 UpdateTailStatement = Expression { ">>" PipelineStage } ">>" FieldTarget [ "." ] .
 FieldTarget        = ( VariableName | "@" ) "::" Identifier .
 
-CheckBlock         = "Check" [ AliasClause ] "{"
-                     WhenBranch { WhenBranch } ElseBranch "}" .
-WhenBranch         = "when" Expression "{" Block "}" .
-ElseBranch         = "else" "{" Block "}" .
+CheckBlock         = "Check" [ AliasClause ] ( "{" CheckBranches "}" | ":" CheckBranches ) .
+CheckBranches      = WhenBranch { WhenBranch } ElseBranch .
+WhenBranch         = "when" Expression Body .
+ElseBranch         = "else" Body .
 
-TryBlock           = "Try" [ AliasClause ] "{" Block "}"
-                     "Catch" [ AliasClause ] "{" Block "}" .
+TryBlock           = "Try" [ AliasClause ] Body
+                     "Catch" [ AliasClause ] Body .
 
-FunctionDefinition = [ ParameterList ">>" ] "pop" ProcessName "{"
-                     Block "}" .
+FunctionDefinition = [ ParameterList ">>" ] "pop" ProcessName Body .
 ParameterList      = "(" VariableName { "," VariableName } ")" .
 
 Expression         = OrExpr .
@@ -403,8 +438,9 @@ PrimaryExpr        = Literal | VariableName | "@" | InlineProcessCall
 InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省いた書き方 *)
 ```
 
+* `SimpleStreamName ProcessCall`（`Map FizzBuzz`）は `SimpleStreamName "{" "@" ">>" ProcessCall "}"` と、`SimpleStreamName "(" Pipeline ")"`（`Map (@ >> FizzBuzz)`）は `SimpleStreamName "{" Pipeline "}"` と同じ意味です。`ProcessCall` には、`{ }` が必要な処理と `Return`・`Break` は書けません。
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
-* ブロック `{ ... }` で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック `{ ... }` 内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
+* ブロック（`{ ... }` または `:` の本体）で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
 * `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように `{ }` が必要な処理は、この形では書けません。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
@@ -588,6 +624,33 @@ value in [1, 3, 5] >> matched.
 [1, 2, 3] >> Map as x { x * 2. } >> doubled.
 ```
 
+### 本体を短く書く（`Map (式)` と `Map 処理名`）
+
+`Map`、`Filter`、`Sort`、`SortDesc`、`Group` は、本体が 1 つの式だけなら、`{ }` の代わりに丸括弧で書けます。式の中の `@`（または `as` の別名）が、各要素です。
+
+```
+[1, 2, 3, 4] >> Filter (@ % 2 == 0) >> evens.     // Filter { @ % 2 == 0 } と同じ
+[1, 2] >> Map as x (x * 10) >> tens.               // Map as x { x * 10 } と同じ
+```
+
+本体が「各要素に、処理を 1 つ当てるだけ」なら、処理名だけを書けます。補助引数もつけられます。`Reduce` も、この形が使えます（`(acc, item)` が、そのまま処理に渡ります）。
+
+```
+(1, 20) >> Range >> Map FizzBuzz >> Display.       // Map { @ >> FizzBuzz } と同じ
+[1, 2, 3, 4] >> Filter IsEven >> evens.
+[[1, 2], [3]] >> Map Length >> sizes.              // [2, 1]
+users >> Map Get("name") >> names.
+words >> Sort Lowercase >> sorted.
+[1, 2, 3] >> Reduce Add >> total.                  // 6
+[1, 2, 3] >> Reduce(10) Add >> total2.             // 16
+```
+
+* `Map 処理名` は、「処理名だけで書く（`@` に適用）」（4章）を、`Map { 処理名 }` の本体に当てはめたものです。新しい規則ではありません。
+* 処理名として書けるのは、ふつうの処理（標準関数と `pop` で定義した関数）だけです。`Check`、`Map`、`Loop`、`Return`、`Break` などは書けません（`Map { … }` のように、ブロックで書きます）。
+* `as` をつけたときは、処理名の形は使えません。丸括弧か `{ }` で書きます。
+* `Reduce(初期値)` の丸括弧は初期値なので、`Reduce` の本体を丸括弧で書くことはできません。
+* `Loop`、`Fork`、`Update`、`Check`、`Try` は、この短い形を持ちません。
+
 ### `Map`
 
 `Map` は `List` の各要素を順番に変換し、同じ長さの新しい `List` を返します。
@@ -741,7 +804,18 @@ x >> Check {
 } >> sign.
 ```
 
-`when 条件:` のように `:` を使う古い書き方は使えません（「Check の分岐は波括弧で書きます」というエラーになります）。波括弧にしたのは、文の最後に添える後置の `when`（「条件付き実行」）と、`Check` の分岐の `when` を、はっきり区別するためです。
+分岐も `Check` 自体も、`{ }` の代わりに `:` と字下げで書けます（4章「`:` と字下げで書くブロック」）。
+
+```
+(num) >> pop FizzBuzz:
+    num >> Check:
+        when num % 15 == 0: "FizzBuzz"
+        when num % 3 == 0: "Fizz"
+        when num % 5 == 0: "Buzz"
+        else: num
+```
+
+`:` のあとの本体は、その行の終わりまでです（次の行の字下げが見出しより深ければ、そこまで続きます）。`when a: 1 else: 2` のように、次の分岐を同じ行に書くことはできません。1 行で書きたいときは `{ }` を使います。
 
 ## 11. `Loop` と `Break`
 

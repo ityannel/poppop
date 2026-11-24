@@ -49,6 +49,21 @@ assert.strictEqual(
 );
 
 
+// ---- `:` の字下げブロックは、元の字下げで閉じる ----
+const colonForm = [
+  "(num) >> pop FizzBuzz:",
+  "    num >> Check:",
+  '        when num % 15 == 0: "FizzBuzz"',
+  "        else: num",
+  "",
+  "(1, 20) >> Range >> Map (@ >> FizzBuzz) >> Display.",
+].join("\n");
+const colonMessy = colonForm.replace(/\n {8}/g, "\n   ").replace(/\n {4}/g, "\n  ").replace(">> Range >>", ">>Range>>");
+assert.strictEqual(formatInPlayground(colonForm), colonForm);
+assert.strictEqual(formatInPlayground(colonMessy), colonForm);
+assert.strictEqual(formatInExtension(colonMessy), colonForm);
+
+
 // ---- 旧形式の Check を、新しい書き方へ直す ----
 const { hasOldCheckSyntax, migrateOldCheckSyntax } = globalThis.PopCornFormatter;
 const oldForm = [
