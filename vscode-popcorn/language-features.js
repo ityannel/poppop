@@ -5,8 +5,8 @@ const { findImplicitVariableScopeRanges, findVariableReferenceOffsets, variableA
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
-const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
+const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
+const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
     "and", "as", "else", "false", "in", "not", "null", "or", "pop", "true", "when"
 ]);
@@ -92,6 +92,7 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Throw: { description: "指定した内容で UserError を発生させます。", output: "エラー" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
+    Count: { description: "条件に合う配列要素の数を返します。", output: "数値" },
     Reduce: { description: "配列を 1 つの値へ集約します。", output: "要素" },
     Zip: { description: "複数の配列を位置ごとにまとめます。", output: "配列" },
     Loop: { description: "状態値を Break まで繰り返し更新します。", output: "式" },
@@ -504,7 +505,7 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
     if (!match) return undefined;
     const stream = match[1] || match[2];
     const paramText = match[3] || match[4] || "";
@@ -760,6 +761,7 @@ function typeMismatchDiagnostic(inputType, functionName, start, length) {
         Entries: ["辞書"],
         Map: ["配列"],
         Filter: ["配列"],
+        Count: ["配列"],
         Reduce: ["配列"],
         Group: ["配列"],
         Zip: ["配列"]

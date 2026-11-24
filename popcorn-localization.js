@@ -49,6 +49,8 @@
       ["Filter block must return Bool", "Filter のブロックは Bool を返す必要があります。"],
       ["Map stream requires a list", "Map にはリストを渡してください。"],
       ["Filter stream requires a list", "Filter にはリストを渡してください。"],
+      ["Count stream requires a list", "Count にはリストを渡してください。"],
+      ["Count block must return Bool", "Count のブロックは Bool を返す必要があります。"],
       ["Reduce stream requires a list", "Reduce にはリストを渡してください。"],
       ["Reduce stream requires non-empty list", "初期値のない Reduce には空でないリストを渡してください。"],
       ["Sort stream requires a list", "Sort にはリストを渡してください。"],

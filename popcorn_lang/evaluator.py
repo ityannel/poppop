@@ -277,9 +277,10 @@ class Evaluator:
                 mapped.append(await self.eval(n.block, item_env))
             return mapped
 
-        if n.stream_type == "Filter":
+        if n.stream_type in ("Filter", "Count"):
+            kind = n.stream_type
             if not isinstance(val, list):
-                raise PopCornError("TypeError", "Filter stream requires a list")
+                raise PopCornError("TypeError", f"{kind} stream requires a list")
             filtered = []
             for item in val:
                 item_env = Environment(parent=env)
@@ -287,10 +288,11 @@ class Evaluator:
                 _bind_aliases(item_env, n.var_names, item)
                 res = await self.eval(n.block, item_env)
                 if not isinstance(res, bool):
-                    raise PopCornError("TypeError", "Filter block must return Bool")
+                    raise PopCornError("TypeError", f"{kind} block must return Bool")
                 if res:
                     filtered.append(item)
-            return filtered
+            # Count は、条件に合った要素の数（Filter >> Length と同じ）
+            return float(len(filtered)) if kind == "Count" else filtered
 
         if n.stream_type == "Reduce":
             if not isinstance(val, list):

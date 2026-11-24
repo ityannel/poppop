@@ -321,7 +321,7 @@ Break when i >= n.                       // @ >> Break when …
 ```
 
 * ブロックの中や関数の中では、`@` は、そのブロックや関数が受け取った入力値です。プログラムの最初の `@` は `null` です。
-* `Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように、ブロックが必要な処理は、この書き方では使えません。`>>` の右側に、ブロックつきで書きます（書くと「`>>` の右側で呼び出してください」というエラーです）。
+* `Map`、`Filter`、`Count`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように、ブロックが必要な処理は、この書き方では使えません。`>>` の右側に、ブロックつきで書きます（書くと「`>>` の右側で呼び出してください」というエラーです）。
 * 入力が必要な処理の、値の書き忘れ（たとえば `Display.`）は、構文エラーにならず、`@` を入力にして実行されます。プログラムの最初で `Display.` と書くと、`null` を表示します。入力が必要な処理は、`>>` で入力を見せて書くことをおすすめします（付録 A）。
 
 ### 条件付き実行（後置 `when`）
@@ -398,7 +398,7 @@ Body               = ":" Block .   (* 字下げで終わる。「`:` と字下�
 SimpleStreamBlock  = SimpleStreamName [ AliasClause ] ( Body | "(" Pipeline ")" )
                    | SimpleStreamName ProcessCall
                    | "Loop" [ AliasClause ] Body .
-SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" .
+SimpleStreamName   = "Map" | "Filter" | "Count" | "Sort" | "SortDesc" | "Group" .
 
 ReduceBlock        = "Reduce" [ "(" Expression ")" ] ( [ AliasClause ] Body | ProcessCall ) .
 
@@ -442,7 +442,7 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
 * ブロックで終わる文の末尾（`Map: ...` や `pop 関数名: ...` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
-* `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のようにブロックが必要な処理は、この形では書けません。
+* `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Count`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のようにブロックが必要な処理は、この形では書けません。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 
 ### パイプラインの評価
@@ -637,7 +637,7 @@ value in [1, 3, 5] >> matched.
 
 #### 式渡し（`Map (式)`）
 
-`Map`、`Filter`、`Sort`、`SortDesc`、`Group` は、本体が 1 つの式だけなら、`:` のブロックの代わりに丸括弧で書けます。式の中の `@`（または `as` の別名）が、各要素です。
+`Map`、`Filter`、`Count`、`Sort`、`SortDesc`、`Group` は、本体が 1 つの式だけなら、`:` のブロックの代わりに丸括弧で書けます。式の中の `@`（または `as` の別名）が、各要素です。
 
 ```
 [1, 2, 3, 4] >> Filter (@ % 2 == 0) >> evens.     // 本体が @ % 2 == 0 の Filter: と同じ
@@ -682,6 +682,19 @@ words >> Sort Lowercase >> sorted.
 [1, 2, 3, 4] >> Filter as value:
     value % 2 == 0.
 >> evens.
+```
+
+### `Count`
+
+`Count` は、ブロックが `Bool` の `true` を返した要素の**数**を、`Num` で返します。`Filter` のあとに `Length` をつなげたのと同じ意味です。本体が `Bool` 以外を返すと `TypeError`、空 `List` なら `0` です。
+
+```
+["kati", "tuka", "mimi", "su"] >> words.
+words >> Map Slice(-1, Length) >> lasts.       // 最後の 1 文字: ["i", "a", "i", "u"]
+lasts >> Count (@ == "i") >> verbs.            // 2
+words >> Count as w:
+    (w >> Length) > 2
+>> long_words.                                 // 3
 ```
 
 ### `Reduce`

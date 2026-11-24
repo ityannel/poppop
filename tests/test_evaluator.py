@@ -1034,3 +1034,21 @@ def test_migrate_keeps_the_meaning():
     old = '"x" >> Try {\n    @ >> Num.\n} Catch as err {\n    0.\n} >> r.'
     assert migrate_braces(old) == '"x" >> Try:\n    @ >> Num.\nCatch as err:\n    0.\n>> r.'
     assert migrate_braces("1 >> x.") == "1 >> x."
+
+
+def test_count_returns_how_many_items_match():
+    code = """
+["kati", "tuka", "mimi", "su", "rata", "piku", "nana"] >> words.
+words >> Map Slice(-1, Length) >> lasts.
+lasts >> Count (@ == "a") >> noun.
+lasts >> Count (@ == "i") >> verb.
+lasts >> Count (not (@ in ["a", "i"])) >> others.
+"NOUN: {noun} times. VERB: {verb} times. OTHERS: {others} times.".
+"""
+    assert run_code(code) == "NOUN: 3 times. VERB: 2 times. OTHERS: 2 times."
+    assert run_code("[] >> Count (@ > 1).") == 0
+    assert run_code("[1, 2, 3, 4] >> Count as n:\n    n % 2 == 0\n>> r.\nr.") == 2
+    is_even = "(n) >> pop IsEven:\n    n % 2 == 0\n\n"
+    assert run_code(is_even + "[1, 2, 3, 4, 6] >> Count IsEven.") == 3
+    expect_error("[1] >> Count (@).", "TypeError")
+    expect_error("5 >> Count (@ > 1).", "TypeError")

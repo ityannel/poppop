@@ -4,7 +4,7 @@ from .language_meta import KEYWORDS, SPECIAL_FORMS
 from .ast_nodes import *
 
 _KEYWORD_TOKEN_TYPES = {kw.upper() for kw in KEYWORDS}
-_SIMPLE_STREAM_NAMES = {"Map", "Filter", "Sort", "SortDesc", "Group"}
+_SIMPLE_STREAM_NAMES = {"Map", "Filter", "Count", "Sort", "SortDesc", "Group"}
 # `Map Name` の省略形で、処理名として書けない名前（ブロックや制御の形をもつもの）
 _NOT_SHORTHAND_NAMES = set(SPECIAL_FORMS) | {"Return", "Break"}
 

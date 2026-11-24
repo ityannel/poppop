@@ -4,7 +4,7 @@ const { maskNonCode } = require("./assignment-targets");
 
 const VARIABLE_IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\{/;
+const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\{/;
 
 function scanLines(text, callback) {
     const lines = text.split("\n");
