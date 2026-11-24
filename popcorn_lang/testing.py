@@ -120,7 +120,11 @@ async def run_test_source(source: str, path: str = "<source>", args: list[str] |
 
     evaluator = Evaluator()
     evaluator.script_args = list(args or [])
-    evaluator.source_path = path  # ファイルからの相対パス（import など）に使えるように
+    evaluator.source_path = path
+    # Use で読み込むファイルは、テストファイルからの相対パスで探す（Use があるとき）
+    module_loader = getattr(evaluator, "module_loader", None)
+    if module_loader is not None and path != "<source>":
+        evaluator.current_module = module_loader.resolve(path, None)
     try:
         await evaluator.eval(program, evaluator.global_env)
     except BaseException as exc:
