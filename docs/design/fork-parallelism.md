@@ -11,10 +11,9 @@
 `Fetch` を複数、同時に出して、待ち時間を重ねたい。
 
 ```
-urls >> Fork {
+urls >> Fork:
     "https://a.example" >> Fetch.
     "https://b.example" >> Fetch.
-}
 ```
 
 ## 崩れるもの
@@ -40,9 +39,8 @@ urls >> Fork {
 ### 案 B：選んだときだけ、並列にする
 
 ```
-urls >> Fork parallel {
+urls >> Fork parallel:
     ...
-}
 ```
 
 規則の案：

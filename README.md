@@ -8,9 +8,9 @@ PopCorn is a small, pipeline-oriented programming language. Values move from
 left to right through `>>`, and each statement ends with `.`.
 
 ```popcorn
-[1, 2, 3] >> Map {
+[1, 2, 3] >> Map:
     @ * 2.
-} >> doubled.
+>> doubled.
 
 doubled >> Display.
 ```

@@ -35,15 +35,17 @@ LESSONS = (
         "intro": "Mapは、リストの値を一つずつ同じルールで作り替えるよ。",
         "goal": "[1, 2, 3] の数字をそれぞれ2倍にしてください。",
         "starter": (
-            "[1, 2, 3] >> Map as number {\n"
+            "[1, 2, 3] >> Map as number:\n"
             "    number + 1.\n"
-            "} >> doubled.\n\n"
+            ">> doubled.\n"
+            "\n"
             "doubled >> Display."
         ),
         "solution": (
-            "[1, 2, 3] >> Map as number {\n"
+            "[1, 2, 3] >> Map as number:\n"
             "    number * 2.\n"
-            "} >> doubled.\n\n"
+            ">> doubled.\n"
+            "\n"
             "doubled >> Display."
         ),
         "hints": (
@@ -61,15 +63,17 @@ LESSONS = (
         "intro": "Filterは、条件に合う値だけを新しいリストへ集めるよ。",
         "goal": "[1, 2, 3, 4] から2と4だけを残してください。",
         "starter": (
-            "[1, 2, 3, 4] >> Filter as number {\n"
+            "[1, 2, 3, 4] >> Filter as number:\n"
             "    number > 2.\n"
-            "} >> evens.\n\n"
+            ">> evens.\n"
+            "\n"
             "evens >> Display."
         ),
         "solution": (
-            "[1, 2, 3, 4] >> Filter as number {\n"
+            "[1, 2, 3, 4] >> Filter as number:\n"
             "    number % 2 == 0.\n"
-            "} >> evens.\n\n"
+            ">> evens.\n"
+            "\n"
             "evens >> Display."
         ),
         "hints": (
@@ -87,15 +91,17 @@ LESSONS = (
         "intro": "Reduceは、これまでの結果と次の値を使って一つの答えを作るよ。",
         "goal": "[1, 2, 3, 4] を順番に足して、10にしてください。",
         "starter": (
-            "[1, 2, 3, 4] >> Reduce(1) as (acc, item) {\n"
+            "[1, 2, 3, 4] >> Reduce(1) as (acc, item):\n"
             "    acc * item.\n"
-            "} >> total.\n\n"
+            ">> total.\n"
+            "\n"
             "total >> Display."
         ),
         "solution": (
-            "[1, 2, 3, 4] >> Reduce(0) as (acc, item) {\n"
+            "[1, 2, 3, 4] >> Reduce(0) as (acc, item):\n"
             "    acc + item.\n"
-            "} >> total.\n\n"
+            ">> total.\n"
+            "\n"
             "total >> Display."
         ),
         "hints": (
@@ -113,17 +119,19 @@ LESSONS = (
         "intro": "Updateは、元の辞書を変えずに新しい内容の辞書を作るよ。",
         "goal": "scoreを15にして、activeにtrueを追加してください。",
         "starter": (
-            '{"name": "Ada", "score": 10} >> Update as user {\n'
-            "    11 >> user::score.\n"
-            "} >> updated.\n\n"
-            "updated >> Display."
+            '{"name": "Ada", "score": 10} >> Update as user:\n'
+            '    11 >> user::score.\n'
+            '>> updated.\n'
+            '\n'
+            'updated >> Display.'
         ),
         "solution": (
-            '{"name": "Ada", "score": 10} >> Update as user {\n'
-            "    15 >> user::score.\n"
-            "    true >> user::active.\n"
-            "} >> updated.\n\n"
-            "updated >> Display."
+            '{"name": "Ada", "score": 10} >> Update as user:\n'
+            '    15 >> user::score.\n'
+            '    true >> user::active.\n'
+            '>> updated.\n'
+            '\n'
+            'updated >> Display.'
         ),
         "hints": (
             "書き方は `新しい値 >> user::項目名.` の順番です。",
@@ -140,32 +148,29 @@ LESSONS = (
         "intro": "Checkは、条件を上から調べて最初に合った答えを選ぶよ。",
         "goal": "数字の2を、文字列のsmallに分類してください。",
         "starter": (
-            "2 >> Check as value {\n"
-            "    when value == 0 {\n"
+            "2 >> Check as value:\n"
+            "    when value == 0:\n"
             '        "zero".\n'
-            "    }\n"
-            "    else {\n"
+            "    else:\n"
             '        "unknown".\n'
-            "    }\n"
-            "} >> label.\n\n"
+            ">> label.\n"
+            "\n"
             "label >> Display."
         ),
         "solution": (
-            "2 >> Check as value {\n"
-            "    when value == 0 {\n"
+            "2 >> Check as value:\n"
+            "    when value == 0:\n"
             '        "zero".\n'
-            "    }\n"
-            "    when value in [1, 2, 3] {\n"
+            "    when value in [1, 2, 3]:\n"
             '        "small".\n'
-            "    }\n"
-            "    else {\n"
+            "    else:\n"
             '        "large".\n'
-            "    }\n"
-            "} >> label.\n\n"
+            ">> label.\n"
+            "\n"
             "label >> Display."
         ),
         "hints": (
-            "`when value in [1, 2, 3] { … }` なら、1、2、3のどれかに合うか調べられます。",
+            "`when value in [1, 2, 3]:` なら、1、2、3のどれかに合うか調べられます。",
             '新しいwhenの中に文字列の`"small"`を書いてみよう。',
         ),
         "expected": "small",
@@ -179,16 +184,16 @@ LESSONS = (
         "intro": "`pop`を使って、二つの数字を足す自分の関数を作ってみよう。",
         "goal": "AddTwoで10と20を足し、30を作ってください。",
         "starter": (
-            "(left, right) >> pop AddTwo {\n"
+            "(left, right) >> pop AddTwo:\n"
             "    left - right.\n"
-            "}\n\n"
+            "\n"
             "10 >> AddTwo(20) >> total.\n"
             "total >> Display."
         ),
         "solution": (
-            "(left, right) >> pop AddTwo {\n"
+            "(left, right) >> pop AddTwo:\n"
             "    left + right.\n"
-            "}\n\n"
+            "\n"
             "10 >> AddTwo(20) >> total.\n"
             "total >> Display."
         ),
@@ -207,17 +212,19 @@ LESSONS = (
         "intro": "Loopで数字を一つずつ増やし、Breakと後置whenで安全に止めてみよう。",
         "goal": "0から始めて、5になったところで止めてください。",
         "starter": (
-            "0 >> Loop as state {\n"
+            "0 >> Loop as state:\n"
             "    state >> Break when state >= 3.\n"
             "    state + 1.\n"
-            "} >> result.\n\n"
+            ">> result.\n"
+            "\n"
             "result >> Display."
         ),
         "solution": (
-            "0 >> Loop as state {\n"
+            "0 >> Loop as state:\n"
             "    state >> Break when state >= 5.\n"
             "    state + 1.\n"
-            "} >> result.\n\n"
+            ">> result.\n"
+            "\n"
             "result >> Display."
         ),
         "hints": (

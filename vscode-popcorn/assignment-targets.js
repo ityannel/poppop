@@ -153,3 +153,5 @@ function findFinalAssignmentTargetOffsets(text) {
 }
 
 module.exports = { findFinalAssignmentTargetOffsets, maskNonCode };
+// `:` のブロックで書いたテキストも、解析できるようにする（layout-view.js）
+module.exports = require("./layout-view").wrapExports(module.exports, ["findFinalAssignmentTargetOffsets"]);

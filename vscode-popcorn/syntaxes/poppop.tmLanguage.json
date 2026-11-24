@@ -52,7 +52,7 @@
         },
         {
           "name": "support.function.builtin.popcorn",
-          "match": "\\b(Display|Input|ReadFile|WriteFile|Fetch|PostFetch|HttpRequest|Set|Remove|Keys|Values|Entries|Merge|Num|Str|Bool|List|Dict|Type|Sleep|Add|Div|Sum|Max|Min|Average|Round|Abs|Length|Reverse|Uppercase|Lowercase|Split|Replace|Join|Get|Contains|Append|Slice|Format|Now|Random|ToJson|FromJson|Array|Range|Return|Break|Debug|Throw|Update|Map|Filter|Reduce|Zip|Loop|Fork|Sort|SortDesc|Group|Check|Try|Catch)\\b"
+          "match": "\\b(Display|Input|ReadFile|WriteFile|Fetch|PostFetch|HttpRequest|Set|Remove|Keys|Values|Entries|Merge|Num|Str|Bool|List|Dict|Type|Sleep|Add|Div|Sum|Max|Min|Average|Round|Abs|Length|Reverse|Uppercase|Lowercase|Split|Replace|Join|Get|Contains|Append|Slice|Format|Now|Random|ToJson|FromJson|Array|Range|Return|Break|Debug|Throw|Update|Map|Filter|Count|Reduce|Zip|Loop|Fork|Sort|SortDesc|Group|Check|Try|Catch)\\b"
         },
         {
           "name": "constant.language.popcorn",

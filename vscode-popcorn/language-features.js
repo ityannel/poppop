@@ -5,8 +5,8 @@ const { findImplicitVariableScopeRanges, findVariableReferenceOffsets, variableA
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
-const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
-const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
+const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
+const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
     "and", "as", "else", "false", "in", "not", "null", "or", "pop", "true", "when"
 ]);
@@ -92,6 +92,7 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Throw: { description: "指定した内容で UserError を発生させます。", output: "エラー" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
+    Count: { description: "条件に合う配列要素の数を返します。", output: "数値" },
     Reduce: { description: "配列を 1 つの値へ集約します。", output: "要素" },
     Zip: { description: "複数の配列を位置ごとにまとめます。", output: "配列" },
     Loop: { description: "状態値を Break まで繰り返し更新します。", output: "式" },
@@ -504,7 +505,7 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = /(?:>>\s*(Map|Filter|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
     if (!match) return undefined;
     const stream = match[1] || match[2];
     const paramText = match[3] || match[4] || "";
@@ -760,6 +761,7 @@ function typeMismatchDiagnostic(inputType, functionName, start, length) {
         Entries: ["辞書"],
         Map: ["配列"],
         Filter: ["配列"],
+        Count: ["配列"],
         Reduce: ["配列"],
         Group: ["配列"],
         Zip: ["配列"]
@@ -992,14 +994,22 @@ function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
     const state = { inBlockComment: false };
+    // "block" は { }、数は `:` の字下げブロック（見出しの行の、元の字下げ）
     const stack = [];
+    const popBrace = () => {
+        while (stack.length && stack[stack.length - 1] !== "block") stack.pop();
+        stack.pop();
+    };
     const formatted = rawLines.map(rawLine => {
         const trimmed = rawLine.trim();
         if (!trimmed) return "";
 
         const trimmedCode = maskNonCode(trimmed, state);
+        // `:` で始めた字下げブロックは、元の字下げが見出しの行と同じか浅くなったら閉じる
+        const rawIndent = rawLine.length - rawLine.trimStart().length;
+        while (stack.length && stack[stack.length - 1] !== "block" && rawIndent <= stack[stack.length - 1]) stack.pop();
         const startsWithClose = /^\}/.test(trimmedCode);
-        if (startsWithClose) stack.pop();
+        if (startsWithClose) popBrace();
 
         const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
         const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
@@ -1011,15 +1021,16 @@ function formatDocument(text, indentSize = 4) {
         if (netOpens > 0) {
             for (let i = 0; i < netOpens; i += 1) stack.push("block");
         } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) stack.pop();
+            for (let i = 0; i < -netOpens; i += 1) popBrace();
         }
+        if (/:\s*$/.test(lineCode)) stack.push(rawIndent);
 
         return line;
     });
     return formatted.join(eol);
 }
 
-module.exports = {
+const exported = {
     analyzeDocument,
     findUpdatePropertyOffsets,
     findUpdateScopeRanges,
@@ -1044,3 +1055,9 @@ module.exports = {
     tokenAtOffset,
     typeFlowSummary
 };
+// `:` のブロックで書いたテキストも、解析できるようにする（layout-view.js）。整形は、元のテキストのまま
+const LAYOUT_NEUTRAL = new Set(["formatDocument", "isVariableName", "typeFlowSummary"]);
+module.exports = require("./layout-view").wrapExports(
+    exported,
+    Object.keys(exported).filter(name => typeof exported[name] === "function" && !LAYOUT_NEUTRAL.has(name))
+);

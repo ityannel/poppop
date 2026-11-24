@@ -51,9 +51,9 @@ def test_legacy_error_pipeline_is_rejected():
 def test_readme_map_pipeline():
     res = run_code(
         """
-        [1, 2, 3] >> Map {
+        [1, 2, 3] >> Map:
             @ * 2.
-        } >> doubled.
+        >> doubled.
         doubled.
         """
     )
@@ -61,15 +61,15 @@ def test_readme_map_pipeline():
 
 
 def test_inline_map_pipeline():
-    assert run_code("[1, 2, 3] >> Map as x { x * 2. } >> doubled. doubled.") == [2, 4, 6]
+    assert run_code("[1, 2, 3] >> Map as x:\n    x * 2.\n>> doubled. doubled.") == [2, 4, 6]
 
 
 def test_named_map_pipeline():
     res = run_code(
         """
-        [1, 2, 3] >> Map as value {
+        [1, 2, 3] >> Map as value:
             value * 2.
-        } >> doubled.
+        >> doubled.
         doubled.
         """
     )
@@ -79,9 +79,9 @@ def test_named_map_pipeline():
 def test_filter_pipeline():
     res = run_code(
         """
-        [1, 2, 3, 4] >> Filter {
+        [1, 2, 3, 4] >> Filter:
             @ % 2 == 0.
-        } >> evens.
+        >> evens.
         evens.
         """
     )
@@ -89,18 +89,18 @@ def test_filter_pipeline():
 
 
 def test_reduce_with_and_without_initial_value():
-    assert run_code("[1, 2, 3, 4] >> Reduce(0) as (acc, item) { acc + item. }") == 10
-    assert run_code("[] >> Reduce(42) as (acc, item) { acc + item. }") == 42
-    assert run_code("[1, 2, 3, 4] >> Reduce as (acc, item) { acc + item. }") == 10
-    assert run_code("[1, 2, 3, 4] >> Reduce { @[0] + @[1]. }") == 10
-    expect_error("[] >> Reduce as (acc, item) { acc + item. }", "RuntimeError")
+    assert run_code("[1, 2, 3, 4] >> Reduce(0) as (acc, item):\n    acc + item.") == 10
+    assert run_code("[] >> Reduce(42) as (acc, item):\n    acc + item.") == 42
+    assert run_code("[1, 2, 3, 4] >> Reduce as (acc, item):\n    acc + item.") == 10
+    assert run_code("[1, 2, 3, 4] >> Reduce:\n    @[0] + @[1].") == 10
+    expect_error("[] >> Reduce as (acc, item):\n    acc + item.", "RuntimeError")
 
 
 def test_zip_builtin_and_pipe_extra_args():
     assert run_code("([1, 2], [10, 20]) >> Zip.") == [[1, 10], [2, 20]]
     assert run_code("[1, 2] >> Zip([10, 20]).") == [[1, 10], [2, 20]]
     assert (
-        run_code("([1, 2], [10, 20]) >> Zip >> Map as (a, b) { a + b. }")
+        run_code("([1, 2], [10, 20]) >> Zip >> Map as (a, b):\n    a + b.")
         == [11, 22]
     )
 
@@ -113,17 +113,17 @@ def test_sort_and_sort_desc():
         {"name": "Cara", "score": 20}
     ] >> users.
     """
-    asc = run_code(code + "users >> Sort as u { u::score. }")
+    asc = run_code(code + "users >> Sort as u:\n        u::score.")
     assert [u["name"] for u in asc] == ["Bob", "Ada", "Cara"]
 
-    desc = run_code(code + "users >> SortDesc as u { u::score. }")
+    desc = run_code(code + "users >> SortDesc as u:\n        u::score.")
     assert [u["name"] for u in desc] == ["Ada", "Cara", "Bob"]
 
-    by_name_desc = run_code(code + "users >> SortDesc as u { u::name. }")
+    by_name_desc = run_code(code + "users >> SortDesc as u:\n        u::name.")
     assert [u["name"] for u in by_name_desc] == ["Cara", "Bob", "Ada"]
 
-    expect_error('[1, "a"] >> Sort { @. }', "RuntimeError")
-    expect_error("[true, false] >> Sort { @. }", "RuntimeError")
+    expect_error('[1, "a"] >> Sort:\n    @.', "RuntimeError")
+    expect_error("[true, false] >> Sort:\n    @.", "RuntimeError")
 
 
 def test_group_pipeline():
@@ -133,36 +133,34 @@ def test_group_pipeline():
             {"team": "red", "name": "A"},
             {"team": "blue", "name": "B"},
             {"team": "red", "name": "C"}
-        ] >> Group as member {
+        ] >> Group as member:
             member::team.
-        } >> teams.
+        >> teams.
         teams.
         """
     )
     assert list(res.keys()) == ["red", "blue"]
     assert [entry["name"] for entry in res["red"]] == ["A", "C"]
     assert [entry["name"] for entry in res["blue"]] == ["B"]
-    expect_error("[1, 2] >> Group as value { [value]. }", "TypeError")
+    expect_error("[1, 2] >> Group as value:\n    [value].", "TypeError")
 
 
 def test_fork_unlabeled_and_labeled():
     assert (
         run_code(
             """
-            [1, 2, 3] >> Fork {
+            [1, 2, 3] >> Fork:
                 @ >> Sum.
                 @ >> Max.
-            }
             """
         )
         == [6, 3]
     )
     stats = run_code(
         """
-        [1, 2, 3] >> Fork as values {
+        [1, 2, 3] >> Fork as values:
             total: values >> Sum.
             max:   values >> Max.
-        }
         """
     )
     assert stats == {"total": 6, "max": 3}
@@ -172,22 +170,22 @@ def test_fork_unlabeled_and_labeled():
 def test_update_pipeline():
     res = run_code(
         """
-        {"name": "Ada", "score": 10} >> Update as user {
+        {"name": "Ada", "score": 10} >> Update as user:
             15 >> user::score.
             user::score * 2 >> user::double.
             true >> user::active.
-        }
         """
     )
     assert res == {"name": "Ada", "score": 15, "double": 30, "active": True}
-    expect_error('{"score": 10} >> Update { @::score >> 15. }', "RuntimeError")
+    expect_error('{"score": 10} >> Update:\n    @::score >> 15.', "RuntimeError")
 
 
 def test_dictionary_access_and_error_types():
     assert run_code('{"name": "PopCorn"} >> project. project::name.') == "PopCorn"
     expect_error('{"name": "PopCorn"} >> p. p::missing.', "KeyError")
     expect_error("[1, 2] >> xs. xs[5].", "IndexError")
-    expect_error("[1, 2] >> xs. xs[-1].", "IndexError")
+    assert run_code("[1, 2] >> xs. xs[-1].") == 2
+    expect_error("[1, 2] >> xs. xs[-3].", "IndexError")
     expect_error("[1, 2] >> xs. xs[1.5].", "TypeError")
     expect_error('[1, 2] >> xs. xs["a"].', "TypeError")
     expect_error('{"a": 1} >> d. d[0].', "TypeError")
@@ -204,18 +202,16 @@ def test_tuple_vs_list_semantics():
     assert run_code("(1, 2) >> Str.") == "(1, 2)"
 
     code = """
-    (left, right) >> pop AddTwo {
+    (left, right) >> pop AddTwo:
         left + right.
-    }
     """
     assert run_code(code + "(10, 20) >> AddTwo.") == 30
     assert run_code(code + "10 >> AddTwo(20).") == 30
     expect_error(code + "[10, 20] >> AddTwo.", "RuntimeError")
 
     single = """
-    (items) >> pop Head {
+    (items) >> pop Head:
         items[0].
-    }
     [10, 20] >> Head.
     """
     assert run_code(single) == 10
@@ -229,17 +225,16 @@ def test_pipe_extra_arguments_chain():
 
 def test_at_resets_across_statements_in_block():
     code = """
-    [5] >> Map {
+    [5] >> Map:
         @ * 2 >> doubled.
         @ + doubled.
-    }
     """
     assert run_code(code) == [15]
 
 
 def test_parenthesized_pipeline_in_expression():
     assert run_code("([1, 2] >> Length) + 1.") == 3
-    assert run_code("[10] >> Map { ([1, 2] >> Length) + @. }") == [12]
+    assert run_code("[10] >> Map:\n    ([1, 2] >> Length) + @.") == [12]
 
 
 def test_unified_num_type_str_and_json():
@@ -259,7 +254,7 @@ def test_unified_num_type_str_and_json():
     assert run_code('{"name": "Ada", "age": 30} >> Str.') == '{"name": "Ada", "age": 30}'
     assert run_code("(1, 2) >> Str.") == "(1, 2)"
     assert run_code("[1, 2, 3] >> ToJson.") == "[1, 2, 3]"
-    assert run_code('"[1, 2.5]" >> FromJson >> Map { @ >> Type. }') == ["Num", "Num"]
+    assert run_code('"[1, 2.5]" >> FromJson >> Map:\n    @ >> Type.') == ["Num", "Num"]
 
     # Int builtin is removed
     expect_error('"42" >> Int.', "NameError")
@@ -311,8 +306,8 @@ def test_in_operator_and_strict_bool():
     assert run_code("true or missing.") is True
     expect_error("1 and true.", "TypeError")
     expect_error("not 0.", "TypeError")
-    expect_error("[1] >> Filter { @. }", "TypeError")
-    expect_error('1 >> Check { when @ { "yes". } else { "no". } }', "TypeError")
+    expect_error("[1] >> Filter:\n    @.", "TypeError")
+    expect_error('1 >> Check:\n    when @:\n        "yes".\n    else:\n        "no".', "TypeError")
 
 
 def test_new_collection_builtins():
@@ -328,7 +323,13 @@ def test_new_collection_builtins():
     assert run_code("[10, 20, 30, 40] >> Slice(1, 3).") == [20, 30]
     assert run_code("[10, 20, 30, 40] >> Slice(2).") == [10, 20]
     assert run_code('"PopCorn" >> Slice(0, 3).') == "Pop"
-    expect_error("[1, 2, 3] >> Slice(-1, 2).", "IndexError")
+    # 負の添字は、うしろから数える
+    assert run_code("[1, 2, 3] >> Slice(-1).") == [1, 2]
+    assert run_code('"hello" >> Slice(-3, -1).') == "ll"
+    assert run_code("[1, 2, 3] >> Slice(-2, 3).") == [2, 3]
+    assert run_code("[1, 2, 3] >> Slice(-3).") == []
+    expect_error("[1, 2, 3] >> Slice(-4).", "IndexError")
+    expect_error("[1, 2, 3] >> Slice(-1, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(2, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(0, 5).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(0.5, 2).", "TypeError")
@@ -350,10 +351,10 @@ def test_postfix_when_and_loop():
     assert (
         run_code(
             """
-            (0, 0) >> Loop as (count, total) {
+            (0, 0) >> Loop as (count, total):
                 total >> Break when count >= 5.
                 (count + 1, total + count).
-            } >> result.
+            >> result.
             result.
             """
         )
@@ -364,10 +365,9 @@ def test_postfix_when_and_loop():
     assert (
         run_code(
             """
-            (items) >> pop FirstOrSelf {
+            (items) >> pop FirstOrSelf:
                 items >> Return when (items >> Length) <= 1.
                 items[0].
-            }
             [42] >> FirstOrSelf.
             """
         )
@@ -376,10 +376,9 @@ def test_postfix_when_and_loop():
     assert (
         run_code(
             """
-            (items) >> pop FirstOrSelf {
+            (items) >> pop FirstOrSelf:
                 items >> Return when (items >> Length) <= 1.
                 items[0].
-            }
             [10, 20] >> FirstOrSelf.
             """
         )
@@ -391,20 +390,15 @@ def test_check_block():
     assert (
         run_code(
             """
-            2 >> Check as value {
-                when value == 0 {
+            2 >> Check as value:
+                when value == 0:
                     "zero".
-                }
-                when value in [1, 2, 3] {
+                when value in [1, 2, 3]:
                     "small".
-                }
-                when value >= 4 {
+                when value >= 4:
                     "large".
-                }
-                else {
+                else:
                     value >> Str.
-                }
-            }
             """
         )
         == "small"
@@ -415,11 +409,10 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "abc" >> Try {
+            "abc" >> Try:
                 @ >> Num.
-            } Catch as err {
+            Catch as err:
                 [err::type, err::message].
-            }
             """
         )[0]
         == "TypeError"
@@ -427,11 +420,10 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "42" >> Try {
+            "42" >> Try:
                 @ >> Num.
-            } Catch as err {
+            Catch as err:
                 0.
-            }
             """
         )
         == 42
@@ -439,11 +431,10 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            "boom" >> Try {
+            "boom" >> Try:
                 @ >> Throw.
-            } Catch as err {
+            Catch as err:
                 err::type + ":" + err::message.
-            }
             """
         )
         == "UserError:boom"
@@ -451,13 +442,11 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            (x) >> pop Early {
-                x >> Try {
+            (x) >> pop Early:
+                x >> Try:
                     99 >> Return.
-                } Catch as err {
+                Catch as err:
                     -1.
-                }
-            }
             1 >> Early.
             """
         )
@@ -466,13 +455,11 @@ def test_try_and_catch():
     assert (
         run_code(
             """
-            0 >> Loop {
-                @ >> Try {
+            0 >> Loop:
+                @ >> Try:
                     7 >> Break.
-                } Catch as err {
+                Catch as err:
                     -1.
-                }
-            }
             """
         )
         == 7
@@ -484,9 +471,8 @@ def test_functions_closures_mutual_recursion_and_return():
         run_code(
             """
             10 >> base.
-            (x) >> pop AddBase {
+            (x) >> pop AddBase:
                 x + base.
-            }
             999 >> base.
             5 >> AddBase.
             """
@@ -496,14 +482,12 @@ def test_functions_closures_mutual_recursion_and_return():
     assert (
         run_code(
             """
-            (n) >> pop IsEven {
+            (n) >> pop IsEven:
                 true >> Return when n == 0.
                 (n - 1) >> IsOdd.
-            }
-            (n) >> pop IsOdd {
+            (n) >> pop IsOdd:
                 false >> Return when n == 0.
                 (n - 1) >> IsEven.
-            }
             6 >> IsEven.
             """
         )
@@ -512,19 +496,14 @@ def test_functions_closures_mutual_recursion_and_return():
     assert (
         run_code(
             """
-            (value, min, max) >> pop Clamp {
-                value >> Check {
-                    when @ < min {
+            (value, min, max) >> pop Clamp:
+                value >> Check:
+                    when @ < min:
                         min >> Return.
-                    }
-                    when @ > max {
+                    when @ > max:
                         max >> Return.
-                    }
-                    else {
+                    else:
                         @.
-                    }
-                }
-            }
             150 >> Clamp(0, 100).
             """
         )
@@ -533,13 +512,11 @@ def test_functions_closures_mutual_recursion_and_return():
     assert (
         run_code(
             """
-            (xs) >> pop FindNeg {
-                xs >> Map as x {
+            (xs) >> pop FindNeg:
+                xs >> Map as x:
                     x >> Return when x < 0.
                     x.
-                }
                 0.
-            }
             [1, 2, -5, 4] >> FindNeg.
             """
         )
@@ -637,14 +614,13 @@ def test_set_is_non_destructive():
 
 
 def test_optional_trailing_dot_in_blocks_evaluates():
-    assert run_code("[1, 2, 3] >> Map as x { x * 2 }") == [2, 4, 6]
-    assert run_code("[1, 2, 3] >> Map as x { x * 2 >> y. y + 1 }") == [3, 5, 7]
+    assert run_code("[1, 2, 3] >> Map as x:\n    x * 2") == [2, 4, 6]
+    assert run_code("[1, 2, 3] >> Map as x:\n    x * 2 >> y. y + 1") == [3, 5, 7]
     assert (
         run_code(
             """
-            (a, b) >> pop Add {
+            (a, b) >> pop Add:
                 a + b
-            }
             10 >> Add(20).
             """
         )
@@ -653,17 +629,13 @@ def test_optional_trailing_dot_in_blocks_evaluates():
     assert (
         run_code(
             """
-            2 >> Check as v {
-                when v == 0 {
+            2 >> Check as v:
+                when v == 0:
                     "zero"
-                }
-                when v in [1, 2, 3] {
+                when v in [1, 2, 3]:
                     "small"
-                }
-                else {
+                else:
                     "other"
-                }
-            }
             """
         )
         == "small"
@@ -672,21 +644,17 @@ def test_optional_trailing_dot_in_blocks_evaluates():
     assert (
         run_code(
             """
-            (n) >> pop Classify {
-                n >> Check {
-                    when @ > 0 {
+            (n) >> pop Classify:
+                n >> Check:
+                    when @ > 0:
                         "huge" >> Return when @ > 100.
                         "positive"
-                    }
-                    when @ == 0 {
+                    when @ == 0:
                         "zero"
-                    }
-                    else {
+                    else:
                         "negative"
-                    }
-                }
-            }
-            [200, 5, 0, -3] >> Map as x { x >> Classify }
+            [200, 5, 0, -3] >> Map as x:
+                x >> Classify
             """
         )
         == ["huge", "positive", "zero", "negative"]
@@ -694,10 +662,9 @@ def test_optional_trailing_dot_in_blocks_evaluates():
     assert (
         run_code(
             """
-            [1, 2, 3] >> Fork as xs {
+            [1, 2, 3] >> Fork as xs:
                 total: xs >> Sum.
                 max: xs >> Max
-            }
             """
         )
         == {"total": 6, "max": 3}
@@ -705,9 +672,8 @@ def test_optional_trailing_dot_in_blocks_evaluates():
     assert (
         run_code(
             """
-            {"score": 10} >> Update as u {
+            {"score": 10} >> Update as u:
                 u::score + 5 >> u::score
-            }
             """
         )
         == {"score": 15}
@@ -715,10 +681,9 @@ def test_optional_trailing_dot_in_blocks_evaluates():
     assert (
         run_code(
             """
-            (0, 0) >> Loop as (count, total) {
+            (0, 0) >> Loop as (count, total):
                 total >> Break when count >= 5.
                 (count + 1, total + count)
-            }
             """
         )
         == 10
@@ -756,68 +721,72 @@ def test_odd_check_and_wraparound_idioms_with_negative_numbers():
 
 
 def test_update_accepts_a_pipeline_on_the_left_side():
-    assert run_code('{"name": "ada", "score": 1} >> Update as user { user::name >> Uppercase >> user::name. } >> u. u.') == {"name": "ADA", "score": 1}
-    assert run_code('{"name": "ada"} >> Update { @::name >> Uppercase >> @::name. } >> u. u.') == {"name": "ADA"}
-    assert run_code('{"n": 2} >> Update as d { d::n >> Add(5) >> d::n. d::n >> Add(1) >> d::n. } >> u. u.') == {"n": 8}
-    assert run_code('{"score": 1} >> Update as user { 15 >> user::score. } >> u. u.') == {"score": 15}
+    assert run_code('{"name": "ada", "score": 1} >> Update as user:\n    user::name >> Uppercase >> user::name.\n>> u. u.') == {"name": "ADA", "score": 1}
+    assert run_code('{"name": "ada"} >> Update:\n    @::name >> Uppercase >> @::name.\n>> u. u.') == {"name": "ADA"}
+    assert run_code('{"n": 2} >> Update as d:\n    d::n >> Add(5) >> d::n. d::n >> Add(1) >> d::n.\n>> u. u.') == {"n": 8}
+    assert run_code('{"score": 1} >> Update as user:\n    15 >> user::score.\n>> u. u.') == {"score": 15}
 
 
 def test_update_rejects_a_target_that_is_not_a_field():
-    expect_error('{"n": 1} >> Update as d { 5 >> d. } >> u.', "RuntimeError")
+    expect_error('{"n": 1} >> Update as d:\n    5 >> d.\n>> u.', "RuntimeError")
 
 
 def test_check_branches_use_braces():
     code = """
-    2 >> Check as value {
-        when value == 0 { "zero". }
-        when value in [1, 2, 3] { "small" }
-        else { "large" }
-    } >> label.
+    2 >> Check as value:
+        when value == 0:
+            "zero".
+        when value in [1, 2, 3]:
+            "small"
+        else:
+            "large"
+    >> label.
     label.
     """
     assert run_code(code) == "small"
 
 
-def test_check_with_the_old_colon_form_explains_the_new_shape():
-    for code in ('1 >> Check { when @ == 1: "yes". else { "no". } }', '1 >> Check { when @ == 1 { "yes". } else: "no". }'):
+def test_check_branches_may_use_a_colon_body():
+    # `:` の本体は、その行の終わりまで（次の行の字下げが深ければ、そこまで）
+    assert run_code('2 >> Check:\n    when @ == 1:\n        "yes".\n    else: "no".') == "no"
+    code = """
+2 >> Check as value:
+    when value == 0:
+        "zero".
+    when value in [1, 2, 3]:
+        "small".
+    else:
+        "large".
+>> label.
+label.
+"""
+    assert run_code(code) == "small"
+
+
+def test_colon_body_must_not_share_its_line_with_the_next_branch():
+    for code, message in (
+        ('1 >> Check:\n    when @ == 1: "yes" else: "no"', "start 'else' on a new line"),
+        ('5 >> Check: when @ > 1: "a" else: "b"', "on the next line"),
+    ):
         try:
             run_code(code)
         except Exception as exc:
-            assert "Check branches use braces" in str(exc), str(exc)
+            assert message in str(exc), str(exc)
         else:
-            raise AssertionError("old Check form must be rejected")
-def test_the_three_string_kinds_in_programs():
-    assert run_code('"Ada" >> name. "Hi {name}!".') == "Hi Ada!"
-    assert run_code("'Hi {name}!'.") == "Hi {name}!"
-    assert run_code(r"`C:\temp\new`.") == r"C:\temp\new"
-    assert run_code(r"'tab\there'.") == "tab\there"
-    assert run_code('"{{literal}} {1 + 2}".') == "{literal} 3"
-    assert run_code("'{{x}}'.") == "{{x}}"
-    assert run_code(r"`a\nb` >> Length.") == 4
-def test_process_name_alone_applies_to_the_current_value():
-    # ブロックの中では、@ はその値。文の先頭に処理名だけを書くと、@ に適用される
-    assert run_code('[[1, 2], [3]] >> Map { Length. }') == [2, 1]
-    # 式の中でも、同じ（(@ >> Length) + 1）
-    assert run_code('[[1, 2], [3]] >> Map { Length + 1. }') == [3, 2]
-    assert run_code('["a", "bb"] >> Map { Length * 10. }') == [10, 20]
-    # プログラムの最初の @ は null
-    assert run_code("Type.") == "Null"
-    # 補間の中でも
-    assert run_code('["ab"] >> Map { "{Length}". }') == ["2"]
+            raise AssertionError("one-line colon branches must be rejected")
 
 
 def test_return_and_break_can_stand_alone_with_when():
     code = """
-    pop First {
+    pop First:
         Return when @ == 0.
         99.
-    }
     0 >> First >> a.
     5 >> First >> b.
     [a, b].
     """
     assert run_code(code) == [0, 99]
-    assert run_code("0 >> Loop as n { Break when n >= 3. n + 1. }") == 3
+    assert run_code("0 >> Loop as n:\n    Break when n >= 3. n + 1.") == 3
 
 
 def test_block_forms_still_need_the_pipe_and_a_block():
@@ -830,8 +799,10 @@ def test_block_forms_still_need_the_pipe_and_a_block():
 
 def test_user_defined_process_can_stand_alone_too():
     code = """
-    pop Double { @ * 2. }
-    [1, 2, 3] >> Map { Double. }
+    pop Double:
+        @ * 2.
+    [1, 2, 3] >> Map:
+        Double.
     """
     assert run_code(code) == [2, 4, 6]
 def test_math_standard_functions():
@@ -943,21 +914,179 @@ def test_new_standard_functions_are_documented():
 def test_retry_recipe_from_the_spec_works():
     # 仕様書の「やり直す」と同じ形（通信の代わりに、2 回失敗してから成功する処理）
     recipe = '''
-    (0, null) >> Loop as (attempt, last) {
+    (0, null) >> Loop as (attempt, last):
         last >> Break when last != null.
         null >> Break when attempt >= LIMIT.
-        attempt >> Try {
-            @ >> Check as n {
-                when n < FAILS { "boom" >> Throw. }
-                else { "ok". }
-            }
-        } Catch {
+        attempt >> Try:
+            @ >> Check as n:
+                when n < FAILS:
+                    "boom" >> Throw.
+                else:
+                    "ok".
+        Catch:
             null.
-        } >> response.
+        >> response.
         (attempt + 1, response).
-    } >> result.
+    >> result.
     result.
     '''
     assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "2")) == "ok"      # 2 回失敗して、3 回目で成功
     assert run_code(recipe.replace("LIMIT", "2").replace("FAILS", "5")) is None      # 上限に達して、あきらめる
     assert run_code(recipe.replace("LIMIT", "5").replace("FAILS", "0")) == "ok"      # 1 回目で成功
+
+
+FIZZBUZZ_COLON = """
+(num) >> pop FizzBuzz:
+    num >> Check:
+        when num % 15 == 0: "FizzBuzz"
+        when num % 3 == 0: "Fizz"
+        when num % 5 == 0: "Buzz"
+        else: num
+
+(1, 20) >> Range >> Map (@ >> FizzBuzz) >> result.
+result.
+"""
+
+FIZZBUZZ_EXPECTED = [
+    1, 2, "Fizz", 4, "Buzz", "Fizz", 7, 8, "Fizz", "Buzz",
+    11, "Fizz", 13, 14, "FizzBuzz", 16, 17, "Fizz", 19, "Buzz",
+]
+
+
+def test_fizzbuzz_with_colon_bodies_and_a_parenthesized_map():
+    assert run_code(FIZZBUZZ_COLON) == FIZZBUZZ_EXPECTED
+
+
+def test_process_name_body_applies_the_process_to_each_item():
+    # 処理名渡し: Map FizzBuzz は Map { @ >> FizzBuzz } と同じ
+    code = FIZZBUZZ_COLON.replace("Map (@ >> FizzBuzz)", "Map FizzBuzz")
+    assert run_code(code) == FIZZBUZZ_EXPECTED
+
+
+def test_short_stream_bodies():
+    is_even = "(n) >> pop IsEven:\n    n % 2 == 0\n\n"
+    assert run_code(is_even + "[1, 2, 3, 4] >> Filter IsEven.") == [2, 4]
+    assert run_code("[1, 2, 3, 4] >> Filter (@ % 2 == 0).") == [2, 4]
+    assert run_code("[1, 2] >> Map as x (x * 10).") == [10, 20]
+    assert run_code('[{"a": 1}, {"a": 2}] >> Map Get("a").') == [1, 2]
+    assert run_code("[[1, 2], [3]] >> Map Length.") == [2, 1]
+    assert run_code('["b", "C", "a"] >> Sort Lowercase.') == ["a", "b", "C"]
+    assert run_code("[1, 2, 3] >> Reduce Add.") == 6
+    assert run_code("[1, 2, 3] >> Reduce(10) Add.") == 16
+
+
+def test_process_name_body_rejects_block_forms():
+    for code in ("[1] >> Map Check.", "[1] >> Filter Return."):
+        try:
+            run_code(code)
+        except Exception as exc:
+            assert "process-name body" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"must be rejected: {code}")
+
+
+def test_colon_bodies_for_every_block_form():
+    assert run_code("[1, 2] >> Map as x:\n    x * 3\n>> Sum >> t.\nt + 1.") == 10
+    assert run_code('0 >> Try:\n    1 >> Get(5)\nCatch as e:\n    e::type\n>> r.\nr.') == "TypeError"
+    assert run_code("[1, 2] >> Fork:\n    a: Sum.\n    b: Length\n>> r.\nr.") == {"a": 3, "b": 2}
+    assert run_code('{"n": 1} >> Update as d:\n    2 >> d::n\n>> r.\nr.') == {"n": 2}
+    loop = "0 >> Loop as i:\n    i >> Break when i >= 3.\n    i + 1\n>> r.\nr."
+    assert run_code(loop) == 3
+
+
+def test_colon_body_ends_at_a_shallower_line_and_inside_brackets():
+    code = """
+(xs) >> pop Total:
+    xs >> Reduce(0) as (acc, x):
+        acc + x
+
+[
+1, 2,
+3
+] >> Total >> r.
+r.
+"""
+    assert run_code(code) == 6
+    assert run_code("[1, 2] >> Map (@ >> Check:\n    when @ == 1: \"one\"\n    else: \"other\") >> r.\nr.") == ["one", "other"]
+
+
+def test_colon_body_needs_something_after_the_colon():
+    try:
+        run_code("(n) >> pop F:\n(1) >> Display.")
+    except Exception as exc:
+        assert "Expected an indented body" in str(exc), str(exc)
+    else:
+        raise AssertionError("empty colon body must be rejected")
+
+
+def test_brace_blocks_are_gone_but_dict_braces_stay():
+    for code in ("[1] >> Map { @ }.", "(n) >> pop F { n }", "1 >> Check { when @ == 1: 1\n else: 2 }"):
+        try:
+            run_code(code)
+        except Exception as exc:
+            assert "not braces" in str(exc), str(exc)
+        else:
+            raise AssertionError(f"brace block must be rejected: {code}")
+    assert run_code('{"a": {"b": 1}} >> d. d::a::b.') == 1
+    assert run_code('[{"a": 1}] >> Map (@::a).') == [1]
+
+
+def test_migrate_keeps_the_meaning():
+    from popcorn_lang.migrate import migrate_braces
+    old = 'x >> Check { when @ < 0 { "n" } else { "p" } } >> s.'
+    assert migrate_braces(old) == 'x >> Check:\n    when @ < 0:\n        "n"\n    else:\n        "p"\n>> s.'
+    old = '"x" >> Try {\n    @ >> Num.\n} Catch as err {\n    0.\n} >> r.'
+    assert migrate_braces(old) == '"x" >> Try:\n    @ >> Num.\nCatch as err:\n    0.\n>> r.'
+    assert migrate_braces("1 >> x.") == "1 >> x."
+
+
+def test_count_returns_how_many_items_match():
+    code = """
+["kati", "tuka", "mimi", "su", "rata", "piku", "nana"] >> words.
+words >> Map Slice(-1, Length) >> lasts.
+lasts >> Count (@ == "a") >> noun.
+lasts >> Count (@ == "i") >> verb.
+lasts >> Count (not (@ in ["a", "i"])) >> others.
+"NOUN: {noun} times. VERB: {verb} times. OTHERS: {others} times.".
+"""
+    assert run_code(code) == "NOUN: 3 times. VERB: 2 times. OTHERS: 2 times."
+    assert run_code("[] >> Count (@ > 1).") == 0
+    assert run_code("[1, 2, 3, 4] >> Count as n:\n    n % 2 == 0\n>> r.\nr.") == 2
+    is_even = "(n) >> pop IsEven:\n    n % 2 == 0\n\n"
+    assert run_code(is_even + "[1, 2, 3, 4, 6] >> Count IsEven.") == 3
+    expect_error("[1] >> Count (@).", "TypeError")
+    expect_error("5 >> Count (@ > 1).", "TypeError")
+
+
+def test_extra_arguments_may_be_pipelines():
+    assert run_code('"kati" >> Slice((@ >> Length) - 1, @ >> Length).') == "i"
+    assert run_code('["ab", "cd"] >> Map (@ >> Slice((@ >> Length) - 1, @ >> Length)).') == ["b", "d"]
+
+
+def test_not_in_and_not_binds_looser_than_comparison():
+    assert run_code('"u" not in ["a", "i"].') is True
+    assert run_code('"a" not in ["a", "i"].') is False
+    assert run_code('not "u" in ["a"].') is True
+    assert run_code('not 1 == 2.') is True
+    assert run_code('["a", "u", "i", "e"] >> Count (@ not in ["a", "i"]).') == 2
+    assert run_code('"ab" not in "xaby".') is False
+
+
+def test_one_line_colon_body_is_only_for_branches_and_functions():
+    # `Map: @ * 2 >> d.` は `>> d` まで本体に入ってしまうので、エラーで案内する
+    try:
+        run_code("[1, 2] >> Map: @ * 2 >> d.")
+    except Exception as exc:
+        assert "next line" in str(exc) and "Map (...)" in str(exc), str(exc)
+    else:
+        raise AssertionError("one-line Map body must be rejected")
+    assert run_code("(n) >> pop Double: n * 2\n\n3 >> Double.") == 6
+    assert run_code('2 >> Check:\n    when @ == 1: "one"\n    else: "other"\n>> r.\nr.') == "other"
+
+
+def test_negative_indices_count_from_the_end_everywhere():
+    assert run_code("[10, 20, 30] >> xs. xs[-1].") == 30
+    assert run_code("[10, 20, 30] >> Get(-2).") == 20
+    assert run_code("[10, 20, 30] >> Get(-4, 0).") == 0
+    assert run_code("[10, 20, 30] >> Set(-1, 99).") == [10, 20, 99]
+    expect_error("[10] >> Get(-2).", "IndexError")

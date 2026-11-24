@@ -23,14 +23,26 @@ assert.equal(
 );
 assert.equal(errorLine("ParseError: something at line 14, column 3"), 14);
 assert.equal(
-  localizeError("SyntaxError: Check branches use braces: write 'when <condition> { ... }' instead of ':' at line 2, column 9"),
-  "文法エラー: Check の分岐は波括弧で書きます。「when <condition> { ... }」の形にしてください（「:」は使えません）。（2行目）",
+  localizeError("SyntaxError: A ':' body runs to the end of its line; start 'else' on a new line at line 2, column 9"),
+  "文法エラー: 「:」のあとの本体は、その行の終わりまでです。「else」は次の行に書いてください。（2行目）",
 );
 assert.equal(
-  localizeError("SyntaxError: Check branches use braces: write 'else { ... }' instead of ':' at line 4, column 5"),
-  "文法エラー: Check の分岐は波括弧で書きます。「else { ... }」の形にしてください（「:」は使えません）。（4行目）",
+  localizeError("SyntaxError: Expected an indented body after ':' in function 'F' at line 1, column 13"),
+  "文法エラー: 「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（function 'F'）。（1行目）",
+);
+assert.equal(
+  localizeError("SyntaxError: 'Map Check' is not allowed as a process-name body; write a block: 'Map:' at line 1, column 12"),
+  "文法エラー: 「Check」は処理名渡しでは書けません。「Map:」のようにブロックで書いてください。（1行目）",
 );
 
+assert.equal(
+  localizeError("SyntaxError: Blocks are written with ':' and indentation, not braces: start Map with ':' at line 1, column 21"),
+  "文法エラー: ブロックは { } ではなく、「:」と字下げで書きます。Map を「:」で始めて、本体を次の行から字下げしてください。（1行目）",
+);
+assert.equal(
+  localizeError("SyntaxError: Write the body of Map on the next line, indented; for one expression, write 'Map (...)' at line 1, column 16"),
+  "文法エラー: Map の本体は、次の行から字下げして書きます。式 1 つだけなら「Map (...)」と書けます。（1行目）",
+);
 assert.equal(
   localizeError("Warning: Single-quoted strings do not interpolate; use a double-quoted string to insert values at line 3, column 5"),
   `注意: 単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 " の文字列を使います。（3行目）`,

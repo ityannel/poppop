@@ -22,9 +22,9 @@
     resultWidth: "popcorn.playground.resultWidth.v1",
     mobileResultHeight: "popcorn.playground.mobileResultHeight.v1",
   };
-  const FALLBACK_SOURCE = `[1, 2, 3, 4] >> Map as value {
+  const FALLBACK_SOURCE = `[1, 2, 3, 4] >> Map as value:
     value * 2.
-} >> doubled.
+>> doubled.
 
 doubled >> Display.`;
   const LESSON_FEATURES = {
@@ -700,6 +700,7 @@ doubled >> Display.`;
         seedSamples();
         renderExamples();
       }
+      worker.postMessage({ type: "migrate-files", files });
       lessonIndex = Math.min(Math.max(0, lessonIndex), Math.max(0, lessons.length - 1));
       completedLessons = new Set(
         [...completedLessons].filter((id) => lessons.some((lesson) => lesson.id === id)),
@@ -707,6 +708,18 @@ doubled >> Display.`;
       installCompleter(runtimeNames);
       renderLesson();
       scheduleAnalysis();
+      return;
+    }
+    if (message.type === "migrated-files") {
+      const changed = Object.keys(message.files ?? {}).filter((path) => typeof files[path] === "string");
+      if (!changed.length) return;
+      try {
+        if (!localStorage.getItem(BLOCK_BACKUP_KEY)) localStorage.setItem(BLOCK_BACKUP_KEY, localStorage.getItem(FS_KEY) || "");
+      } catch {}
+      changed.forEach((path) => { files[path] = message.files[path]; });
+      if (changed.includes(activeFile)) setSource(files[activeFile], { markChanged: false, focus: false });
+      persistFiles();
+      showToast(`保存してあった ${changed.length} 個のコードの { } ブロックを、新しい書き方（: と字下げ）に直しました`);
       return;
     }
     if (message.type === "boot-error") {
@@ -1611,10 +1624,10 @@ doubled >> Display.`;
           "変更してよいのは、文字列・数値・小文字の変数名と、既存ブロック内の短い式だけです。",
           "存在しない単独の関数呼び出し形式を作ってはいけません。Range(1, 6)、Sum()、Check(x) のように >> なしでは書けません。",
           "標準関数は `(1, 6) >> Range >> values.`、`values >> Sum >> total.`、またはパイプ追加引数 `items >> Get(0)` のように `>>` の右側に書きます。",
-          "Mapなどのブロックは、元の例と同じ `Map as name { ... }` の形を保ちます。",
+          "Mapなどのブロックは、元の例と同じ `Map as name:` と字下げの形を保ちます。",
           "starterは実行可能だが目標をまだ満たさず、solutionは目標を満たす完成コードにします。",
           "starterとsolutionの最後の文は、必ず `値または変数 >> Display.` にしてください。",
-          "改行には構文上の意味がありません。通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。",
+          "通常の文は `.` で終えます。ブロックは `:` で開き、本体を4つの空白で字下げします。波括弧 `{ }` でブロックは書けません（`{ }` は辞書だけ）。",
           "小学高学年でも一度で読める、自然で優しい日本語にしてください。",
           "題名は「何を作るか」が分かる18文字以内の表現にし、できれば「〜しよう」で終えてください。",
           "「全員を変換」「非破壊更新」「道を選ぶ」のような直訳調・仕様書調の題名は禁止です。",
@@ -2100,11 +2113,11 @@ doubled >> Display.`;
         [
           "あなたはPopCorn言語のやさしい先生です。",
           "基礎8問を終えた学習者向けの、少し発展的な練習問題を1つ作ってください。",
-          "PopCornは `>>` で値を流し、通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます。関数定義は `pop` を使います。数値型は `Num` のみです。",
-          "使えるもの: Display, Map as name {, Filter as name {, Reduce(0) as (acc, item) {, SortDesc as name {, Check as name { when 条件 { ... } else { ... } }, Update as name {, Fork as name {, Try { ... } Catch as err {, 後置 `when 条件.`, Range, Sum, Length, Random, Get。",
+          "PopCornは `>>` で値を流し、通常の文は `.`、ブロックは `:` で開き、本体を字下げします（`{ }` のブロックはありません）。関数定義は `pop` を使います。数値型は `Num` のみです。",
+          "使えるもの: Display, Map as name:, Filter as name:, Reduce(0) as (acc, item):, SortDesc as name:, Check as name: と字下げした when 条件: / else:, Update as name:, Fork as name:, Try: と Catch as err:, 式渡し Map (@ * 2), 処理名渡し Map Length, 後置 `when 条件.`, Range, Sum, Length, Random, Get。",
           "標準関数を `>>` なしで `Range(1, 6)` や `Sum()` のように単独呼び出ししてはいけません。",
           "標準関数は `(1, 6) >> Range >> values.`、`values >> Sum >> total.`、`items >> Get(0)` のように、必ず `>>` の右側に書いてください。",
-          "ブロックは提示した `Map as name { ... }` などの形を崩さないでください。",
+          "ブロックは提示した `Map as name:` と字下げの形を崩さないでください。",
           "最終結果は必ず `>> Display.` で表示してください。",
           "starterには、学習者が必ず修正しなければ目標を達成できない誤りを一つだけ残してください。",
           "starterとsolutionは、変数名や空白だけでなく、演算子・条件・値・処理段階のいずれかが意味的に異なる必要があります。",
@@ -2115,10 +2128,10 @@ doubled >> Display.`;
           "買い物の集計、ゲームの得点判定、予定や記録の整理など、結果の使い道が分かる実利的な題材にしてください。",
           "可能なら Filter の後に Sum を使うなど、既習機能を2段階以上組み合わせてください。",
           "次の検査済みの形を参考に、値・名前・式を題材に合わせて変更してください。",
-          "Mapの形:\n[1, 2, 3] >> Map as value {\n    value * 2.\n} >> result.\nresult >> Display.",
-          "Filterの形:\n[1, 2, 3, 4] >> Filter as value {\n    value % 2 == 0.\n} >> result.\nresult >> Display.",
-          "Reduceの形:\n[1, 2, 3] >> Reduce(0) as (acc, item) {\n    acc + item.\n} >> result.\nresult >> Display.",
-          "二段階集計の形:\n[120, 80, 250] >> Filter as price {\n    price >= 100.\n} >> selected.\nselected >> Sum >> total.\ntotal >> Display.",
+          "Mapの形:\n[1, 2, 3] >> Map as value:\n    value * 2.\n>> result.\nresult >> Display.",
+          "Filterの形:\n[1, 2, 3, 4] >> Filter as value:\n    value % 2 == 0.\n>> result.\nresult >> Display.",
+          "Reduceの形:\n[1, 2, 3] >> Reduce(0) as (acc, item):\n    acc + item.\n>> result.\nresult >> Display.",
+          "二段階集計の形:\n[120, 80, 250] >> Filter as price:\n    price >= 100.\n>> selected.\nselected >> Sum >> total.\ntotal >> Display.",
           learnerProfileSummary(),
           `これまでの学習記録: ${learningSummary()}`,
           `これまでの会話:\n${recentTutorConversation() || "なし"}`,
@@ -2359,7 +2372,7 @@ doubled >> Display.`;
           "あなたはPopCorn Playgroundに住むロボット先生です。",
           "短く自然な日本語で、質問に直接答えてください。",
           "完成コードを丸ごと渡さず、理解できる次の一手を示してください。",
-          "PopCornでは改行に構文上の意味はなく、通常の文は `.`、ブロック全体は `{` で開いて `}` で閉じます（ブロックで終わる文とブロック内の最後の文は `.` を省略できます）。",
+          "PopCornでは、通常の文は `.` で終え、ブロックは `:` で開いて本体を字下げします（`{ }` のブロックはありません。ブロックで終わる文とブロック内の最後の文は `.` を省略できます）。",
           ">> は左の値を右へ流します。すべての標準関数は元の値を破壊しません。",
           "不確かな仕様を作らず、分からない場合は仕様書を確認するよう伝えてください。",
           "JSONだけを返してください。",
@@ -2477,6 +2490,7 @@ doubled >> Display.`;
 
   // ===== エクスプローラー（フォルダー・ファイル）と、開いているファイルのタブ =====
   const FS_KEY = "popcorn.playground.fs.v2";
+  const BLOCK_BACKUP_KEY = "popcorn.playground.fs.backup.colon-blocks";
   const SPEC_FILE = "specification.md";
   let files = {};
   let folders = [];
@@ -2506,7 +2520,6 @@ doubled >> Display.`;
   const SAMPLES_DIR = "samples";
   const SAMPLES_SEEDED_KEY = "popcorn.playground.samples.seeded.v3"; // 古い記録（パスの一覧）。いまは「消した」の判定にだけ使う
   const SAMPLES_HASH_KEY = "popcorn.playground.samples.hash.v4";     // { パス: 入れたときの内容の指紋 }
-  const CHECK_BACKUP_KEY = "popcorn.playground.fs.backup.check-braces";
 
   // 内容の指紋（短い文字列）。同じ内容なら、同じ値になる
   function hashText(text) {
@@ -2584,25 +2597,11 @@ doubled >> Display.`;
     localStorage.setItem(FS_KEY, JSON.stringify({ files, folders, openTabs, expanded, selected, active: activeFile }));
   }
 
-  // 保存してあるコードに、旧形式の Check（`when 条件:` / `else:`）があれば、新しい書き方（{ }）へ直す。
-  // 直す前の保存データは、一度だけバックアップする
-  let migratedCheckCount = 0;
-  function migrateStoredCheckSyntax(saved) {
-    const formatter = window.PopCornFormatter;
-    if (!formatter?.hasOldCheckSyntax) return;
-    const stale = Object.keys(files).filter((path) => typeof files[path] === "string" && formatter.hasOldCheckSyntax(files[path]));
-    if (!stale.length) return;
-    try { if (!localStorage.getItem(CHECK_BACKUP_KEY)) localStorage.setItem(CHECK_BACKUP_KEY, JSON.stringify(saved)); } catch {}
-    stale.forEach((path) => { files[path] = formatter.migrateOldCheckSyntax(files[path]); });
-    migratedCheckCount = stale.length;
-  }
-
   function loadFileStore() {
     try {
       const saved = JSON.parse(localStorage.getItem(FS_KEY) || "null");
       if (saved && saved.files && Object.keys(saved.files).length) {
         files = saved.files;
-        migrateStoredCheckSyntax(saved);
         folders = saved.folders || [];
         openTabs = (saved.openTabs || []).filter((path) => files[path] !== undefined);
         expanded = saved.expanded || [];
@@ -2610,10 +2609,6 @@ doubled >> Display.`;
         selected = saved.selected || activeFile;
         if (!openTabs.includes(activeFile)) openTabs.push(activeFile);
         setSource(files[activeFile], { markChanged: false, focus: false });
-        if (migratedCheckCount) {
-          persistFiles();
-          setTimeout(() => showToast(`保存してあった ${migratedCheckCount} 個のコードの Check を、新しい書き方（{ }）に直しました`), 1200);
-        }
         return;
       }
     } catch {}

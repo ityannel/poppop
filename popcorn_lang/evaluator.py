@@ -277,9 +277,10 @@ class Evaluator:
                 mapped.append(await self.eval(n.block, item_env))
             return mapped
 
-        if n.stream_type == "Filter":
+        if n.stream_type in ("Filter", "Count"):
+            kind = n.stream_type
             if not isinstance(val, list):
-                raise PopCornError("TypeError", "Filter stream requires a list")
+                raise PopCornError("TypeError", f"{kind} stream requires a list")
             filtered = []
             for item in val:
                 item_env = Environment(parent=env)
@@ -287,10 +288,11 @@ class Evaluator:
                 _bind_aliases(item_env, n.var_names, item)
                 res = await self.eval(n.block, item_env)
                 if not isinstance(res, bool):
-                    raise PopCornError("TypeError", "Filter block must return Bool")
+                    raise PopCornError("TypeError", f"{kind} block must return Bool")
                 if res:
                     filtered.append(item)
-            return filtered
+            # Count は、条件に合った要素の数（Filter >> Length と同じ）
+            return float(len(filtered)) if kind == "Count" else filtered
 
         if n.stream_type == "Reduce":
             if not isinstance(val, list):
@@ -547,6 +549,8 @@ class Evaluator:
             return not _values_equal(left, right)
         if op == "in":
             return _contains_value(right, left)
+        if op == "not in":
+            return not _contains_value(right, left)
         raise PopCornError("RuntimeError", f"Unknown operator {op}")
 
     async def eval_FunctionCallNode(self, node: FunctionCallNode, env: Environment):
@@ -632,9 +636,11 @@ class Evaluator:
 
         if isinstance(target, (list, tuple)):
             whole_idx = _as_whole_int(idx, "List indices must be whole Num values")
-            if whole_idx < 0 or whole_idx >= len(target):
+            # 負の添字は、うしろから数える（xs[-1] は最後の要素）
+            pos = whole_idx + len(target) if whole_idx < 0 else whole_idx
+            if pos < 0 or pos >= len(target):
                 raise PopCornError("IndexError", f"Index {whole_idx} out of bounds")
-            return target[whole_idx]
+            return target[pos]
 
         if isinstance(target, dict):
             if not isinstance(idx, str):

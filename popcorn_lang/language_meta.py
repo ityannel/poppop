@@ -16,6 +16,7 @@ KEYWORDS = (
 STREAM_BLOCKS = (
     "Map",
     "Filter",
+    "Count",
     "Reduce",
     "Sort",
     "SortDesc",

@@ -11,16 +11,16 @@ API や `Fetch` は、一時的に失敗することがあります（回線の�
 書けます。`Loop` と `Try` / `Catch` を組み合わせます（仕様書の「やり直す」にも、同じ例があります）。
 
 ```
-(0, null) >> Loop as (attempt, last) {
+(0, null) >> Loop as (attempt, last):
     last >> Break when last != null.           // 成功したら、その値で終わる
     null >> Break when attempt >= 3.           // 3 回失敗したら、あきらめる（null を返す）
-    "https://example.com/api" >> Try {
+    "https://example.com/api" >> Try:
         Fetch.
-    } Catch {
+    Catch:
         null.
-    } >> response.
+    >> response.
     (attempt + 1, response).
-} >> result.
+>> result.
 ```
 
 * `Loop` の状態は `(attempt, last)`（何回目か、直前の結果）。
@@ -34,9 +34,9 @@ API や `Fetch` は、一時的に失敗することがあります（回線の�
 ### 案 A：`Retry` ブロックを足す
 
 ```
-"https://example.com/api" >> Retry(3) as attempt {
+"https://example.com/api" >> Retry(3) as attempt:
     Fetch.
-} >> response.
+>> response.
 ```
 
 * ブロックが成功するまで、最大 3 回くり返す。3 回とも失敗したら、最後のエラーを、そのまま出す。

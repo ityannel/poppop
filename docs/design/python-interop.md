@@ -26,7 +26,7 @@ data >> Python("statistics.mean")
 ```python
 from popcorn_lang import run
 
-result = run("@ >> Map { @ * 2 }", input=[1, 2, 3])   # [2.0, 4.0, 6.0]
+result = run("@ >> Map (@ * 2)", input=[1, 2, 3])   # [2.0, 4.0, 6.0]
 ```
 
 * PopCorn の約束は、そのまま保たれます。呼ぶのが、Python（ホスト）の側だからです。

@@ -371,8 +371,9 @@ def builtin_Get(current, env, evaluator):
 
         if isinstance(target, (list, tuple)):
             whole_key = _as_whole_int(key, "List indices must be whole Num values")
-            if 0 <= whole_key < len(target):
-                return target[whole_key]
+            pos = whole_key + len(target) if whole_key < 0 else whole_key  # 負の添字は、うしろから
+            if 0 <= pos < len(target):
+                return target[pos]
             if has_default:
                 return default
             raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
@@ -404,10 +405,11 @@ def builtin_Set(current, env, evaluator):
             return res
         if isinstance(target, list):
             whole_key = _as_whole_int(key, "List indices must be whole Num values")
-            if whole_key < 0 or whole_key >= len(target):
+            pos = whole_key + len(target) if whole_key < 0 else whole_key  # 負の添字は、うしろから
+            if pos < 0 or pos >= len(target):
                 raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
             res = list(target)
-            res[whole_key] = value
+            res[pos] = value
             return res
         _type_error("Set target must be List or Dict")
     _type_error("Set requires (target, key, value)")
@@ -503,12 +505,16 @@ def builtin_Slice(current, env, evaluator):
         else:
             start = _as_whole_int(current[1], "Slice indices must be whole Num values")
             end = _as_whole_int(current[2], "Slice indices must be whole Num values")
-        if start < 0 or end < 0 or start > end or end > len(target):
+        # 負の添字は、うしろから数える（-1 は最後の要素の位置）。xs >> Slice(-1) は、最後の 1 つを除いたもの
+        size = len(target)
+        norm_start = start + size if start < 0 else start
+        norm_end = end + size if end < 0 else end
+        if norm_start < 0 or norm_end < 0 or norm_start > norm_end or norm_end > size:
             raise PopCornError(
                 "IndexError",
-                f"Invalid Slice range ({start}, {end}) for length {len(target)}",
+                f"Invalid Slice range ({start}, {end}) for length {size}",
             )
-        return target[start:end]
+        return target[norm_start:norm_end]
     _type_error("Slice requires (target, end) or (target, start, end)")
 
 
