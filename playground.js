@@ -224,6 +224,24 @@ doubled >> Display.`;
       const Mode = function Mode() { this.HighlightRules = Rules; };
       oop.inherits(Mode, TextMode);
       Mode.prototype.lineCommentStart = "//";
+      // 行末に `:` を書いて Enter を押したら、次の行を 1 段下げる
+      Mode.prototype.getNextLineIndent = function getNextLineIndent(_state, line, tab) {
+        return window.PopCornFormatter ? window.PopCornFormatter.nextLineIndent(line, tab) : this.$getIndent(line);
+      };
+      Mode.prototype.checkOutdent = function checkOutdent(_state, line, input) {
+        return Boolean(window.PopCornFormatter) && /^[:a-z]$/.test(input) && /^\s+$/.test(line);
+      };
+      // 字下げした本体のあとで `else:` などを打ったら、1 段戻す
+      Mode.prototype.autoOutdent = function autoOutdent(_state, doc, row) {
+        const line = doc.getLine(row);
+        if (!window.PopCornFormatter || !window.PopCornFormatter.isBranchLine(line) || row === 0) return;
+        const indent = this.$getIndent(line);
+        const previous = this.$getIndent(doc.getLine(row - 1));
+        if (indent.length && indent.length >= previous.length) {
+          const unit = doc.getTabString ? doc.getTabString() : "    ";
+          doc.replace({ start: { row, column: 0 }, end: { row, column: indent.length } }, indent.slice(unit.length));
+        }
+      };
       Mode.prototype.$id = "ace/mode/popcorn";
       exports.Mode = Mode;
     });
@@ -236,6 +254,16 @@ doubled >> Display.`;
       elements.editorFallback.style.display = "block";
       elements.editorFallback.value = source;
       elements.editorFallback.addEventListener("input", onSourceChanged);
+      // Ace が読めないときも、行末の `:` で Enter を押したら、次の行を 1 段下げる
+      elements.editorFallback.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || event.isComposing || event.shiftKey || !window.PopCornFormatter) return;
+        const area = elements.editorFallback;
+        const lineStart = area.value.lastIndexOf("\n", area.selectionStart - 1) + 1;
+        const indent = window.PopCornFormatter.nextLineIndent(area.value.slice(lineStart, area.selectionStart));
+        event.preventDefault();
+        area.setRangeText(`\n${indent}`, area.selectionStart, area.selectionEnd, "end");
+        onSourceChanged();
+      });
       elements.editorFallback.addEventListener("keyup", updateEditorStatus);
       elements.editorFallback.addEventListener("click", updateEditorStatus);
       return;

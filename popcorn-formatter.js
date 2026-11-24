@@ -63,45 +63,105 @@
         index += 1;
       }
     }
-    return result.trimEnd();
+    // 行頭の `>>`（ブロックのあとに外側のパイプラインを続ける行）の前には、空白を入れない
+    return result.trim();
   }
 
+  // 行の中の、ブロックを開く `:`（`::`、辞書のキー、Fork のラベルは除く）。辞書・リストの括弧の中の `:` は、ブロックではない
+  function isBlockColon(code, index, innermostBracket) {
+    if (innermostBracket === "{" || innermostBracket === "[") return false;
+    if (code[index + 1] === ":" || code[index - 1] === ":") return false;
+    const label = /^\s*([a-z_][a-zA-Z0-9_]*)\s*:/.exec(code);
+    return !(label && label[0].length - 1 === index && !/^(when|else)$/.test(label[1]));
+  }
+
+  /**
+   * 字下げをそろえ、`>>` の前後の空白を 1 つにします。
+   *   * `:` のブロックの本体は、見出しの行より 1 段深く。見出しと同じか浅い行で、ブロックは終わります。
+   *   * 丸括弧・角括弧・波括弧の中で改行した行は、括弧 1 つ（開いた行 1 つ）につき 1 段深く。
+   *     閉じ括弧で、その中で開いたブロックも終わります。
+   *   * コメントだけの行は、ブロックを閉じません。
+   *   * 行末の `:` のすぐ次の行は、字下げを忘れていても本体として 1 段下げます（本体のないブロックはないため）。
+   *     そのときは、`>>` や `when` / `else` / `Catch` で始まる行、空行、それより浅い行までを本体とみなします。
+   */
   function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
-    // "block" は { }、数は `:` の字下げブロック（見出しの行の、元の字下げ）
-    const stack = [];
-    const popBrace = () => {
-      while (stack.length && stack[stack.length - 1] !== "block") stack.pop();
-      stack.pop();
-    };
-    const formatted = rawLines.map((rawLine) => {
+    // { indent: 見出しの行の元の字下げ, depth: 開いたときの括弧の深さ,
+    //   awaitingBody: 行末が `:`（本体は次の行から）, flushIndent: 字下げを忘れた本体の、元の字下げ }
+    const blocks = [];
+    const brackets = [];    // 開いている括弧ごとに { ch: 括弧, line: 開いた行の番号 }
+    const levelOf = openBrackets => new Set(openBrackets.map(bracket => bracket.line)).size;
+
+    let previousBlank = false;
+
+    const formatted = rawLines.map((rawLine, lineIndex) => {
       const trimmed = rawLine.trim();
-      if (!trimmed) return "";
-
-      const trimmedCode = maskNonCode(trimmed);
-      // `:` で始めた字下げブロックは、元の字下げが見出しの行と同じか浅くなったら閉じる
-      const rawIndent = rawLine.length - rawLine.trimStart().length;
-      while (stack.length && stack[stack.length - 1] !== "block" && rawIndent <= stack[stack.length - 1]) stack.pop();
-      const startsWithClose = /^\}/.test(trimmedCode);
-      if (startsWithClose) popBrace();
-
-      const line = " ".repeat(stack.length * indentSize)
-        + normalizePipelineSpacing(trimmed, trimmedCode);
-
-      const lineCode = maskNonCode(line.trim());
-      const openCount = (lineCode.match(/\{/g) || []).length;
-      const closeCount = (lineCode.match(/\}/g) || []).length;
-      const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-      const netOpens = openCount - remainingCloses;
-
-      if (netOpens > 0) {
-        for (let i = 0; i < netOpens; i += 1) stack.push("block");
-      } else if (netOpens < 0) {
-        for (let i = 0; i < -netOpens; i += 1) popBrace();
+      if (!trimmed) {
+        previousBlank = true;
+        return "";
       }
-      if (/:\s*$/.test(lineCode)) stack.push(rawIndent);
 
+      const code = maskNonCode(trimmed);
+      const rawIndent = rawLine.length - rawLine.trimStart().length;
+      const isCommentOnly = trimmed.startsWith("//");
+      // 行頭の閉じ括弧は、開いた行と同じ段にそろえる
+      const leadingCloses = (/^[)\]}]+/.exec(code.replace(/\s+/g, "")) || [""])[0].length;
+      const visibleBrackets = brackets.slice(0, Math.max(0, brackets.length - leadingCloses));
+      if (!isCommentOnly) {
+        const top = blocks[blocks.length - 1];
+        if (top?.awaitingBody) {
+          // 行末の `:` の次の行は、いつも本体
+          top.awaitingBody = false;
+          if (rawIndent <= top.indent) top.flushIndent = rawIndent;
+        } else {
+          // 同じ括弧の中で開いたブロックは、見出しと同じか浅い字下げの行で終わる
+          // `>>`、`when` / `else` / `Catch` の行は、字下げを忘れた本体を 1 つだけ閉じる
+          let siblingUsed = false;
+          while (blocks.length && blocks[blocks.length - 1].depth === visibleBrackets.length) {
+            const block = blocks[blocks.length - 1];
+            let ends;
+            if (block.flushIndent === undefined) {
+              ends = rawIndent <= block.indent;
+            } else if (previousBlank || rawIndent < block.flushIndent) {
+              ends = true;
+            } else if (!siblingUsed && /^\s*(?:>>|(?:when|else|Catch)\b)/.test(code)) {
+              ends = true;
+              siblingUsed = true;
+            } else {
+              ends = false;
+            }
+            if (!ends) break;
+            blocks.pop();
+          }
+        }
+        previousBlank = false;
+      }
+      const openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+      const level = openBlocks + levelOf(visibleBrackets);
+      const line = " ".repeat(level * indentSize) + normalizePipelineSpacing(trimmed, code);
+
+      if (!isCommentOnly) {
+        let opened;
+        let openedAt = -1;
+        for (let index = 0; index < code.length; index += 1) {
+          const ch = code[index];
+          if (ch === "(" || ch === "[" || ch === "{") brackets.push({ ch, line: lineIndex });
+          else if (ch === ")" || ch === "]" || ch === "}") {
+            brackets.pop();
+            while (blocks.length && blocks[blocks.length - 1].depth > brackets.length) blocks.pop();
+            if (opened && opened.depth > brackets.length) opened = undefined;
+          } else if (ch === ":" && !opened && isBlockColon(code, index, brackets[brackets.length - 1]?.ch)) {
+            opened = { indent: rawIndent, depth: brackets.length };
+            openedAt = index;
+          }
+        }
+        if (opened) {
+          // `:` のあとがコメントだけなら、本体は次の行から（文字列は隠してあるので、元の行で調べる）
+          opened.awaitingBody = /^\s*(?:\/\/.*)?$/.test(trimmed.slice(openedAt + 1));
+          blocks.push(opened);
+        }
+      }
       return line;
     });
     return formatted.join(eol);
@@ -138,5 +198,26 @@
     return out.join(eol);
   }
 
-  return Object.freeze({ formatDocument, hasOldCheckSyntax, migrateOldCheckSyntax });
+  // ---- 入力中の字下げ（Enter を押したとき） ----
+  // 行末が `:`（ブロックの見出し）なら、次の行は 1 段深く。それ以外は、いまの行と同じ字下げ
+  function opensBlockAtEnd(line) {
+    // 文字列は "S" に置きかえ（中の `:` や `//` を見ない）、コメントを取り除いてから、行末を見る
+    const code = line
+      .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`/g, "S")
+      .replace(/\/\/.*$/, "")
+      .trimEnd();
+    return /(^|[^:]):$/.test(code);
+  }
+
+  function nextLineIndent(line, unit = "    ") {
+    const indent = /^[ \t]*/.exec(line)[0];
+    return opensBlockAtEnd(line) ? indent + unit : indent;
+  }
+
+  // `else:`、`Catch`、`when …:` を打ったら、見出しの `when` / `Try` と同じ段へ戻す
+  function isBranchLine(line) {
+    return /^\s*(?:else\s*:|Catch\b|when\b.*:)/.test(line);
+  }
+
+  return Object.freeze({ formatDocument, hasOldCheckSyntax, migrateOldCheckSyntax, nextLineIndent, isBranchLine });
 });

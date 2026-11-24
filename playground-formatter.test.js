@@ -21,6 +21,13 @@ const cases = [
   '1>>Check {\nwhen @ == 1 { "one" }\nelse { "other" }\n}>>r.',
   '1>>Check {\nwhen @ == 1 {\n"one".\n} else {\n"other".\n}\n}>>r.',
   "(0, 0)>>Loop as (count, total) {\ntotal>>Break when count >= 5.\n(count + 1, total + count).\n}>>result.",
+  // `:` と字下げのブロック
+  "[1, 2, 3]>>Map as x:\n  x * 2\n>>doubled.",
+  '(num)>>pop FizzBuzz:\n  num>>Check:\n      when num % 15 == 0: "FizzBuzz"\n      else: num\n\n(1, 20)>>Range>>Map FizzBuzz>>Display.',
+  "[1, 2]>>Map (\n@ * 2\n)>>xs.",
+  '{\n"a": 1,\n"b": [\n2,\n3\n]\n}>>d.',
+  "5>>Fork:\n  double: @ * 2\n  triple: @ * 3\n>>r.",
+  "xs>>Map:\n// comment\n  @ * 2\n>>ys.",
 ];
 
 for (const source of cases) {
@@ -118,3 +125,20 @@ assert.strictEqual(
 );
 
 console.log("Playground formatter parity tests passed.");
+
+// Enter を押したときの字下げ: 行末の `:` で 1 段下げる（VS Code の language-configuration.json と同じ判定）
+{
+  const { nextLineIndent, isBranchLine } = globalThis.PopCornFormatter;
+  const fs = await import("node:fs");
+  const configuration = JSON.parse(fs.readFileSync(new URL("./vscode-popcorn/language-configuration.json", import.meta.url), "utf8"));
+  const onEnter = new RegExp(configuration.onEnterRules[0].beforeText);
+  const lines = ["xs >> Map:", "    when x > 0:", "xs >> Map as (a, b): // c", "5 >> Fork:", "else:",
+    '"a:" >> x.', '  when a: "b"', "x >> Map // note:", "1 >> x.", "x::"];
+  for (const line of lines) {
+    const indent = /^\s*/.exec(line)[0];
+    const expected = onEnter.test(line) ? `${indent}    ` : indent;
+    assert.strictEqual(nextLineIndent(line), expected, `Enter after: ${line}`);
+  }
+  assert.ok(isBranchLine("    else:") && isBranchLine("Catch as e:") && !isBranchLine("x >> Map:"));
+  console.log("Playground enter-indent tests passed.");
+}

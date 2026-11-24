@@ -2,11 +2,11 @@
   "name": "vscode-popcorn",
   "displayName": "PopCorn Language Support Japanese — PopCorn",
   "description": "PopCorn 言語向けの日本語ホバー、データフロー表示、診断、実行コマンドを提供します。",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "publisher": "popcorn-dev",
   "main": "./extension.js",
   "scripts": {
-    "test": "node assignment-targets.test.js && node layout-view.test.js && node semantic-highlights.test.js && node language-features.test.js && node extension-flow.test.js"
+    "test": "node assignment-targets.test.js && node layout-view.test.js && node semantic-highlights.test.js && node language-features.test.js && node current-syntax.test.js && node grammar.test.js && node extension-flow.test.js"
   },
   "icon": "icon.png",
   "engines": {

@@ -1,9 +1,13 @@
 "use strict";
 
 const { maskNonCode } = require("./assignment-targets");
+const { findInterpolatedVariables } = require("./popcorn-strings");
+const { forEachBrace } = require("./layout-view");
 
 const VARIABLE_IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
+// 式渡し `Map (…)` の丸括弧（複数行にまたがってもよい）。Reduce(初期値) の中の @ も、流れてきた List
+const EXPRESSION_BODY_OPEN = />>\s*(?:Map|Filter|Count|Sort|SortDesc|Group|Reduce)(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?\s*\(/g;
 const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\{/;
 
 function scanLines(text, callback) {
@@ -74,36 +78,19 @@ function findImplicitVariableScopeRanges(text) {
     const documentEnd = text.length;
 
     scanLines(text, ({ code, lineStart }) => {
-        const trimmed = code.trim();
-        const startsWithClose = /^\}/.test(trimmed);
-
-        if (startsWithClose) {
-            const block = blockStack.pop();
-            if (block && block.isImplicitScope) {
-                ranges.push({ start: block.start, end: lineStart });
-            }
-        }
-
-        const openCount = (code.match(/\{/g) || []).length;
-        const closeCount = (code.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-
-        if (netOpens > 0) {
-            for (let i = 0; i < netOpens; i += 1) {
-                blockStack.push({
-                    start: lineStart,
-                    isImplicitScope: IMPLICIT_SCOPE_HEADER.test(code)
-                });
-            }
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) {
+        // `{` と `}` を、行の中で出てきた順に読む（閉じと開きが同じ行にあってもよい）
+        forEachBrace(code, {
+            open: () => blockStack.push({
+                start: lineStart,
+                isImplicitScope: IMPLICIT_SCOPE_HEADER.test(code)
+            }),
+            close: () => {
                 const block = blockStack.pop();
                 if (block && block.isImplicitScope) {
                     ranges.push({ start: block.start, end: lineStart });
                 }
             }
-        }
+        });
     });
 
     for (const block of blockStack) {
@@ -112,7 +99,37 @@ function findImplicitVariableScopeRanges(text) {
         }
     }
 
+    ranges.push(...findExpressionBodyRanges(text));
     return ranges.filter(range => range.end > range.start);
+}
+
+function maskedText(text) {
+    const state = { inBlockComment: false };
+    return text.split("\n").map(line => maskNonCode(line, state)).join("\n");
+}
+
+/** 式渡し `xs >> Map (` から、対応する `)` までの範囲（行をまたいでもよい） */
+function findExpressionBodyRanges(text) {
+    const masked = maskedText(text);
+    const ranges = [];
+    for (const match of masked.matchAll(EXPRESSION_BODY_OPEN)) {
+        const open = match.index + match[0].length - 1;
+        let depth = 0;
+        let close = masked.length;
+        for (let index = open; index < masked.length; index += 1) {
+            const ch = masked[index];
+            if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+            else if (ch === ")" || ch === "]" || ch === "}") {
+                depth -= 1;
+                if (depth === 0) {
+                    close = index;
+                    break;
+                }
+            }
+        }
+        ranges.push({ start: open + 1, end: close });
+    }
+    return ranges;
 }
 
 function findVariableReferenceOffsets(text, variableName) {
@@ -126,7 +143,11 @@ function findVariableReferenceOffsets(text, variableName) {
             }
         }
     });
-    return offsets;
+    // "…{name}…" の補間の中も、変数の利用
+    for (const occurrence of findInterpolatedVariables(text)) {
+        if (occurrence.name === variableName) offsets.push({ start: occurrence.start, length: occurrence.length });
+    }
+    return offsets.sort((left, right) => left.start - right.start);
 }
 
 function variableAtOffset(text, offset) {
@@ -147,10 +168,16 @@ function variableAtOffset(text, offset) {
             }
         }
     });
+    if (!result) {
+        const interpolated = findInterpolatedVariables(text)
+            .find(occurrence => offset >= occurrence.start && offset <= occurrence.start + occurrence.length);
+        result = interpolated?.name;
+    }
     return result;
 }
 
 const exported = {
+    findExpressionBodyRanges,
     findImplicitVariableOffsets,
     findImplicitVariableScopeRanges,
     findPipelineGuideRanges,

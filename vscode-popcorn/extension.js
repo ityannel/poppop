@@ -13,7 +13,10 @@ const {
 } = require('./semantic-highlights');
 const {
     analyzeDocument,
+    completionItems,
     findBlockRanges,
+    findFoldingRanges,
+    processInfoAtOffset,
     findPipelineAtOffset,
     implicitContextAtOffset,
     implicitValueAtOffset,
@@ -459,6 +462,14 @@ function activate(context) {
                     ))
                 );
             }
+            const process = processInfoAtOffset(text, document.offsetAt(position));
+            if (process) {
+                const definition = process.definition;
+                return new vscode.Location(document.uri, new vscode.Range(
+                    document.positionAt(definition.start),
+                    document.positionAt(definition.start + definition.length)
+                ));
+            }
             const name = variableNameAtPosition(document, position);
             if (!name) return undefined;
             return findVariableDefinitions(text, name).map(definition =>
@@ -597,6 +608,28 @@ function activate(context) {
                 ));
             }
 
+            const process = processInfoAtOffset(text, offset);
+            if (process) {
+                const definition = process.definition;
+                const signature = `(${definition.params.map(param => param.name).join(', ')}) >> pop ${definition.name}`;
+                const processParams = definition.params.filter(param => param.process).map(param => `\`${param.name}\``);
+                const lines = process.kind === 'process-parameter'
+                    ? [
+                        `\`${process.token.word}\`（処理引数）`,
+                        `\`${definition.name}\` を呼ぶ側が丸括弧に書いた式を、計算しないまま受け取ります。`,
+                        '呼ぶたびに、そのときの入力を `@` にして計算します（`x >> ' + process.token.word + '`、`Filter ' + process.token.word + '`）。'
+                    ]
+                    : [
+                        `\`${signature}\``,
+                        `${definition.line + 1} 行目で定義した関数です。`,
+                        processParams.length ? `処理引数: ${processParams.join('、')}（丸括弧に式を書いて渡します）` : ''
+                    ];
+                return new vscode.Hover(markdownLines(lines), new vscode.Range(
+                    document.positionAt(process.token.start),
+                    document.positionAt(process.token.start + process.token.length)
+                ));
+            }
+
             const token = tokenAtOffset(text, offset);
             if (token && STANDARD_FUNCTIONS[token.word]) {
                 const standard = STANDARD_FUNCTIONS[token.word];
@@ -633,8 +666,22 @@ function activate(context) {
     const adviceCodeActionProvider = vscode.languages.registerCodeActionsProvider
         ? vscode.languages.registerCodeActionsProvider(selector, {
         provideCodeActions(document, _range, context) {
-            const ignorableKinds = new Set(["likely-update-key-typo", "implicit-variable-scope"]);
-            return context.diagnostics
+            const ignorableKinds = new Set(["likely-update-key-typo", "implicit-variable-scope", "unknown-process", "plain-string-interpolation"]);
+            const fixes = context.diagnostics
+                .filter(diagnostic => String(diagnostic.code) === 'unknown-process')
+                .map(diagnostic => {
+                    const suggestion = /'([A-Za-z0-9_]+)' の書き間違い/.exec(diagnostic.message)?.[1];
+                    if (!suggestion) return undefined;
+                    const action = new vscode.CodeAction(`'${suggestion}' に直す`, vscode.CodeActionKind.QuickFix);
+                    action.diagnostics = [diagnostic];
+                    action.isPreferred = true;
+                    const edit = new vscode.WorkspaceEdit();
+                    edit.replace(document.uri, diagnostic.range, suggestion);
+                    action.edit = edit;
+                    return action;
+                })
+                .filter(Boolean);
+            return fixes.concat(context.diagnostics
                 .filter(diagnostic => ignorableKinds.has(String(diagnostic.code)))
                 .map(diagnostic => {
                     const action = new vscode.CodeAction(
@@ -647,7 +694,7 @@ function activate(context) {
                     edit.insert(document.uri, lineEnd, ` // popcorn-ignore: ${diagnostic.code}`);
                     action.edit = edit;
                     return action;
-                });
+                }));
         }
         })
         : { dispose() {} };
@@ -659,7 +706,9 @@ function activate(context) {
     });
     const symbolProvider = vscode.languages.registerDocumentSymbolProvider(selector, {
         provideDocumentSymbols(document) {
-            return findBlockRanges(document.getText()).map(block => {
+            const lastLine = document.lineCount - 1;
+            return findBlockRanges(document.getText()).filter(block => block.kind !== 'branch').map(block => {
+                block = { ...block, endLine: Math.min(block.endLine, lastLine) };
                 const kind = block.kind === 'function' ? vscode.SymbolKind.Function
                     : block.kind === 'stream' ? vscode.SymbolKind.Method : vscode.SymbolKind.Namespace;
                 const range = new vscode.Range(new vscode.Position(block.startLine, 0), new vscode.Position(block.endLine, document.lineAt(block.endLine).text.length));
@@ -667,11 +716,43 @@ function activate(context) {
             });
         }
     });
+    const completionProvider = vscode.languages.registerCompletionItemProvider
+        ? vscode.languages.registerCompletionItemProvider(selector, {
+            provideCompletionItems(document, position) {
+                const completionKinds = {
+                    function: vscode.CompletionItemKind.Function,
+                    'user-function': vscode.CompletionItemKind.Function,
+                    'process-parameter': vscode.CompletionItemKind.TypeParameter,
+                    keyword: vscode.CompletionItemKind.Keyword,
+                    variable: vscode.CompletionItemKind.Variable,
+                    property: vscode.CompletionItemKind.Property,
+                    snippet: vscode.CompletionItemKind.Snippet
+                };
+                const text = document.getText();
+                const offset = document.offsetAt(position);
+                const before = document.lineAt(position.line).text.slice(0, position.character);
+                if (/[^:]:$/.test(before)) return [];   // ブロックの `:` では出さない（`::` のときだけ）
+                // 文字列とコメントの中では出さない（"…{ }" の補間の中は出す）
+                const outside = before.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '');
+                if (/\/\/|['`]/.test(outside)) return [];
+                const openString = /"([^"]*)$/.exec(outside);
+                if (openString && !/\{[^}]*$/.test(openString[1].replace(/\{\{|\}\}/g, ''))) return [];
+                return completionItems(text, offset).map((item, index) => {
+                    const completion = new vscode.CompletionItem(item.label, completionKinds[item.kind]);
+                    completion.detail = item.detail;
+                    if (item.documentation) completion.documentation = new vscode.MarkdownString(item.documentation);
+                    // 自分で定義したもの、引数、変数を先に
+                    completion.sortText = `${{ 'process-parameter': 0, variable: 1, 'user-function': 2, function: 3, snippet: 4, keyword: 5, property: 0 }[item.kind]}${String(index).padStart(4, '0')}`;
+                    if (item.snippet && vscode.SnippetString) completion.insertText = new vscode.SnippetString(item.snippet);
+                    return completion;
+                });
+            }
+        }, ':')
+        : { dispose() {} };
     const foldingProvider = vscode.languages.registerFoldingRangeProvider(selector, {
         provideFoldingRanges(document) {
-            return findBlockRanges(document.getText())
-                .filter(block => block.endLine > block.startLine)
-                .map(block => new vscode.FoldingRange(block.startLine, block.endLine - 1));
+            return findFoldingRanges(document.getText())
+                .map(range => new vscode.FoldingRange(range.start, range.end));
         }
     });
 
@@ -691,6 +772,7 @@ function activate(context) {
         adviceCodeActionProvider,
         formattingProvider,
         symbolProvider,
+        completionProvider,
         foldingProvider,
         showResultsDisposable,
         showFlowDisposable,
