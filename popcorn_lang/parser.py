@@ -494,13 +494,20 @@ class Parser:
                 )
             extra_args = []
             while True:
-                extra_args.append(self.parse_expression())
+                extra_args.append(self._parse_argument())
                 if self.match("RPAREN"):
                     break
                 self.expect("COMMA")
                 if self.match("RPAREN"):
                     break
         return FunctionCallNode(line, col, name, extra_args)
+
+    def _parse_argument(self) -> ASTNode:
+        """補助引数。かっこの中なので、パイプラインもそのまま書ける: Slice(-1, @ >> Length)"""
+        pipe = self.parse_pipeline()
+        if len(pipe.nodes) == 1:
+            return pipe.nodes[0]
+        return GroupedPipelineNode(pipe.line, pipe.column, pipe)
 
     def parse_pipeline(self) -> Pipeline:
         curr = self.current()

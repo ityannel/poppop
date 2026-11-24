@@ -297,7 +297,7 @@ x >> Func(y, z)
 (x, y, z) >> Func
 ```
 
-この書き方を使うと、パイプラインを途中で切らずに複数引数の関数をつなげられます。
+この書き方を使うと、パイプラインを途中で切らずに複数引数の関数をつなげられます。補助引数はかっこの中にあるので、それぞれにパイプラインを書けます（`word >> Slice((@ >> Length) - 1, @ >> Length)`）。
 
 ```
 "a,b,c" >> Split(",") >> Join("-") >> Uppercase >> text.
@@ -377,7 +377,7 @@ Block              = { Statement } [ BlockTailStatement ] .
 Pipeline           = Expression { ">>" PipelineStage } .
 PipelineStage      = ProcessCall | Binding | StreamBlock .
 ProcessCall        = ProcessName [ "(" ArgumentList ")" ] .
-ArgumentList       = Expression { "," Expression } [ "," ] .
+ArgumentList       = Pipeline { "," Pipeline } [ "," ] .
 Binding            = VariableName | "(" VariableName "," VariableName
                      { "," VariableName } ")" .
 

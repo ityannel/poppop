@@ -1052,3 +1052,8 @@ lasts >> Count (not (@ in ["a", "i"])) >> others.
     assert run_code(is_even + "[1, 2, 3, 4, 6] >> Count IsEven.") == 3
     expect_error("[1] >> Count (@).", "TypeError")
     expect_error("5 >> Count (@ > 1).", "TypeError")
+
+
+def test_extra_arguments_may_be_pipelines():
+    assert run_code('"kati" >> Slice((@ >> Length) - 1, @ >> Length).') == "i"
+    assert run_code('["ab", "cd"] >> Map (@ >> Slice((@ >> Length) - 1, @ >> Length)).') == ["b", "d"]
