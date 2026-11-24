@@ -558,33 +558,48 @@ class Parser:
         return left
 
     def parse_and(self, left_node=None) -> ASTNode:
-        left = self.parse_comp(left_node=left_node)
+        left = self.parse_not(left_node=left_node)
         while self.current() and self.current().type == "AND":
             tok = self.current()
             self.advance()
-            right = self.parse_comp()
+            right = self.parse_not()
             left = ExpressionNode(tok.line, tok.column, left, "and", right)
         return left
+
+    def parse_not(self, left_node=None) -> ASTNode:
+        """`not` は比較より弱く結びつく: `not @ in xs` は `not (@ in xs)`、`not a == b` は `not (a == b)`。"""
+        curr = self.current()
+        if left_node is None and curr is not None and curr.type == "NOT":
+            self.advance()
+            return UnaryOpNode(curr.line, curr.column, "not", self.parse_not())
+        return self.parse_comp(left_node=left_node)
 
     def _is_comp_token(self, tok: Optional[Token]) -> bool:
         if not tok:
             return False
         if tok.type == "IN":
             return True
+        if tok.type == "NOT":  # `not in`（いまのトークンについて呼ぶ）
+            nxt = self.peek()
+            return tok is self.current() and nxt is not None and nxt.type == "IN"
         return tok.type == "OPERATOR" and tok.value in ("==", "!=", ">", "<", ">=", "<=")
 
     def parse_comp(self, left_node=None) -> ASTNode:
         left = left_node if left_node else self.parse_additive()
         if self._is_comp_token(self.current()):
             tok = self.current()
+            op = tok.value
             self.advance()
+            if tok.type == "NOT":  # `not in`
+                self.advance()
+                op = "not in"
             right = self.parse_additive()
             if self._is_comp_token(self.current()):
                 nxt = self.current()
                 raise ParseError(
                     f"Comparison operator '{nxt.value}' is non-associative at line {nxt.line}, column {nxt.column}"
                 )
-            return ExpressionNode(tok.line, tok.column, left, tok.value, right)
+            return ExpressionNode(tok.line, tok.column, left, op, right)
         return left
 
     def parse_additive(self) -> ASTNode:

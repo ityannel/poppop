@@ -1057,3 +1057,12 @@ lasts >> Count (not (@ in ["a", "i"])) >> others.
 def test_extra_arguments_may_be_pipelines():
     assert run_code('"kati" >> Slice((@ >> Length) - 1, @ >> Length).') == "i"
     assert run_code('["ab", "cd"] >> Map (@ >> Slice((@ >> Length) - 1, @ >> Length)).') == ["b", "d"]
+
+
+def test_not_in_and_not_binds_looser_than_comparison():
+    assert run_code('"u" not in ["a", "i"].') is True
+    assert run_code('"a" not in ["a", "i"].') is False
+    assert run_code('not "u" in ["a"].') is True
+    assert run_code('not 1 == 2.') is True
+    assert run_code('["a", "u", "i", "e"] >> Count (@ not in ["a", "i"]).') == 2
+    assert run_code('"ab" not in "xaby".') is False

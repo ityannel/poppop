@@ -549,6 +549,8 @@ class Evaluator:
             return not _values_equal(left, right)
         if op == "in":
             return _contains_value(right, left)
+        if op == "not in":
+            return not _contains_value(right, left)
         raise PopCornError("RuntimeError", f"Unknown operator {op}")
 
     async def eval_FunctionCallNode(self, node: FunctionCallNode, env: Environment):

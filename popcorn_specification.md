@@ -427,11 +427,12 @@ ParameterList      = "(" VariableName { "," VariableName } ")" .
 
 Expression         = OrExpr .
 OrExpr             = AndExpr { "or" AndExpr } .
-AndExpr            = CompareExpr { "and" CompareExpr } .
-CompareExpr        = AddExpr [ ( "==" | "!=" | ">" | "<" | ">=" | "<=" | "in" ) AddExpr ] .
+AndExpr            = NotExpr { "and" NotExpr } .
+NotExpr            = "not" NotExpr | CompareExpr .
+CompareExpr        = AddExpr [ ( "==" | "!=" | ">" | "<" | ">=" | "<=" | "in" | "not" "in" ) AddExpr ] .
 AddExpr            = MulExpr { ( "+" | "-" ) MulExpr } .
 MulExpr            = UnaryExpr { ( "*" | "/" | "%" ) UnaryExpr } .
-UnaryExpr          = ( "-" | "not" ) UnaryExpr | PostfixExpr .
+UnaryExpr          = "-" UnaryExpr | PostfixExpr .
 PostfixExpr        = PrimaryExpr { "[" Expression "]" | "::" Identifier } .
 PrimaryExpr        = Literal | VariableName | "@" | InlineProcessCall
                    | "(" Pipeline ")" | ValueList | ListLiteral | DictLiteral .
@@ -503,7 +504,7 @@ user::name >> name.
 
 ```
 +  -  *  /  %
-==  !=  >  <  >=  <=  in
+==  !=  >  <  >=  <=  in  not in
 and  or
 ```
 
@@ -512,12 +513,15 @@ and  or
 | 優先順位 | 演算子 | 結合方向 | 入力と結果 |
 |---|---|---|---|
 | 1 | `(式)` / `(パイプライン)` | — | 内側を先に評価します |
-| 2 | `-`、`not` | 右 | 数値の符号反転、`Bool` の否定 |
+| 2 | `-`（単項） | 右 | 数値の符号反転 |
 | 3 | `*`、`/`、`%` | 左 | 数値の乗算、除算、剰余 |
 | 4 | `+`、`-` | 左 | 数値演算、同じ型のコレクションの連結、数値の減算 |
-| 5 | `==`、`!=`、`>`、`<`、`>=`、`<=`、`in` | 非結合 | 比較・含有判定の `Bool` |
-| 6 | `and` | 左 | `Bool` の論理積（短絡評価） |
-| 7 | `or` | 左 | `Bool` の論理和（短絡評価） |
+| 5 | `==`、`!=`、`>`、`<`、`>=`、`<=`、`in`、`not in` | 非結合 | 比較・含有判定の `Bool` |
+| 6 | `not` | 右 | `Bool` の否定 |
+| 7 | `and` | 左 | `Bool` の論理積（短絡評価） |
+| 8 | `or` | 左 | `Bool` の論理和（短絡評価） |
+
+`not` は比較より弱く結びつきます。`not @ in ["a", "i"]` は `not (@ in ["a", "i"])`、`not a == b` は `not (a == b)` の意味です。
 
 ### 数値演算の型ルール
 
@@ -547,6 +551,13 @@ and  or
 大小比較（`>`、`<`、`>=`、`<=`）は数値どうし、または `Str` どうし（Unicode コードポイント順）で使えます。比べられない型の組み合わせは `TypeError` です。
 
 `item in target` は `target >> Contains(item)` と同じ意味です。`List` の要素、`Dict` の `Str` キー、`Str` の部分文字列が含まれるかを調べて `Bool` を返します。
+
+`item not in target` は、その逆です（含まれていなければ `true`）。
+
+```
+["kati", "su", "nana"] >> Map Slice(-1, Length) >> lasts.
+lasts >> Count (@ not in ["a", "i"]) >> others.     // 1
+```
 
 ### 厳格な `Bool` ルール
 
