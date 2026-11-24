@@ -328,7 +328,13 @@ def test_new_collection_builtins():
     assert run_code("[10, 20, 30, 40] >> Slice(1, 3).") == [20, 30]
     assert run_code("[10, 20, 30, 40] >> Slice(2).") == [10, 20]
     assert run_code('"PopCorn" >> Slice(0, 3).') == "Pop"
-    expect_error("[1, 2, 3] >> Slice(-1, 2).", "IndexError")
+    # 負の添字は、うしろから数える
+    assert run_code("[1, 2, 3] >> Slice(-1).") == [1, 2]
+    assert run_code('"hello" >> Slice(-3, -1).') == "ll"
+    assert run_code("[1, 2, 3] >> Slice(-2, 3).") == [2, 3]
+    assert run_code("[1, 2, 3] >> Slice(-3).") == []
+    expect_error("[1, 2, 3] >> Slice(-4).", "IndexError")
+    expect_error("[1, 2, 3] >> Slice(-1, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(2, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(0, 5).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(0.5, 2).", "TypeError")

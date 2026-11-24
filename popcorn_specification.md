@@ -240,7 +240,7 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | コレクション | `Merge` | `(left, right)` | 2つの `Dict` を左から右へ合わせた新しい `Dict` を返します。同じキーは右側が優先されます。 |
 | コレクション | `Contains` | `(target, item)` | `List` の要素、`Dict` の `Str` キー、`Str` の部分文字列を探して `Bool` を返します。 |
 | コレクション | `Append` | `(items, item)` | `item` を末尾に追加した新しい `List` を返します。非破壊。 |
-| コレクション | `Slice` | `(target, end)` または `(target, start, end)` | 範囲を切り出した新しい `List` または `Str`（コードポイント単位）を返します。終端 `end` は含みません。負の添字・`start > end`・範囲外は `IndexError`。 |
+| コレクション | `Slice` | `(target, end)` または `(target, start, end)` | 範囲を切り出した新しい `List` または `Str`（コードポイント単位）を返します。終端 `end` は含みません。負の添字はうしろから数えます（`[1, 2, 3] >> Slice(-1)` は `[1, 2]`、`"hello" >> Slice(-3, -1)` は `"ll"`）。うしろから数えたあとで `start > end` になるときや、範囲外は `IndexError`。 |
 | コレクション | `Array` | 非負の整数値（`Num`）の `size` またはサイズの `List` | 指定した各次元を `0` で埋めた新しい `List` を返します。 |
 | コレクション | `Zip` | 空でない `List` 群（値リスト） | 同じ位置の要素どうしを `List` にまとめた `List` を返します。いちばん短い入力の長さで止まります。 |
 | コレクション | `Unique` | `List` | 同じ値（`==` で等しい値）の 2 つ目以降を取り除いた、新しい `List` を返します。最初に現れた順を保ちます。非破壊。 |
