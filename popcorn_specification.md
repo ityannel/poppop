@@ -425,7 +425,8 @@ TryBlock           = "Try" [ AliasClause ] Body
                      "Catch" [ AliasClause ] Body .
 
 FunctionDefinition = [ ParameterList ">>" ] "pop" ProcessName Body .
-ParameterList      = "(" VariableName { "," VariableName } ")" .
+ParameterList      = "(" VariableName { "," ( VariableName | ProcessName ) } ")" .
+                     (* 2 番目以降の大文字の名前は処理引数。13章「処理引数」を参照 *)
 
 Expression         = OrExpr .
 OrExpr             = AndExpr { "or" AndExpr } .
@@ -650,6 +651,7 @@ value in [1, 3, 5] >> matched.
 | `Map`、`Filter`、`Count`、`Sort`、`SortDesc`、`Group` | 各要素に当てる式（条件・変換・キー） | 要素ごとに、`@` をその要素にして毎回 |
 | `Reduce` | 初期値 | 最初に 1 回だけ（`@` は流れてきた `List`） |
 | ふつうの処理（`Split(",")` など） | 2 番目以降の引数 | 呼ぶ前に 1 回だけ |
+| ユーザー関数 | 引数名が小文字なら値、大文字なら処理引数 | 値は呼ぶ前に 1 回だけ、処理引数は関数の中で呼ぶたびに（13章「処理引数」） |
 
 | 呼び名 | 英語名 | 書き方 | 同じ意味のブロック |
 | :--- | :--- | :--- | :--- |
@@ -936,6 +938,31 @@ x >> Check:
 * 関数は**定義された時点の外側環境を値で捕捉する**字句スコープを使います（あとから外側の同名変数を束縛し直しても、関数の中から見える値は変わりません）。
 * 関数の引数やブロックの別名はローカルなので、外側にある同じ名前の値を書き換えません。
 * 複数引数の関数には、値リスト `(a, b) >> Func` またはパイプ追加引数 `a >> Func(b)` で順番どおりに値を渡します。引数の数が合わないと `RuntimeError` です。
+
+### 処理引数（大文字の引数）
+
+関数の引数のうち、2 番目以降を大文字で始めると、**処理引数**になります。処理引数には、呼ぶ側が丸括弧に書いた式が、計算されないまま、ひとつの処理として渡ります。関数の中では、その名前をふつうの処理と同じように呼べます（`x >> Keep`、`Filter Keep`、`Map (Keep)`）。呼ばれるたびに、そのときの入力を `@` にして式を計算します。
+
+これで、`Filter (@ > 0)` のように「要素ごとに計算する補助引数」を受け取る処理を、自分で作れます。
+
+```
+(xs, Keep) >> pop MyFilter:
+    xs >> Filter Keep.
+
+[1, 2, 3, 4] >> MyFilter(@ % 2 == 0) >> evens.     // [2, 4]
+[1, 2, 3, 4] >> MyFilter(IsEven) >> evens2.        // 処理名を渡すこともできる
+
+(xs, init, Step) >> pop Fold:
+    xs >> Reduce(init) as (acc, x):
+        (acc, x) >> Step.
+
+[1, 2, 3] >> Fold(10, @[0] + @[1]) >> total.        // 16（init は値、Step は処理引数）
+```
+
+* 処理引数の式は、それを書いた場所の変数を見ます（`3 >> k.` のあとの `Fold(0, @[0] + @[1] * k)` では、`k` は 3）。
+* 処理引数は丸括弧の補助引数でだけ渡せます。値リスト `(xs, 5) >> MyFilter` のように、計算済みの値を渡すと `TypeError` です。
+* 処理引数は補助引数をとりません（`x >> Keep(1)` は `RuntimeError`）。
+* 1 番目の引数（流れてくる値）は、処理引数にできません。`Map`、`Check`、`Return` などの名前も使えません。
 
 ### `Return`
 
