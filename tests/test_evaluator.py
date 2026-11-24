@@ -184,7 +184,8 @@ def test_dictionary_access_and_error_types():
     assert run_code('{"name": "PopCorn"} >> project. project::name.') == "PopCorn"
     expect_error('{"name": "PopCorn"} >> p. p::missing.', "KeyError")
     expect_error("[1, 2] >> xs. xs[5].", "IndexError")
-    expect_error("[1, 2] >> xs. xs[-1].", "IndexError")
+    assert run_code("[1, 2] >> xs. xs[-1].") == 2
+    expect_error("[1, 2] >> xs. xs[-3].", "IndexError")
     expect_error("[1, 2] >> xs. xs[1.5].", "TypeError")
     expect_error('[1, 2] >> xs. xs["a"].', "TypeError")
     expect_error('{"a": 1} >> d. d[0].', "TypeError")
@@ -763,11 +764,14 @@ label.
 
 
 def test_colon_body_must_not_share_its_line_with_the_next_branch():
-    for code in ('1 >> Check:\n    when @ == 1: "yes" else: "no"', '5 >> Check: when @ > 1: "a" else: "b"'):
+    for code, message in (
+        ('1 >> Check:\n    when @ == 1: "yes" else: "no"', "start 'else' on a new line"),
+        ('5 >> Check: when @ > 1: "a" else: "b"', "on the next line"),
+    ):
         try:
             run_code(code)
         except Exception as exc:
-            assert "start 'else' on a new line" in str(exc), str(exc)
+            assert message in str(exc), str(exc)
         else:
             raise AssertionError("one-line colon branches must be rejected")
 
@@ -1066,3 +1070,23 @@ def test_not_in_and_not_binds_looser_than_comparison():
     assert run_code('not 1 == 2.') is True
     assert run_code('["a", "u", "i", "e"] >> Count (@ not in ["a", "i"]).') == 2
     assert run_code('"ab" not in "xaby".') is False
+
+
+def test_one_line_colon_body_is_only_for_branches_and_functions():
+    # `Map: @ * 2 >> d.` は `>> d` まで本体に入ってしまうので、エラーで案内する
+    try:
+        run_code("[1, 2] >> Map: @ * 2 >> d.")
+    except Exception as exc:
+        assert "next line" in str(exc) and "Map (...)" in str(exc), str(exc)
+    else:
+        raise AssertionError("one-line Map body must be rejected")
+    assert run_code("(n) >> pop Double: n * 2\n\n3 >> Double.") == 6
+    assert run_code('2 >> Check:\n    when @ == 1: "one"\n    else: "other"\n>> r.\nr.') == "other"
+
+
+def test_negative_indices_count_from_the_end_everywhere():
+    assert run_code("[10, 20, 30] >> xs. xs[-1].") == 30
+    assert run_code("[10, 20, 30] >> Get(-2).") == 20
+    assert run_code("[10, 20, 30] >> Get(-4, 0).") == 0
+    assert run_code("[10, 20, 30] >> Set(-1, 99).") == [10, 20, 99]
+    expect_error("[10] >> Get(-2).", "IndexError")

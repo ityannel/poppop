@@ -371,8 +371,9 @@ def builtin_Get(current, env, evaluator):
 
         if isinstance(target, (list, tuple)):
             whole_key = _as_whole_int(key, "List indices must be whole Num values")
-            if 0 <= whole_key < len(target):
-                return target[whole_key]
+            pos = whole_key + len(target) if whole_key < 0 else whole_key  # 負の添字は、うしろから
+            if 0 <= pos < len(target):
+                return target[pos]
             if has_default:
                 return default
             raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
@@ -404,10 +405,11 @@ def builtin_Set(current, env, evaluator):
             return res
         if isinstance(target, list):
             whole_key = _as_whole_int(key, "List indices must be whole Num values")
-            if whole_key < 0 or whole_key >= len(target):
+            pos = whole_key + len(target) if whole_key < 0 else whole_key  # 負の添字は、うしろから
+            if pos < 0 or pos >= len(target):
                 raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
             res = list(target)
-            res[whole_key] = value
+            res[pos] = value
             return res
         _type_error("Set target must be List or Dict")
     _type_error("Set requires (target, key, value)")

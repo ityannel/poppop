@@ -40,6 +40,10 @@ assert.equal(
   "文法エラー: ブロックは { } ではなく、「:」と字下げで書きます。Map を「:」で始めて、本体を次の行から字下げしてください。（1行目）",
 );
 assert.equal(
+  localizeError("SyntaxError: Write the body of Map on the next line, indented; for one expression, write 'Map (...)' at line 1, column 16"),
+  "文法エラー: Map の本体は、次の行から字下げして書きます。式 1 つだけなら「Map (...)」と書けます。（1行目）",
+);
+assert.equal(
   localizeError("Warning: Single-quoted strings do not interpolate; use a double-quoted string to insert values at line 3, column 5"),
   `注意: 単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 " の文字列を使います。（3行目）`,
 );

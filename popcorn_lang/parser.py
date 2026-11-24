@@ -34,6 +34,7 @@ class Parser:
                 self._line_indent.setdefault(tok.line, tok.column)
             prev_line = tok.line
         self._layouts: List[Optional[int]] = []
+        self._inline_bodies: set = set()  # `:` と同じ行に書いた本体（_layouts の深さ）
 
     def _dedent_at(self, index: int) -> Optional[Token]:
         """字下げブロックの外に出た行の先頭なら、仮の DEDENT トークンを返す。"""
@@ -68,17 +69,31 @@ class Parser:
         return curr.type in end_set
 
     # ---- ブロックの本体: `:` と字下げ ----
-    def _open_body(self, what: str) -> str:
+    def _open_body(self, what: str, allow_inline: bool = False) -> str:
         """本体を開く。ふつうは "layout"。旧形式の `{` を読むモードのときだけ "brace" もある。"""
         curr = self.current()
         if curr is not None and curr.type == "COLON":
             self.advance()
             self._layouts.append(self._line_indent.get(curr.line, curr.column))
             nxt = self.current()
+            if (
+                not allow_inline
+                and nxt is not None
+                and nxt.type != "DEDENT"
+                and nxt.line == curr.line
+            ):
+                # `Map: @ * 2 >> d.` は、`>> d` まで本体に入ってしまうので、同じ行には書かせない
+                hint = f"; for one expression, write '{what} (...)'" if what in _SIMPLE_STREAM_NAMES else ""
+                raise ParseError(
+                    f"Write the body of {what} on the next line, indented{hint} "
+                    f"at line {nxt.line}, column {nxt.column}"
+                )
             if nxt is None or nxt.type == "DEDENT":
                 raise ParseError(
                     f"Expected an indented body after ':' in {what} at line {curr.line}, column {curr.column}"
                 )
+            if nxt.line == curr.line:
+                self._inline_bodies.add(len(self._layouts))
             return "layout"
         if curr is not None and curr.type == "LBRACE":
             if not self.legacy_braces:
@@ -104,14 +119,15 @@ class Parser:
             raise ParseError(
                 f"Unexpected token {curr.type} ({curr.value}) at line {curr.line}, column {curr.column}"
             )
+        self._inline_bodies.discard(len(self._layouts))
         self._layouts.pop()
 
     @staticmethod
     def _body_end(kind: str) -> set:
         return {"RBRACE"} if kind == "brace" else {"DEDENT"}
 
-    def _parse_body(self, what: str) -> BlockNode:
-        kind = self._open_body(what)
+    def _parse_body(self, what: str, allow_inline: bool = False) -> BlockNode:
+        kind = self._open_body(what, allow_inline)
         block = self.parse_block(self._body_end(kind))
         self._close_body(kind)
         return block
@@ -212,6 +228,13 @@ class Parser:
         end_set = end_tokens or set()
         pipeline = self.parse_pipeline()
         if self.current() and self.current().type == "WHEN":
+            if len(self._layouts) in self._inline_bodies:
+                # `when a: "x" when b` は、2つめの when が分岐に見えて紛らわしい
+                tok = self.current()
+                raise ParseError(
+                    f"A one-line ':' body cannot end with 'when'; start the next branch on a new line, "
+                    f"or write the body on the next line at line {tok.line}, column {tok.column}"
+                )
             self.advance()
             cond = self.parse_expression()
             if self.match("DOT"):
@@ -426,7 +449,7 @@ class Parser:
                 w_tok = self.current()
                 self.advance()
                 cond = self.parse_expression()
-                block = self._parse_body("a when branch")
+                block = self._parse_body("a when branch", allow_inline=True)
                 branches.append(Branch(w_tok.line, w_tok.column, cond, block, "predicate"))
             if not branches:
                 raise ParseError(
@@ -438,7 +461,7 @@ class Parser:
                 )
             e_tok = self.current()
             self.advance()
-            else_block = self._parse_body("the else branch")
+            else_block = self._parse_body("the else branch", allow_inline=True)
             branches.append(Branch(e_tok.line, e_tok.column, None, else_block, "else"))
             self._close_body(kind)
             single_alias = alias_names[0] if len(alias_names) == 1 else None
@@ -849,6 +872,6 @@ class Parser:
 
         self.expect("POP")
         name = self.expect("VERB").value
-        block = self._parse_body(f"function '{name}'")
+        block = self._parse_body(f"function '{name}'", allow_inline=True)
 
         return FunctionDefNode(line, col, name, params, block)

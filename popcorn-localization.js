@@ -77,6 +77,12 @@
     if (match) return `「:」のあとの本体は、その行の終わりまでです。「${match[1]}」は次の行に書いてください。`;
     match = message.match(/^Blocks are written with ':' and indentation, not braces: start (.+) with ':'$/);
     if (match) return `ブロックは { } ではなく、「:」と字下げで書きます。${match[1]} を「:」で始めて、本体を次の行から字下げしてください。`;
+    match = message.match(/^Write the body of (.+?) on the next line, indented(?:; for one expression, write '(.+)')?$/);
+    if (match) return match[2]
+      ? `${match[1]} の本体は、次の行から字下げして書きます。式 1 つだけなら「${match[2]}」と書けます。`
+      : `${match[1]} の本体は、次の行から字下げして書きます。`;
+    match = message.match(/^A one-line ':' body cannot end with 'when'; start the next branch on a new line, or write the body on the next line$/);
+    if (match) return "同じ行に書いた本体は、後ろに when を付けられません。本体を次の行に書いてください。";
     match = message.match(/^Expected an indented body after ':' in (.+)$/);
     if (match) return `「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（${match[1]}）。`;
     match = message.match(/^Expected ':' to start (.+?), but got (.+)$/);

@@ -636,9 +636,11 @@ class Evaluator:
 
         if isinstance(target, (list, tuple)):
             whole_idx = _as_whole_int(idx, "List indices must be whole Num values")
-            if whole_idx < 0 or whole_idx >= len(target):
+            # 負の添字は、うしろから数える（xs[-1] は最後の要素）
+            pos = whole_idx + len(target) if whole_idx < 0 else whole_idx
+            if pos < 0 or pos >= len(target):
                 raise PopCornError("IndexError", f"Index {whole_idx} out of bounds")
-            return target[whole_idx]
+            return target[pos]
 
         if isinstance(target, dict):
             if not isinstance(idx, str):

@@ -45,13 +45,13 @@ answer >> Display.
 | グループ | `( )`、`[ ]`、`{ }`（`{ }` は辞書だけ） |
 | 区切り | `,` |
 | アクセス | `::`、`@` |
-| 演算子 | `+ - * / % == != > < >= <=` |
+| 演算子 | `+ - * / % == != > < >= <=`、単語の演算子 `and` `or` `not` `in` `not in` |
 
 ### 評価の順序
 
 式とパイプラインは左から右へ、必要になったタイミングで評価します。関数呼び出しや標準処理は現在値を受け取り、その結果を次の段階へ渡します。`and` と `or` だけは短絡評価を行うため、左辺だけで結果が決まるときは右辺を評価しません。
 
-トークンの間であれば、改行・インデント・空行を増やしたり減らしたりしてもプログラムの意味は変わりません。文を区切るときは必ず `.` を使ってください。
+`:` のブロックの字下げと、ブロックのあとの行の字下げを除けば、改行・空白・空行を増やしたり減らしたりしてもプログラムの意味は変わりません。文を区切るときは `.` を使ってください。
 
 ## 2. 名前と表記
 
@@ -60,7 +60,7 @@ answer >> Display.
 標準のパイプ処理と型変換処理は、先頭を大文字にしたキャメルケースで書きます。
 
 ```
-Map  Filter  Reduce  Sort  SortDesc  Group  Fork  Update  Check  Loop  Try  Catch
+Map  Filter  Count  Reduce  Sort  SortDesc  Group  Fork  Update  Check  Loop  Try  Catch
 Break  Return  Zip  Bool  Str  List  Dict  Num  Type
 ```
 
@@ -231,8 +231,8 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 文字列 | `Format` | `(template, value, ...)` | `{0}`、`{1}` などの位置プレースホルダに値を埋め込んだ `Str` を返します。ふだんは `{式}` 補間を使うのがおすすめです。 |
 | コレクション | `Length` | `List`、`Dict`、`Str`、値リスト | 要素数、キー数、または Unicode コードポイント数を `Num` で返します。 |
 | コレクション | `Reverse` | `List` または `Str` | 逆順にした新しい `List` または `Str`（コードポイント単位）を返します。非破壊。 |
-| コレクション | `Get` | `(target, key)` または `(target, key, default)` | `List` の添字や `Dict` のキーに対応する値を返します。見つからないとき、`default` があればそれを返し、なければ `IndexError` / `KeyError`。 |
-| コレクション | `Set` | `(target, key, value)` | `List` の要素や `Dict` のフィールドを置き換えた新しい値を返します。非破壊。 |
+| コレクション | `Get` | `(target, key)` または `(target, key, default)` | `List` の添字（負ならうしろから）や `Dict` のキーに対応する値を返します。見つからないとき、`default` があればそれを返し、なければ `IndexError` / `KeyError`。 |
+| コレクション | `Set` | `(target, key, value)` | `List` の要素（負の添字はうしろから）や `Dict` のフィールドを置き換えた新しい値を返します。非破壊。 |
 | コレクション | `Remove` | `(dict, key)` | 指定キーを取り除いた新しい `Dict` を返します。存在しないキーでもエラーにならず複製を返します。非破壊。 |
 | コレクション | `Keys` | `Dict` | 挿入順のキー（`Str`）の `List` を返します。 |
 | コレクション | `Values` | `Dict` | 挿入順の値の `List` を返します。 |
@@ -349,7 +349,9 @@ arr >> Break when i >= n - 1.
 ```
 
 * `:` のブロックは、`:` のある行（見出しの行）の最初のトークンより、深く字下げされた行が続くあいだ続きます。見出しの行と同じか浅い行が来たところで、終わります。
-* `:` のすぐあと、同じ行に本体を書いてもかまいません（`else: num`）。その場合も、次の行が見出しより深ければ、本体はそこまで続きます。
+* `Check` の分岐（`when …:` / `else:`）と関数定義（`pop 名前:`）だけは、`:` のすぐあと、同じ行に本体を書けます（`else: num`）。その場合も、次の行が見出しより深ければ、本体はそこまで続きます。
+* `Map` などのストリーム処理や `Loop`、`Try` などは、本体を次の行から書きます。`[1, 2] >> Map: @ * 2 >> d.` のように同じ行に書くと、`>> d` まで本体に入ってしまうためです（エラーで案内します）。1 行で書きたいときは式渡し `Map (@ * 2)` を使います。
+* 同じ行に書いた本体は、後置の `when` で終われません（`when a: "x" when b` は、2 つめの `when` が分岐に見えて紛らわしいため、エラーです）。
 * ブロックの最後の文の `.` は省略できます。最後以外の文には `.` が必要です。
 * 本体が空のブロックは書けません。受け取った値をそのまま返したいときは `@` と書きます。
 * 丸括弧、角括弧、辞書の `{ }` の中では、行の字下げを見ません（複数行のリストや値リストは、自由に字下げできます）。閉じかっこが来ると、その中で開いた `:` のブロックは終わります。
@@ -428,11 +430,11 @@ ParameterList      = "(" VariableName { "," VariableName } ")" .
 Expression         = OrExpr .
 OrExpr             = AndExpr { "or" AndExpr } .
 AndExpr            = NotExpr { "and" NotExpr } .
-NotExpr            = "not" NotExpr | CompareExpr .
+NotExpr            = "not" NotExpr | CompareExpr .   (* 式の途中の not は UnaryExpr *)
 CompareExpr        = AddExpr [ ( "==" | "!=" | ">" | "<" | ">=" | "<=" | "in" | "not" "in" ) AddExpr ] .
 AddExpr            = MulExpr { ( "+" | "-" ) MulExpr } .
 MulExpr            = UnaryExpr { ( "*" | "/" | "%" ) UnaryExpr } .
-UnaryExpr          = "-" UnaryExpr | PostfixExpr .
+UnaryExpr          = ( "-" | "not" ) UnaryExpr | PostfixExpr .
 PostfixExpr        = PrimaryExpr { "[" Expression "]" | "::" Identifier } .
 PrimaryExpr        = Literal | VariableName | "@" | InlineProcessCall
                    | "(" Pipeline ")" | ValueList | ListLiteral | DictLiteral .
@@ -490,7 +492,7 @@ values[0] >> first.
 user::name >> name.
 ```
 
-存在する添字やキーを指定すると、その値が返ります。`List` の範囲外の添字は `IndexError`、添字の型違いは `TypeError`、存在しない `Dict` キーは `KeyError` になります。
+存在する添字やキーを指定すると、その値が返ります。負の添字はうしろから数えます（`values[-1]` は最後の要素）。`Get` と `Set` の添字も同じです。`List` の範囲外の添字は `IndexError`、添字の型違いは `TypeError`、存在しない `Dict` キーは `KeyError` になります。
 
 ### スコープと束縛
 
@@ -521,7 +523,7 @@ and  or
 | 7 | `and` | 左 | `Bool` の論理積（短絡評価） |
 | 8 | `or` | 左 | `Bool` の論理和（短絡評価） |
 
-`not` は比較より弱く結びつきます。`not @ in ["a", "i"]` は `not (@ in ["a", "i"])`、`not a == b` は `not (a == b)` の意味です。
+`not` は比較より弱く結びつきます。`not @ in ["a", "i"]` は `not (@ in ["a", "i"])`、`not a == b` は `not (a == b)` の意味です。比較の右側など、式の途中に書いた `not`（`x == not y`）は、すぐあとの値だけを否定します。
 
 ### 数値演算の型ルール
 
@@ -1000,7 +1002,8 @@ PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スク�
 
 * **ブロックの書き分け:** 1 つの式だけの短い処理は `[1, 2, 3] >> Map as x (x * 2)` や `words >> Map Length` のように 1 行で書き、複数の文になるときは `:` のブロックにします。ブロックのあとの段階は、見出しの行と同じ字下げで `>> 次段階.` と続けます。字下げは 4 つの空白がおすすめです。
 * **対等なペア引数の書き方:** `Random` の `(minimum, maximum)` や `Zip` の複数 `List` のように、引数が対等な関数は `(1, 6) >> Random` のように値リストで渡すのがおすすめです。
-* **処理名だけで書くのは、入力を使わない処理だけ:** `Pi * 2` や `Now::year` のように、入力を使わない処理（`Pi`、`E`、`Now`、`Args`）は、処理名だけで書けます。入力を使う処理（`Display`、`Length`、`Sum` など）は、`value >> Length` のように、`>>` で入力を見せて書くと、書き忘れに気づけます。
+* **処理名だけで書くのは、入力がはっきりしているときだけ:** 入力を使わない処理（`Pi * 2`、`Now::year`）と、ブロックや処理名渡しの中で各要素に当てる処理（`words >> Map Length`、`Slice(-1, Length)`）は、処理名だけで書いてかまいません。それ以外で入力を使う処理（`Display`、`Sum` など）は、`value >> Sum` のように、`>>` で入力を見せて書くと、書き忘れに気づけます。
+* **否定の書き方:** 「含まれていない」は `x not in xs`、「等しくない」は `a != b` と書くのがおすすめです（`not x in xs` や `not (a == b)` も同じ意味ですが、読み違えやすいです）。
 * **長いパイプラインの改行:** 3 段階以上つながるパイプラインは、`>>` の前で改行して縦に揃えると読みやすくなります。
 
 ## 付録 B. 参考にした仕様書の構成
