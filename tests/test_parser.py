@@ -80,7 +80,7 @@ def test_implicit_value_is_allowed_after_program_input():
 
 
 def test_reduce_accepts_initial_value_and_destructuring_alias():
-    ast = parse_code("[1, 2] >> Reduce from 0 as (acc, item):\n    acc + item.")
+    ast = parse_code("[1, 2] >> Reduce(0) as (acc, item):\n    acc + item.")
     block = ast.statements[0].nodes[1]
     assert isinstance(block, StreamBlockNode)
     assert block.stream_type == "Reduce"

@@ -107,11 +107,10 @@ assert.deepStrictEqual(
 
 // Destructuring alias in Reduce, pop function params, and labeled Fork should not flag undefined variables
 const reduceForkAndPop = [
-    "0 >> base.",
     "(a, b) >> pop AddTwo {",
     "    a + b.",
     "}",
-    "[1, 2, 3] >> Reduce from base as (acc, item) {",
+    "[1, 2, 3] >> Reduce(0) as (acc, item) {",
     "    acc + item.",
     "} >> total.",
     "[1, 2, 3] >> Fork as values {",

@@ -48,7 +48,7 @@
       "patterns": [
         {
           "name": "keyword.control.flow.popcorn",
-          "match": "\\b(when|else|as|pop|not|from)\\b"
+          "match": "\\b(when|else|as|pop|not)\\b"
         },
         {
           "name": "support.function.builtin.popcorn",

@@ -89,8 +89,6 @@
     if (match) return `${match[1]} の本体は「:」で始めてください（「${match[2]}」が見つかりました）。`;
     match = message.match(/^'(\w+) (\w+)' is not allowed as a process-name body; write a block: '.+'$/);
     if (match) return `「${match[2]}」は処理名渡しでは書けません。「${match[1]}:」のようにブロックで書いてください。`;
-    match = message.match(/^Write the initial value of Reduce with 'from': '(.+)'$/);
-    if (match) return `Reduce の初期値は from で書きます。「${match[1]}」のように書いてください。`;
     match = message.match(/^Variable '([^']+)' is not defined\.?$/);
     if (match) return `変数「${match[1]}」は定義されていません。`;
     match = message.match(/^Function '([^']+)' is not defined\.?$/);
