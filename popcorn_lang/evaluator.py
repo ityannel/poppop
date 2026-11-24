@@ -253,6 +253,16 @@ class Evaluator:
             env.has_current_item = prev_has
 
     async def eval_Pipeline(self, node: Pipeline, env: Environment):
+        try:
+            return await self._eval_pipeline_stages(node, env)
+        except PopCornError as exc:
+            # 行番号がまだなければ、いちばん内側の文の行を覚えておく（テストの報告などで使う）
+            if exc.line is None and getattr(node, "line", None):
+                exc.line = node.line
+                exc.column = node.column
+            raise
+
+    async def _eval_pipeline_stages(self, node: Pipeline, env: Environment):
         val = await self.eval(node.nodes[0], env)
         env.set_current(val)
         self.trace_pipeline_value(node.nodes[0], val)
@@ -585,6 +595,11 @@ class Evaluator:
                 index for index, param in enumerate(function_entry[0].params)
                 if param.type_name == "process"
             }
+        else:
+            from .pop_builtins import BUILTIN_PROCESS_ARGUMENTS
+
+            # 標準処理のうち、補助引数を処理として受け取るもの（ExpectError など）
+            process_positions = BUILTIN_PROCESS_ARGUMENTS.get(name, set())
 
         if node.args:
             extra_vals = []
@@ -654,9 +669,16 @@ class Evaluator:
         from .pop_builtins import BUILTIN_REGISTRY
 
         if name in BUILTIN_REGISTRY:
-            res = BUILTIN_REGISTRY[name](current, env, self)
-            if inspect.iscoroutine(res):
-                res = await res
+            try:
+                res = BUILTIN_REGISTRY[name](current, env, self)
+                if inspect.iscoroutine(res):
+                    res = await res
+            except PopCornError as exc:
+                # どこで起きたかを、テストの報告などで示せるように覚えておく
+                if exc.line is None:
+                    exc.line = node.line
+                    exc.column = node.column
+                raise
             return res
 
         raise PopCornError("NameError", f"Function '{name}' is not defined.")

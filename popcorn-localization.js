@@ -20,6 +20,7 @@
     ["NetworkError", "通信エラー"],
     ["SystemError", "システムエラー"],
     ["UserError", "プログラムからのエラー"],
+    ["AssertionError", "テスト失敗"],
     ["PlaygroundError", "Playgroundエラー"],
   ]);
 

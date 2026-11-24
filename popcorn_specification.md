@@ -265,6 +265,9 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 制御 | `Return` | 任意の値 | いちばん内側の `pop` 関数を終わらせ、入力値を関数の結果にします。関数外では `RuntimeError`。 |
 | 制御 | `Break` | 任意の値 | いちばん内側の `Loop` を終わらせ、入力値を `Loop` の結果にします。`Loop` 外では `RuntimeError`。 |
 | エラー | `Throw` | 任意の値 | 入力値を `Str` 変換したメッセージで `UserError` を起こします。 |
+| テスト | `Expect` | `(actual, expected)` または `(actual, expected, message)` | `actual == expected` なら `actual` をそのまま返します。ちがえば、期待した値と実際の値を示す `AssertionError` を起こします（17章）。 |
+| テスト | `Assert` | `Bool` または `(condition, message)` | `true` なら `true` を返します。`false` なら `AssertionError`（`message` があれば、それを説明にします）。`Bool` 以外は `TypeError`。 |
+| テスト | `ExpectError` | 任意の値と、丸括弧に書いた式（と、省略できるエラーの分類 `Str`） | 式を、入力値を `@` にして計算し、エラーになれば `{"type": Str, "message": Str}` を返します。エラーにならないときや、分類がちがうときは `AssertionError`（17章）。 |
 
 ## 4. パイプライン、束縛、パイプ追加引数
 
@@ -1011,6 +1014,7 @@ value >> Reverse >> value.
 | `IOError` | `ReadFile` / `WriteFile` の失敗 |
 | `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` の通信失敗や HTTP エラー |
 | `UserError` | `Throw` を評価したとき |
+| `AssertionError` | `Expect`・`Assert`・`ExpectError` で確かめたことが成り立たなかったとき（17章） |
 
 エラーが起きたパイプラインでは、そのあとの段階は評価しません。`Fork` の分岐や、`Map`・`Filter`・`Reduce`・`Sort`・`SortDesc`・`Group` の中でエラーが起きた場合も、いちばん内側の `Try`/`Catch` で捕捉されない限り、そのストリーム処理全体のエラーになります。
 
@@ -1019,6 +1023,69 @@ value >> Reverse >> value.
 PopCorn 1 に適合する処理系は、この文書で決めたソースコードを同じ評価順序・値・スコープ・`Str` 変換表現・標準処理の結果・エラー分類で動かします。日時・乱数・入力・ファイル・ネットワークなど実行環境に左右される具体的な値まで一致させる必要はありませんが、入力の形・結果の型・エラー分類はこの仕様に合わせます。
 
 エディタや静的解析器は、実行結果を変えない範囲で注意を表示できます。大文字・小文字だけが標準処理名と違うユーザー名に注意を出すことはできますが、正しいプログラムとして扱います。
+
+## 17. テスト
+
+PopCorn では、テスト（プログラムが思ったとおりに動くかを確かめるコード）を、ふつうの PopCorn で書きます。
+
+### テストの書き方
+
+名前が `Test` で始まる、引数のない関数が、テストです（`TestAdd`、`Test_add`、`Test1` など。`Test` の次は大文字・数字・`_` にします。`Tester` はテストではありません）。中で、標準関数 `Expect`・`Assert`・`ExpectError` を使って、結果を確かめます。
+
+```
+(a, b) >> pop AddTwo:
+    a + b.
+
+pop TestAddTwo:
+    (1, 2) >> AddTwo >> Expect(3).
+    10 >> AddTwo(-3) >> Expect(7).
+
+pop TestEvenNumbers:
+    [1, 2, 3, 4] >> Filter (@ % 2 == 0) >> evens.
+    evens >> Expect([2, 4]).
+    (evens >> Length) == 2 >> Assert("偶数は 2 個のはず").
+
+pop TestDivideByZero:
+    0 >> ExpectError(10 / @, "RuntimeError") >> err.
+    err::message >> Expect("Division by zero").
+```
+
+* `actual >> Expect(expected)` は、`==` と同じルール（3章「等価性」）で比べます。等しければ `actual` をそのまま返すので、パイプラインを続けられます。3 つめに `Str` を渡すと（`Expect(3, "1 + 2 は 3")`）、失敗したときの説明になります。
+* `条件 >> Assert` は、条件が `true` かどうかを確かめます。`Assert("説明")` と書くと、失敗したときに、その説明を表示します。条件は `Bool` でなければなりません（6章「厳格な `Bool` ルール」）。
+* `value >> ExpectError(式)` は、丸括弧の中の式を計算しないまま受け取り、`value` を `@` にして計算します（13章「処理引数」と同じしくみ）。エラーになれば、`Catch` と同じ `{"type": Str, "message": Str}` を返します。2 つめにエラーの分類（`"TypeError"` など）を書くと、分類も確かめます。
+* 確かめたことが成り立たないと、`AssertionError` になります。`AssertionError` も PopCorn エラーなので、テストの外でも使えますし、`Try` / `Catch` で受け取ることもできます。
+
+### テストの実行（`popcorn test`）
+
+```
+popcorn test                  // いまのフォルダの中の *_test.pop を、すべて実行
+popcorn test calc_test.pop    // ファイルを指定して実行（名前は自由）
+popcorn test tests            // フォルダの中の *_test.pop を実行
+```
+
+テストファイルごとに、次の順で進みます。
+
+1. ファイル全体を、ふつうのプログラムと同じように実行します（関数の定義と、いちばん外側の文）。ここでエラーになると、そのファイルのテストは実行しません。
+2. テスト関数を、ファイルに書いた順に 1 つずつ呼びます。入力（`@`）は `null` です。値は非破壊なので、あるテストが、ほかのテストの結果を変えることはありません。
+3. 1 つのテストが失敗しても、残りのテストは続けて実行します。
+
+結果は、テストごとに `✓`（成功）、`✗`（`AssertionError` で失敗）、`!`（それ以外のエラー）で表示し、最後に件数をまとめます。失敗したテストには、行番号と、期待した値・実際の値、わかるときはヒント（型のちがい、小数の誤差、前後の空白、ちがう要素の位置など）を表示します。すべて成功したときだけ、終了コードは `0` です。
+
+```
+calc_test.pop
+  ✓ TestAddTwo
+  ✗ TestAverage（9 行目）
+      期待した値と、実際の値がちがいます。
+        期待した値: 0.3
+        実際の値:   0.30000000000000004
+        ヒント: 小数の計算では、ごく小さな誤差が出ることがあります。Round などで丸めてから比べましょう（例: @ * 100 >> Round）。
+
+結果: 2 件中 1 件成功、1 件失敗。直すところがあります
+```
+
+`popcorn calc_test.pop` のように、ふつうに実行したときは、テスト関数は呼ばれません（定義されるだけです）。
+
+ブラウザの Playground では、コマンドの代わりに、実行ボタンで、プログラムを実行したあと、テスト関数があれば、続けて同じようにテストを実行します。
 
 ## 付録 A. PopCorn 1 の非目標と推奨スタイル
 

@@ -977,3 +977,170 @@ for _name, _fn in (
     ("Args", builtin_Args),
 ):
     BUILTIN_REGISTRY[_name] = _fn
+
+
+# ================================================================
+# テスト用の標準関数（Expect・Assert・ExpectError）
+# ================================================================
+# 失敗は AssertionError です。学ぶ人が読むものなので、メッセージは日本語で書きます。
+
+# 補助引数を、計算しないまま「処理」として受け取る標準関数と、その位置（1 から数える）
+BUILTIN_PROCESS_ARGUMENTS = {"ExpectError": {1}}
+
+
+def _assertion_error(message: str):
+    raise PopCornError("AssertionError", message)
+
+
+def _show_value(value) -> str:
+    """失敗の報告に出す値の書き方。文字列は引用符つきにして、3 と "3" を見分けられるようにする。"""
+    try:
+        text = format_popcorn_str(value, nested=True)
+    except PopCornError:
+        text = repr(value)
+    if len(text) > 200:
+        text = text[:197] + "..."
+    return text
+
+
+def _difference_hint(expected, actual) -> str | None:
+    """どこがちがうのかの手がかり。見つからなければ None。"""
+    expected_type = popcorn_type_name(expected)
+    actual_type = popcorn_type_name(actual)
+    if expected_type != actual_type:
+        hint = f"型がちがいます（期待した型: {expected_type}、実際の型: {actual_type}）。"
+        if {expected_type, actual_type} == {"Num", "Str"}:
+            hint += "数と文字列は、見た目が同じでも別の値です。Num や Str で型をそろえてから比べましょう。"
+        elif {expected_type, actual_type} == {"List", "Tuple"}:
+            hint += "値リスト (…) と List […] は別の値です。List で List に変換できます。"
+        return hint
+    if expected_type == "Num":
+        expected_num, actual_num = float(expected), float(actual)
+        if abs(expected_num - actual_num) <= 1e-9 * max(1.0, abs(expected_num), abs(actual_num)):
+            return (
+                "小数の計算では、ごく小さな誤差が出ることがあります。"
+                "Round などで丸めてから比べましょう（例: @ * 100 >> Round）。"
+            )
+        return None
+    if expected_type == "Str":
+        if expected.strip() == actual.strip():
+            return "前やうしろの空白や改行がちがいます。Trim で取り除けます。"
+        if expected.lower() == actual.lower():
+            return "大文字と小文字がちがいます。"
+        return None
+    if expected_type in ("List", "Tuple"):
+        if len(expected) != len(actual):
+            return f"要素の数がちがいます（期待: {len(expected)} 個、実際: {len(actual)} 個）。"
+        for index, (want, got) in enumerate(zip(expected, actual)):
+            if not _values_equal(want, got):
+                return (
+                    f"添字 {index} の要素がちがいます"
+                    f"（期待: {_show_value(want)}、実際: {_show_value(got)}）。"
+                )
+        return None
+    if expected_type == "Dict":
+        missing = [key for key in expected if key not in actual]
+        extra = [key for key in actual if key not in expected]
+        if missing:
+            return "キー " + "、".join(f'"{key}"' for key in missing) + " がありません。"
+        if extra:
+            return "期待していないキー " + "、".join(f'"{key}"' for key in extra) + " があります。"
+        for key in expected:
+            if not _values_equal(expected[key], actual[key]):
+                return (
+                    f'キー "{key}" の値がちがいます'
+                    f"（期待: {_show_value(expected[key])}、実際: {_show_value(actual[key])}）。"
+                )
+    return None
+
+
+def builtin_Expect(current, env, evaluator):
+    """actual >> Expect(expected): 2 つの値が == で等しければ、actual をそのまま返す。"""
+    if not isinstance(current, tuple) or len(current) not in (2, 3):
+        _type_error("Expect requires (actual, expected) or (actual, expected, message)")
+    actual, expected = current[0], current[1]
+    note = current[2] if len(current) == 3 else None
+    if note is not None and not isinstance(note, str):
+        _type_error("Expect message must be Str")
+    if _values_equal(actual, expected):
+        return actual
+    lines = []
+    if note:
+        lines.append(note)
+    lines.append("期待した値と、実際の値がちがいます。")
+    lines.append(f"  期待した値: {_show_value(expected)}")
+    lines.append(f"  実際の値:   {_show_value(actual)}")
+    hint = _difference_hint(expected, actual)
+    if hint:
+        lines.append(f"  ヒント: {hint}")
+    _assertion_error("\n".join(lines))
+
+
+def builtin_Assert(current, env, evaluator):
+    """condition >> Assert または condition >> Assert("説明"): true でなければ失敗。"""
+    note = None
+    condition = current
+    if isinstance(current, tuple):
+        if len(current) != 2:
+            _type_error("Assert requires a Bool, or (condition, message)")
+        condition, note = current
+        if not isinstance(note, str):
+            _type_error("Assert message must be Str")
+    if not isinstance(condition, bool):
+        _type_error(
+            f"Assert requires Bool, got {popcorn_type_name(condition)}; "
+            "compare values (==, <, in …) before Assert"
+        )
+    if condition:
+        return True
+    _assertion_error(note or "条件が true になりませんでした（false でした）。")
+
+
+async def builtin_ExpectError(current, env, evaluator):
+    """value >> ExpectError(式) / ExpectError(式, "TypeError"): 式がエラーになることを確かめる。
+
+    式は計算しないまま受け取り、value を @ にして計算します。エラーになれば、
+    Catch と同じ {"type": …, "message": …} の Dict を返します。
+    """
+    from .environment import Environment
+    from .evaluator import EvaluatorError, ProcessArgument
+
+    if not isinstance(current, tuple) or len(current) not in (2, 3):
+        _type_error("ExpectError requires an expression in parentheses: '>> ExpectError(…)'")
+    value, body = current[0], current[1]
+    wanted = current[2] if len(current) == 3 else None
+    if not isinstance(body, ProcessArgument):
+        _type_error("Pass the expression of ExpectError in parentheses: '>> ExpectError(…)'")
+    if wanted is not None and not isinstance(wanted, str):
+        _type_error("ExpectError error type must be Str (for example \"TypeError\")")
+
+    body_env = Environment(parent=body.env)
+    body_env.set_current(value)
+    try:
+        result = await evaluator.eval(body.expr, body_env)
+    except PopCornError as exc:
+        error = {"type": exc.err_type, "message": exc.message}
+    except EvaluatorError as exc:
+        error = {"type": "RuntimeError", "message": str(exc)}
+    except OSError as exc:
+        error = {"type": "IOError", "message": str(exc)}
+    else:
+        lines = ["エラーになるはずでしたが、エラーになりませんでした。"]
+        if wanted:
+            lines.append(f"  期待したエラー: {wanted}")
+        lines.append(f"  実際の結果:     {_show_value(result)}")
+        _assertion_error("\n".join(lines))
+
+    if wanted and error["type"] != wanted:
+        _assertion_error(
+            "エラーにはなりましたが、エラーの分類がちがいます。\n"
+            f"  期待したエラー: {wanted}\n"
+            f"  実際のエラー:   {error['type']}: {error['message']}"
+        )
+    return error
+
+
+for _name, _fn in (
+    ("Expect", builtin_Expect), ("Assert", builtin_Assert), ("ExpectError", builtin_ExpectError),
+):
+    BUILTIN_REGISTRY[_name] = _fn
