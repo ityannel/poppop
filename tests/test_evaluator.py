@@ -984,7 +984,8 @@ def test_fizzbuzz_with_colon_bodies_and_a_parenthesized_map():
     assert run_code(FIZZBUZZ_COLON) == FIZZBUZZ_EXPECTED
 
 
-def test_map_with_a_process_name_is_the_same_as_applying_it_to_each_item():
+def test_process_name_body_applies_the_process_to_each_item():
+    # 処理名渡し: Map FizzBuzz は Map { @ >> FizzBuzz } と同じ
     code = FIZZBUZZ_COLON.replace("Map (@ >> FizzBuzz)", "Map FizzBuzz")
     assert run_code(code) == FIZZBUZZ_EXPECTED
 
@@ -1001,12 +1002,12 @@ def test_short_stream_bodies():
     assert run_code("[1, 2, 3] >> Reduce(10) Add.") == 16
 
 
-def test_short_stream_body_rejects_block_forms():
+def test_process_name_body_rejects_block_forms():
     for code in ("[1] >> Map Check.", "[1] >> Filter Return."):
         try:
             run_code(code)
         except Exception as exc:
-            assert "write a block" in str(exc), str(exc)
+            assert "process-name body" in str(exc), str(exc)
         else:
             raise AssertionError(f"must be rejected: {code}")
 

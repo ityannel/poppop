@@ -282,8 +282,8 @@ class Parser:
     ) -> Optional[BlockNode]:
         """ブロックを短く書く2つの形。当てはまらなければ None。
 
-        * `Map (式)`   は `Map { 式 }` と同じ（式の中の `@` が、各要素）
-        * `Map Name`   は `Map { Name }`、つまり `Map { @ >> Name }` と同じ
+        * 式渡し（expression body）:     `Map (式)` は `Map { 式 }` と同じ（式の中の `@` が、各要素）
+        * 処理名渡し（process-name body）: `Map Name` は `Map { @ >> Name }` と同じ
                        （`Map Get("x")` のように補助引数も書ける）
         """
         curr = self.current()
@@ -296,7 +296,7 @@ class Parser:
         if curr.type == "VERB" and not alias_names:
             if curr.value in _NOT_SHORTHAND_NAMES:
                 raise ParseError(
-                    f"'{name} {curr.value}' is not allowed; write a block: "
+                    f"'{name} {curr.value}' is not allowed as a process-name body; write a block: "
                     f"'{name} {{ ... }}' at line {line}, column {col}"
                 )
             stage = self._parse_stream_block_or_call()

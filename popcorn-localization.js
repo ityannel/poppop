@@ -77,8 +77,8 @@
     if (match) return `「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（${match[1]}）。`;
     match = message.match(/^Expected '\{' or ':' to start (.+?), but got (.+)$/);
     if (match) return `${match[1]} の本体は「{ … }」か「:」で始めてください（「${match[2]}」が見つかりました）。`;
-    match = message.match(/^'(\w+) (\w+)' is not allowed; write a block: '.+'$/);
-    if (match) return `「${match[1]} ${match[2]}」とは書けません。「${match[1]} { … }」のようにブロックで書いてください。`;
+    match = message.match(/^'(\w+) (\w+)' is not allowed as a process-name body; write a block: '.+'$/);
+    if (match) return `「${match[2]}」は処理名渡しでは書けません。「${match[1]} { … }」のようにブロックで書いてください。`;
     match = message.match(/^Variable '([^']+)' is not defined\.?$/);
     if (match) return `変数「${match[1]}」は定義されていません。`;
     match = message.match(/^Function '([^']+)' is not defined\.?$/);
