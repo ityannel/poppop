@@ -80,7 +80,7 @@ def test_implicit_value_is_allowed_after_program_input():
 
 
 def test_reduce_accepts_initial_value_and_destructuring_alias():
-    ast = parse_code("[1, 2] >> Reduce(0) as (acc, item) { acc + item. }")
+    ast = parse_code("[1, 2] >> Reduce(0) as (acc, item):\n    acc + item.")
     block = ast.statements[0].nodes[1]
     assert isinstance(block, StreamBlockNode)
     assert block.stream_type == "Reduce"
@@ -116,14 +116,14 @@ def test_brackets_accept_list_index():
 
 def test_fork_labeled_and_unlabeled():
     unlabeled = parse_code(
-        "[1, 2] >> Fork as values { values >> Sum. values >> Max. }"
+        "[1, 2] >> Fork as values:\n    values >> Sum. values >> Max."
     ).statements[0].nodes[1]
     assert unlabeled.var_names == ["values"]
     assert unlabeled.labeled_entries is None
     assert len(unlabeled.block.pipelines) == 2
 
     labeled = parse_code(
-        "[1, 2] >> Fork as values { total: values >> Sum. max: values >> Max. }"
+        "[1, 2] >> Fork as values:\n    total: values >> Sum. max: values >> Max."
     ).statements[0].nodes[1]
     assert labeled.var_names == ["values"]
     assert labeled.labeled_entries is not None
@@ -175,7 +175,7 @@ def test_postfix_when_statement():
 
 
 def test_try_catch_syntax():
-    ast = parse_code("1 >> Try { @. } Catch as err { err::message. }")
+    ast = parse_code("1 >> Try:\n    @.\nCatch as err:\n    err::message.")
     node = ast.statements[0].nodes[1]
     assert isinstance(node, TryCatchBlock)
     assert node.catch_alias_names == ["err"]
@@ -212,20 +212,20 @@ def test_parenthesized_pipeline_in_expression():
 
 def test_optional_trailing_dot_inside_blocks():
     # Single statement in block without trailing dot
-    parse_code("[1, 2, 3] >> Map as x { x * 2 } >> doubled.")
+    parse_code("[1, 2, 3] >> Map as x:\n    x * 2\n>> doubled.")
     # Multi-statement block: earlier statement requires dot, last omits dot
-    parse_code("[1, 2] >> Map as x { x * 2 >> y. y + 1 }")
+    parse_code("[1, 2] >> Map as x:\n    x * 2 >> y. y + 1")
     # Function body omitting trailing dot
-    parse_code("(a, b) >> pop Add { a + b }")
+    parse_code("(a, b) >> pop Add:\n    a + b")
     # Check branches omitting trailing dot before next when / else / }
-    parse_code('2 >> Check as v { when v == 0 { "zero" } when v == 2 { "two" } else { "other" } }')
+    parse_code('2 >> Check as v:\n    when v == 0:\n        "zero"\n    when v == 2:\n        "two"\n    else:\n        "other"')
     # Fork unlabeled and labeled omitting trailing dot on last branch
-    parse_code("[1, 2] >> Fork { @ >> Sum. @ >> Max }")
-    parse_code("[1, 2] >> Fork { total: @ >> Sum. max: @ >> Max }")
+    parse_code("[1, 2] >> Fork:\n    @ >> Sum. @ >> Max")
+    parse_code("[1, 2] >> Fork:\n    total: @ >> Sum. max: @ >> Max")
     # Update omitting trailing dot on last statement
-    parse_code('{"a": 1} >> Update as u { 2 >> u::a }')
+    parse_code('{"a": 1} >> Update as u:\n    2 >> u::a')
     # Postfix when as last statement in block omitting trailing dot
-    parse_code("0 >> Loop as x { x >> Break when x >= 5 }")
+    parse_code("0 >> Loop as x:\n    x >> Break when x >= 5")
 
     # Non-last statement inside block STILL requires dot
     try:

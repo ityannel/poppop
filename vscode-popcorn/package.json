@@ -6,7 +6,7 @@
   "publisher": "popcorn-dev",
   "main": "./extension.js",
   "scripts": {
-    "test": "node assignment-targets.test.js && node semantic-highlights.test.js && node language-features.test.js && node extension-flow.test.js"
+    "test": "node assignment-targets.test.js && node layout-view.test.js && node semantic-highlights.test.js && node language-features.test.js && node extension-flow.test.js"
   },
   "icon": "icon.png",
   "engines": {

@@ -14,9 +14,13 @@ class ParseError(Exception):
 
 
 class Parser:
-    def __init__(self, tokens: List[Token]):
+    def __init__(self, tokens: List[Token], *, legacy_braces: bool = False):
         self.tokens = tokens
         self.pos = 0
+        # legacy_braces: 旧形式の `{ … }` ブロックも読む（`popcorn migrate` が、書きかえ位置を知るためだけに使う）
+        self.legacy_braces = legacy_braces
+        self.brace_blocks: List[tuple] = []  # (開き `{` の位置, 閉じ `}` の位置)
+        self._brace_stack: List[int] = []
         # 字下げブロック（`:` のあとに書く本体）のための情報。
         #   _line_starts:  行の最初のトークンの位置
         #   _line_indent:  行ごとの、最初のトークンの列
@@ -63,9 +67,9 @@ class Parser:
             return "DEDENT" in end_set
         return curr.type in end_set
 
-    # ---- ブロックの本体: `{ … }` または `:` と字下げ ----
+    # ---- ブロックの本体: `:` と字下げ ----
     def _open_body(self, what: str) -> str:
-        """本体を開く。`{` なら "brace"、`:` なら "layout" を返す。"""
+        """本体を開く。ふつうは "layout"。旧形式の `{` を読むモードのときだけ "brace" もある。"""
         curr = self.current()
         if curr is not None and curr.type == "COLON":
             self.advance()
@@ -76,16 +80,24 @@ class Parser:
                     f"Expected an indented body after ':' in {what} at line {curr.line}, column {curr.column}"
                 )
             return "layout"
-        if curr is None or curr.type != "LBRACE":
-            loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
-            got = curr.type if curr else "EOF"
-            raise ParseError(f"Expected '{{' or ':' to start {what}, but got {got} {loc}")
-        self.advance()
-        return "brace"
+        if curr is not None and curr.type == "LBRACE":
+            if not self.legacy_braces:
+                raise ParseError(
+                    f"Blocks are written with ':' and indentation, not braces: "
+                    f"start {what} with ':' at line {curr.line}, column {curr.column}"
+                )
+            self._brace_stack.append(self.pos)
+            self.advance()
+            return "brace"
+        loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
+        got = curr.type if curr else "EOF"
+        raise ParseError(f"Expected ':' to start {what}, but got {got} {loc}")
 
     def _close_body(self, kind: str) -> None:
         if kind == "brace":
+            close_pos = self.pos
             self.expect("RBRACE")
+            self.brace_blocks.append((self._brace_stack.pop(), close_pos))
             return
         curr = self.current()
         if curr is not None and curr.type != "DEDENT":
@@ -224,8 +236,8 @@ class Parser:
         tok = self.current()
         if "DEDENT" in end_tokens and tok is not None and tok.type in kinds:
             raise ParseError(
-                f"A ':' body runs to the end of its line; start '{tok.value}' on a new line, "
-                f"or write the branches with braces at line {tok.line}, column {tok.column}"
+                f"A ':' body runs to the end of its line; start '{tok.value}' on a new line "
+                f"at line {tok.line}, column {tok.column}"
             )
 
     def parse_block(self, end_tokens) -> BlockNode:
@@ -297,7 +309,7 @@ class Parser:
             if curr.value in _NOT_SHORTHAND_NAMES:
                 raise ParseError(
                     f"'{name} {curr.value}' is not allowed as a process-name body; write a block: "
-                    f"'{name} {{ ... }}' at line {line}, column {col}"
+                    f"'{name}:' at line {line}, column {col}"
                 )
             stage = self._parse_stream_block_or_call()
             implicit = ImplicitVariableNode(line, col, "@")
@@ -637,7 +649,7 @@ class Parser:
                         raise ParseError(
                             f"Empty interpolation at line {expr_line}, column {expr_col}"
                         )
-                    sub_parser = Parser(sub_tokens)
+                    sub_parser = Parser(sub_tokens, legacy_braces=self.legacy_braces)
                     sub_pipe = sub_parser.parse_pipeline()
                     if sub_parser.current() is not None:
                         extra = sub_parser.current()

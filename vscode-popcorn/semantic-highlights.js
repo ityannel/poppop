@@ -150,10 +150,12 @@ function variableAtOffset(text, offset) {
     return result;
 }
 
-module.exports = {
+const exported = {
     findImplicitVariableOffsets,
     findImplicitVariableScopeRanges,
     findPipelineGuideRanges,
     findVariableReferenceOffsets,
     variableAtOffset
 };
+// `:` のブロックで書いたテキストも、解析できるようにする（layout-view.js）
+module.exports = require("./layout-view").wrapExports(exported, Object.keys(exported));

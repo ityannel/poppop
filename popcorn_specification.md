@@ -10,7 +10,7 @@ PopCorn 1
 
 PopCorn は、値を `>>` で次の処理へ渡していくデータフロー言語です。値の加工は非破壊的で、元のリストや辞書を書き換えません。画面表示やファイル操作など外部へ作用する処理は、値の加工とは分けて扱います。
 
-ふつうの文は `.` で終え、ブロックは `{` で開いて `}` で閉じます。`{ }` を使うかぎり、改行には構文上の意味がなく、空白・改行・インデントは読みやすさのために自由に使えます。ブロックは `{ }` の代わりに `:` と字下げでも書けます。その場合だけ、字下げがブロックの終わりを決めます（4章「`:` と字下げで書くブロック」）。ブロックで終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
+ふつうの文は `.` で終え、ブロックは `:` で開いて、字下げで本体を書きます。字下げがブロックの終わりを決めます（4章「`:` と字下げで書くブロック」）。それ以外の空白・改行は、読みやすさのために自由に使えます。ブロックで終わる文の末尾（`Map: ...` や `pop 関数名: ...` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 
 ### 言語の分類と特徴
 
@@ -40,9 +40,9 @@ answer >> Display.
 
 | 分類 | 記号 |
 |---|---|
-| 文とブロック | `.`、`{ }`、`:` |
+| 文とブロック | `.`、`:` |
 | パイプ | `>>` |
-| グループ | `( )`、`[ ]`、`{ }` |
+| グループ | `( )`、`[ ]`、`{ }`（`{ }` は辞書だけ） |
 | 区切り | `,` |
 | アクセス | `::`、`@` |
 | 演算子 | `+ - * / % == != > < >= <=` |
@@ -315,12 +315,13 @@ x >> Func(y, z)
 Pi * 2 >> Display.                       // (@ >> Pi) * 2
 Now::year >> Display.                    // (@ >> Now)::year
 Args >> Length >> count.                 // 引数の数
-[[1, 2], [3]] >> Map { Length + 1. }     // 各要素の長さ + 1  →  [3, 2]
+[[1, 2], [3]] >> Map:
+    Length + 1.     // 各要素の長さ + 1  →  [3, 2]
 Break when i >= n.                       // @ >> Break when …
 ```
 
 * ブロックの中や関数の中では、`@` は、そのブロックや関数が受け取った入力値です。プログラムの最初の `@` は `null` です。
-* `Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように、`{ }` が必要な処理は、この書き方では使えません。`>>` の右側に、ブロックつきで書きます（書くと「`>>` の右側で呼び出してください」というエラーです）。
+* `Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように、ブロックが必要な処理は、この書き方では使えません。`>>` の右側に、ブロックつきで書きます（書くと「`>>` の右側で呼び出してください」というエラーです）。
 * 入力が必要な処理の、値の書き忘れ（たとえば `Display.`）は、構文エラーにならず、`@` を入力にして実行されます。プログラムの最初で `Display.` と書くと、`null` を表示します。入力が必要な処理は、`>>` で入力を見せて書くことをおすすめします（付録 A）。
 
 ### 条件付き実行（後置 `when`）
@@ -334,7 +335,7 @@ arr >> Break when i >= n - 1.
 
 ### `:` と字下げで書くブロック
 
-ブロックの `{ … }` は、どこでも `:` と字下げに置きかえられます（関数定義、`Check` とその分岐、`Map` などのストリーム処理、`Loop`、`Try` / `Catch`、`Fork`、`Update`）。
+ブロック（関数定義、`Check` とその分岐、`Map` などのストリーム処理、`Loop`、`Try` / `Catch`、`Fork`、`Update` の本体）は、`:` と字下げで書きます。波括弧 `{ }` でブロックを書くことはできません（`{ }` は辞書リテラルだけに使います）。
 
 ```
 (num) >> pop FizzBuzz:
@@ -349,9 +350,10 @@ arr >> Break when i >= n - 1.
 
 * `:` のブロックは、`:` のある行（見出しの行）の最初のトークンより、深く字下げされた行が続くあいだ続きます。見出しの行と同じか浅い行が来たところで、終わります。
 * `:` のすぐあと、同じ行に本体を書いてもかまいません（`else: num`）。その場合も、次の行が見出しより深ければ、本体はそこまで続きます。
-* ブロックの最後の文の `.` は、`{ }` のときと同じように省略できます。最後以外の文には `.` が必要です。
-* 丸括弧、角括弧、`{ }` の中では、行の字下げを見ません（複数行のリストや値リストは、自由に字下げできます）。閉じかっこが来ると、その中で開いた `:` のブロックは終わります。
-* `}` のあとと同じように、ブロックのあとの行を `>>` で始めると、外側のパイプラインが続きます。
+* ブロックの最後の文の `.` は省略できます。最後以外の文には `.` が必要です。
+* 本体が空のブロックは書けません。受け取った値をそのまま返したいときは `@` と書きます。
+* 丸括弧、角括弧、辞書の `{ }` の中では、行の字下げを見ません（複数行のリストや値リストは、自由に字下げできます）。閉じかっこが来ると、その中で開いた `:` のブロックは終わります。
+* ブロックのあとの行を、見出しの行と同じ字下げで `>>` から始めると、外側のパイプラインが続きます。
 
 ```
 [1, 2, 3] >> Map as x:
@@ -359,7 +361,7 @@ arr >> Break when i >= n - 1.
 >> doubled.
 ```
 
-* 1 つのプログラムの中で、`{ }` と `:` を混ぜてもかまいません。
+* 1 行で短く書きたいときは、式渡し（`Map (@ * 2)`）や処理名渡し（`Map Length`）を使います（8章）。
 
 ### 構文記法（EBNF）
 
@@ -391,8 +393,7 @@ StreamBlock        = SimpleStreamBlock
 AliasClause        = "as" ( VariableName
                      | "(" VariableName "," VariableName { "," VariableName } ")" ) .
 
-Body               = "{" Block "}"
-                   | ":" Block .   (* 字下げで終わる。「`:` と字下げで書くブロック」を参照 *)
+Body               = ":" Block .   (* 字下げで終わる。「`:` と字下げで書くブロック」を参照 *)
 
 SimpleStreamBlock  = SimpleStreamName [ AliasClause ] ( Body | "(" Pipeline ")" )
                    | SimpleStreamName ProcessCall
@@ -401,20 +402,19 @@ SimpleStreamName   = "Map" | "Filter" | "Sort" | "SortDesc" | "Group" .
 
 ReduceBlock        = "Reduce" [ "(" Expression ")" ] ( [ AliasClause ] Body | ProcessCall ) .
 
-ForkBlock          = "Fork" [ AliasClause ] ( "{" ( ForkListBody | ForkDictBody ) "}"
-                                          | ":" ( ForkListBody | ForkDictBody ) ) .
+ForkBlock          = "Fork" [ AliasClause ] ":" ( ForkListBody | ForkDictBody ) .
 ForkListBody       = { Statement } BlockTailStatement .
 ForkDictBody       = { ForkEntry } ForkTailEntry .
 ForkEntry          = VariableName ":" Statement .
 ForkTailEntry      = VariableName ":" BlockTailStatement .
 
-UpdateBlock        = "Update" [ AliasClause ] ( "{" UpdateBody "}" | ":" UpdateBody ) .
+UpdateBlock        = "Update" [ AliasClause ] ":" UpdateBody .
 UpdateBody         = { UpdateStatement } [ UpdateTailStatement ] .
 UpdateStatement    = Expression { ">>" PipelineStage } ">>" FieldTarget "." .
 UpdateTailStatement = Expression { ">>" PipelineStage } ">>" FieldTarget [ "." ] .
 FieldTarget        = ( VariableName | "@" ) "::" Identifier .
 
-CheckBlock         = "Check" [ AliasClause ] ( "{" CheckBranches "}" | ":" CheckBranches ) .
+CheckBlock         = "Check" [ AliasClause ] ":" CheckBranches .
 CheckBranches      = WhenBranch { WhenBranch } ElseBranch .
 WhenBranch         = "when" Expression Body .
 ElseBranch         = "else" Body .
@@ -440,9 +440,9 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 
 * `SimpleStreamName ProcessCall`（`Map FizzBuzz`）は `SimpleStreamName "{" "@" ">>" ProcessCall "}"` と、`SimpleStreamName "(" Pipeline ")"`（`Map (@ >> FizzBuzz)`）は `SimpleStreamName "{" Pipeline "}"` と同じ意味です。`ProcessCall` には、`{ }` が必要な処理と `Return`・`Break` は書けません。
 * `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
-* ブロック（`{ ... }` または `:` の本体）で終わる文の末尾（`Map { ... }` や `pop 関数名 { ... }` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
+* ブロックで終わる文の末尾（`Map: ...` や `pop 関数名: ...` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
-* `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のように `{ }` が必要な処理は、この形では書けません。
+* `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のようにブロックが必要な処理は、この形では書けません。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 
 ### パイプラインの評価
@@ -471,9 +471,9 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 ストリームブロックでは、`as` を使って現在値にわかりやすい別名を付けられます。
 
 ```
-[1, 2, 3] >> Map as value {
+[1, 2, 3] >> Map as value:
     value * 2.
-} >> doubled.
+>> doubled.
 ```
 
 `Reduce` や `Loop` のように値リストや `List` が流れてくるブロックでは、`as (a, b)` で分解して名前を付けられます。別名はブロックの中だけで有効なので、外側に同じ名前があっても上書きしません。
@@ -618,28 +618,30 @@ value in [1, 3, 5] >> matched.
 
 ## 8. 標準ストリーム処理
 
-ストリーム処理は、処理名、任意の引数や `as` 別名、`{`、本体、`}` の順に書きます。別名を省いたときは本体の中で `@` を使います。本体は上から順に評価され、最後の文の結果がブロック全体の結果になります。空の本体は、受け取った現在値をそのまま返します。短い処理なら 1 行でも書けます。
+ストリーム処理は、処理名、任意の引数や `as` 別名、`:`、字下げした本体の順に書きます。別名を省いたときは本体の中で `@` を使います。本体は上から順に評価され、最後の文の結果がブロック全体の結果になります。短い処理なら、式渡しや処理名渡しで 1 行に書けます。
 
 ```
-[1, 2, 3] >> Map as x { x * 2. } >> doubled.
+[1, 2, 3] >> Map as x:
+    x * 2.
+>> doubled.
 ```
 
 ### 本体を短く書く（式渡しと処理名渡し）
 
 `Map` などの本体は、2 つの短い形でも書けます。
 
-| 呼び名 | 英語名 | 書き方 | 同じ意味の `{ }` |
+| 呼び名 | 英語名 | 書き方 | 同じ意味のブロック |
 | :--- | :--- | :--- | :--- |
-| **式渡し** | expression body | `Map (@ * 2)` | `Map { @ * 2 }` |
-| **処理名渡し** | process-name body | `Map FizzBuzz` | `Map { @ >> FizzBuzz }` |
+| **式渡し** | expression body | `Map (@ * 2)` | `Map:` の本体が `@ * 2` |
+| **処理名渡し** | process-name body | `Map FizzBuzz` | `Map:` の本体が `@ >> FizzBuzz` |
 
 #### 式渡し（`Map (式)`）
 
-`Map`、`Filter`、`Sort`、`SortDesc`、`Group` は、本体が 1 つの式だけなら、`{ }` の代わりに丸括弧で書けます。式の中の `@`（または `as` の別名）が、各要素です。
+`Map`、`Filter`、`Sort`、`SortDesc`、`Group` は、本体が 1 つの式だけなら、`:` のブロックの代わりに丸括弧で書けます。式の中の `@`（または `as` の別名）が、各要素です。
 
 ```
-[1, 2, 3, 4] >> Filter (@ % 2 == 0) >> evens.     // Filter { @ % 2 == 0 } と同じ
-[1, 2] >> Map as x (x * 10) >> tens.               // Map as x { x * 10 } と同じ
+[1, 2, 3, 4] >> Filter (@ % 2 == 0) >> evens.     // 本体が @ % 2 == 0 の Filter: と同じ
+[1, 2] >> Map as x (x * 10) >> tens.               // 本体が x * 10 の Map as x: と同じ
 ```
 
 #### 処理名渡し（`Map 処理名`）
@@ -647,7 +649,7 @@ value in [1, 3, 5] >> matched.
 本体が「各要素に、処理を 1 つ当てるだけ」なら、処理名だけを書けます。補助引数もつけられます。`Reduce` も、この形が使えます（`(acc, item)` が、そのまま処理に渡ります）。
 
 ```
-(1, 20) >> Range >> Map FizzBuzz >> Display.       // Map { @ >> FizzBuzz } と同じ
+(1, 20) >> Range >> Map FizzBuzz >> Display.       // 本体が @ >> FizzBuzz の Map: と同じ
 [1, 2, 3, 4] >> Filter IsEven >> evens.
 [[1, 2], [3]] >> Map Length >> sizes.              // [2, 1]
 users >> Map Get("name") >> names.
@@ -656,9 +658,9 @@ words >> Sort Lowercase >> sorted.
 [1, 2, 3] >> Reduce(10) Add >> total2.             // 16
 ```
 
-* 処理名渡しは、「処理名だけで書く（`@` に適用）」（4章）を、`Map { 処理名 }` の本体に当てはめたものです。新しい規則ではありません。
-* 処理名渡しで書けるのは、ふつうの処理（標準関数と `pop` で定義した関数）だけです。`Check`、`Map`、`Loop`、`Return`、`Break` などは書けません（`Map { … }` のように、ブロックで書きます）。
-* `as` をつけたときは、処理名渡しは使えません。丸括弧か `{ }` で書きます。
+* 処理名渡しは、「処理名だけで書く（`@` に適用）」（4章）を、`Map:` の本体に当てはめたものです。新しい規則ではありません。
+* 処理名渡しで書けるのは、ふつうの処理（標準関数と `pop` で定義した関数）だけです。`Check`、`Map`、`Loop`、`Return`、`Break` などは書けません（`Map:` のように、ブロックで書きます）。
+* `as` をつけたときは、処理名渡しは使えません。式渡しか `:` のブロックで書きます。
 * `Reduce(初期値)` の丸括弧は初期値なので、`Reduce` は式渡しを持ちません（処理名渡しは使えます）。
 * `Loop`、`Fork`、`Update`、`Check`、`Try` は、式渡しも処理名渡しも持ちません。
 
@@ -667,9 +669,9 @@ words >> Sort Lowercase >> sorted.
 `Map` は `List` の各要素を順番に変換し、同じ長さの新しい `List` を返します。
 
 ```
-[1, 2, 3] >> Map as value {
+[1, 2, 3] >> Map as value:
     value * 2.
-} >> doubled.
+>> doubled.
 ```
 
 ### `Filter`
@@ -677,9 +679,9 @@ words >> Sort Lowercase >> sorted.
 `Filter` は、ブロックが `Bool` の `true` を返した要素だけを残します。
 
 ```
-[1, 2, 3, 4] >> Filter as value {
+[1, 2, 3, 4] >> Filter as value:
     value % 2 == 0.
-} >> evens.
+>> evens.
 ```
 
 ### `Reduce`
@@ -690,14 +692,14 @@ words >> Sort Lowercase >> sorted.
 * 初期値を省いたときは先頭要素が初期 `accumulator` になり、空 `List` は `RuntimeError` です。
 
 ```
-[1, 2, 3, 4] >> Reduce(0) as (acc, item) {
+[1, 2, 3, 4] >> Reduce(0) as (acc, item):
     acc + item.
-} >> total.
+>> total.
 
 // 初期値を省略する書き方
-[1, 2, 3, 4] >> Reduce as (acc, item) {
+[1, 2, 3, 4] >> Reduce as (acc, item):
     acc + item.
-} >> total2.
+>> total2.
 ```
 
 ### `Sort` と `SortDesc`
@@ -710,13 +712,13 @@ words >> Sort Lowercase >> sorted.
     {"name": "Bob", "score": 10}
 ] >> users.
 
-users >> SortDesc as user {
+users >> SortDesc as user:
     user::score.
-} >> by_score.
+>> by_score.
 
-users >> SortDesc as user {
+users >> SortDesc as user:
     user::name.
-} >> by_name_desc.
+>> by_name_desc.
 ```
 
 ### `Group`
@@ -728,9 +730,9 @@ users >> SortDesc as user {
     {"team": "red", "name": "A"},
     {"team": "blue", "name": "B"},
     {"team": "red", "name": "C"}
-] >> Group as member {
+] >> Group as member:
     member::team.
-} >> by_team.
+>> by_team.
 ```
 
 ### `Fork`
@@ -742,10 +744,10 @@ users >> SortDesc as user {
 
 ```
 // ラベル付き形式（Dict を返します）
-[1, 2, 3] >> Fork as values {
+[1, 2, 3] >> Fork as values:
     total: values >> Sum.
     max:   values >> Max.
-} >> stats.
+>> stats.
 stats::total >> Display.
 ```
 
@@ -754,19 +756,19 @@ stats::total >> Display.
 `Update` は `Dict` を非破壊的に更新します。`UpdateBlock` の中では、`>>` で好きな段数のパイプラインをつないで、最後を `>> target::field.` にします。トップレベルのフィールドを追加・上書きします。書いた順に反映されるため、後ろの行から直前に更新したフィールドを参照できます。
 
 ```
-{"name": "Ada", "score": 10} >> Update as user {
+{"name": "Ada", "score": 10} >> Update as user:
     15 >> user::score.
     true >> user::active.
-} >> updated.
+>> updated.
 ```
 
 左辺はパイプラインでもかまいません。自分のフィールドを加工して、そのフィールドへ書き戻せます。
 
 ```
-{"name": "ada", "score": 1} >> Update as user {
+{"name": "ada", "score": 1} >> Update as user:
     user::name >> Uppercase >> user::name.
     user::score >> Add(10) >> user::score.
-} >> updated.
+>> updated.
 // updated は {"name": "ADA", "score": 11}
 ```
 
@@ -789,33 +791,27 @@ stats::total >> Display.
 すべての `when` 条件は `Bool` を返す必要があります。`Bool` 以外を返すと `TypeError` です。複数の候補に当てはまるか調べたいときは `in` 演算子が便利です。
 
 ```
-2 >> Check as value {
-    when value == 0 {
+2 >> Check as value:
+    when value == 0:
         "zero".
-    }
-    when value in [1, 2, 3] {
+    when value in [1, 2, 3]:
         "small".
-    }
-    when value >= 4 {
+    when value >= 4:
         "large".
-    }
-    else {
+    else:
         value >> Str.
-    }
-} >> label.
+>> label.
 ```
 
-分岐は、ほかのブロックと同じように、必ず `{ }` で囲みます。ブロックの最後の文の `.` は省略できるので、1行でも書けます。
+分岐の本体が短いときは、`:` と同じ行に書けます（4章「`:` と字下げで書くブロック」）。
 
 ```
-x >> Check {
-    when @ < 0 { "negative" }
-    when @ == 0 { "zero" }
-    else { "positive" }
-} >> sign.
+x >> Check:
+    when @ < 0: "negative"
+    when @ == 0: "zero"
+    else: "positive"
+>> sign.
 ```
-
-分岐も `Check` 自体も、`{ }` の代わりに `:` と字下げで書けます（4章「`:` と字下げで書くブロック」）。
 
 ```
 (num) >> pop FizzBuzz:
@@ -826,11 +822,11 @@ x >> Check {
         else: num
 ```
 
-`:` のあとの本体は、その行の終わりまでです（次の行の字下げが見出しより深ければ、そこまで続きます）。`when a: 1 else: 2` のように、次の分岐を同じ行に書くことはできません。1 行で書きたいときは `{ }` を使います。
+`:` のあとの本体は、その行の終わりまでです（次の行の字下げが見出しより深ければ、そこまで続きます）。`when a: 1 else: 2` のように、次の分岐を同じ行に書くことはできません。分岐ごとに行を分けます。
 
 ## 11. `Loop` と `Break`
 
-`Loop` は状態値をくり返し更新する標準ストリーム処理です。ブロックの最後の値が、次の反復の状態になります。状態値が 1 つなら `Loop as state {`、値リストで複数持つなら `Loop as (a, b) {` と書けます。
+`Loop` は状態値をくり返し更新する標準ストリーム処理です。ブロックの最後の値が、次の反復の状態になります。状態値が 1 つなら `Loop as state:`、値リストで複数持つなら `Loop as (a, b):` と書けます。
 
 各反復は次の順で進みます。
 
@@ -842,10 +838,10 @@ x >> Check {
 `Break` はいちばん内側の `Loop` を終わらせ、現在のパイプ値を `Loop` の結果にします。`Loop` の外で `Break` を使うと `RuntimeError` です。
 
 ```
-(0, 0) >> Loop as (count, total) {
+(0, 0) >> Loop as (count, total):
     total >> Break when count >= 5.
     (count + 1, total + count).
-} >> result.
+>> result.
 ```
 
 意図的な無限ループも許されます。`Loop` を入れ子にしたとき、`Break` が止めるのは常にいちばん内側の `Loop` だけです。
@@ -860,13 +856,11 @@ x >> Check {
 
 ```
 "https://api.example.com/user"
-    >> Try {
+    >> Try:
         @ >> Fetch >> FromJson.
-    }
-    Catch as err {
+    Catch as err:
         err::message >> Debug.
         {"name": "guest"}.
-    }
     >> user.
 ```
 
@@ -875,16 +869,16 @@ x >> Check {
 通信のように、一時的に失敗することのある処理は、`Loop` と `Try` / `Catch` を組み合わせて、やり直せます。
 
 ```
-(0, null) >> Loop as (attempt, last) {
+(0, null) >> Loop as (attempt, last):
     last >> Break when last != null.           // 成功したら、その値で終わる
     null >> Break when attempt >= 3.           // 3 回失敗したら、あきらめる（null を返す）
-    "https://example.com/api" >> Try {
+    "https://example.com/api" >> Try:
         Fetch.
-    } Catch {
+    Catch:
         null.
-    } >> response.
+    >> response.
     (attempt + 1, response).
-} >> result.
+>> result.
 ```
 
 * `Loop` の状態は `(attempt, last)`（何回目か、直前の結果）です。
@@ -896,9 +890,8 @@ x >> Check {
 関数はプログラムのいちばん外側（`TopLevelStatement`）で `pop` を使って定義します。関数本体の最後の値が自動的に返ります。トップレベルの関数どうしは、ファイル内の書く順番に関係なく呼び合ったり、再帰呼び出ししたりできます。
 
 ```
-(left, right) >> pop AddTwo {
+(left, right) >> pop AddTwo:
     left + right.
-}
 
 (10, 20) >> AddTwo >> total.
 10 >> AddTwo(20) >> total2.
@@ -915,19 +908,14 @@ x >> Check {
 `Return` は関数の途中で早めに抜けるための標準パイプ処理です。いちばん内側の `pop` 関数をその場で終わらせ、現在のパイプ値を関数の結果にします。関数の外で使うと `RuntimeError` です。
 
 ```
-(value, min, max) >> pop Clamp {
-    value >> Check {
-        when @ < min {
+(value, min, max) >> pop Clamp:
+    value >> Check:
+        when @ < min:
             min >> Return.
-        }
-        when @ > max {
+        when @ > max:
             max >> Return.
-        }
-        else {
+        else:
             @.
-        }
-    }
-}
 
 150 >> Clamp(0, 100) >> clamped.
 ```
@@ -953,7 +941,7 @@ value >> Reverse >> value.
 
 | 分類 | 起きる例 |
 |---|---|
-| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧やブロックの `{` / `}` の抜け、単独の `Func(...)` 呼び出し |
+| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧、ブロックの字下げの誤り、`{ }` で書いたブロック、単独の `Func(...)` 呼び出し |
 | `NameError` | 未定義の変数や関数の参照 |
 | `TypeError` | 標準処理・演算子・`when`/`Filter` 条件に合わない型を渡したとき |
 | `IndexError` | `List` の範囲外アクセス、不正な `Slice` 範囲 |
@@ -986,7 +974,7 @@ PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スク�
 
 ### 推奨スタイルガイド
 
-* **ブロック `{ }` の書き分け:** 1文だけの短い処理は `[1, 2, 3] >> Map as x { x * 2. }` のように 1 行で書き、複数行になるときは閉じ `}` を単独行か `} >> 次段階.` の行頭に揃えると見やすくなります。
+* **ブロックの書き分け:** 1 つの式だけの短い処理は `[1, 2, 3] >> Map as x (x * 2)` や `words >> Map Length` のように 1 行で書き、複数の文になるときは `:` のブロックにします。ブロックのあとの段階は、見出しの行と同じ字下げで `>> 次段階.` と続けます。字下げは 4 つの空白がおすすめです。
 * **対等なペア引数の書き方:** `Random` の `(minimum, maximum)` や `Zip` の複数 `List` のように、引数が対等な関数は `(1, 6) >> Random` のように値リストで渡すのがおすすめです。
 * **処理名だけで書くのは、入力を使わない処理だけ:** `Pi * 2` や `Now::year` のように、入力を使わない処理（`Pi`、`E`、`Now`、`Args`）は、処理名だけで書けます。入力を使う処理（`Display`、`Length`、`Sum` など）は、`value >> Length` のように、`>>` で入力を見せて書くと、書き忘れに気づけます。
 * **長いパイプラインの改行:** 3 段階以上つながるパイプラインは、`>>` の前で改行して縦に揃えると読みやすくなります。

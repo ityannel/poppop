@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .evaluator import Evaluator, EvaluatorError, PopCornError
 from .lexer import Lexer, LexerError
+from .migrate import MigrationError, migrate_braces
 from .parser import ParseError, Parser
 from .version import DISPLAY_VERSION, VERSION
 
@@ -69,13 +70,18 @@ async def repl() -> int:
         if line.strip() in {":quit", "exit"}:
             return 0
 
-        buffer.append(line)
-        joined = "\n".join(buffer)
-        if joined.count("{") > joined.count("}"):
-            continue
         stripped = line.strip()
-        if not (stripped.endswith(".") or stripped.endswith("}")):
+        in_block = any(previous.rstrip().endswith(":") for previous in buffer)
+        if stripped:
+            buffer.append(line)
+        # `:` のブロックを書いているあいだは、空の行が来るまで読みつづける
+        if stripped.endswith(":") or (in_block and stripped):
             continue
+        if not buffer:
+            continue
+        if not in_block and not stripped.endswith("."):
+            continue
+        joined = "\n".join(buffer)
 
         try:
             await evaluate(joined, evaluator)
@@ -94,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("args", nargs="*", help="arguments for the program (read them with Args)")
     parser.add_argument("--ast", action="store_true", help="print the parsed AST as JSON")
     parser.add_argument(
+        "--migrate",
+        action="store_true",
+        help="rewrite old '{ ... }' blocks in the file to ':' and indentation (in place)",
+    )
+    parser.add_argument(
         "--version", action="version", version=DISPLAY_VERSION
     )
     return parser
@@ -106,11 +117,22 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         source = args.file.read_text(encoding="utf-8")
+        if args.migrate:
+            migrated = migrate_braces(source)
+            if migrated == source:
+                print(f"{args.file}: no '{{ }}' blocks to rewrite")
+            else:
+                args.file.write_text(migrated, encoding="utf-8")
+                print(f"{args.file}: rewrote '{{ }}' blocks to ':' and indentation")
+            return 0
         if args.ast:
             print(get_ast_json(source))
         else:
             asyncio.run(evaluate(source, args=args.args))
         return 0
+    except MigrationError as exc:
+        print(f"SyntaxError: {exc}")
+        return 1
     except (OSError, LexerError, ParseError, PopCornError, EvaluatorError) as exc:
         print(format_error(exc))
         return 1

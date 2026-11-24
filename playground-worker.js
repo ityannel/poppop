@@ -19,6 +19,7 @@ const SOURCE_FILES = [
   "evaluator.py",
   "pop_builtins.py",
   "cli.py",
+  "migrate.py",
 ];
 
 let pyodide = null;
@@ -232,6 +233,29 @@ json.dumps(__payload, ensure_ascii=False, default=str)
   });
 }
 
+// 保存してあるコードの、旧形式の { } ブロックを、`:` と字下げに書きかえる（意味が変わらないときだけ）
+async function migrateFiles(files) {
+  const runtime = await readyPromise;
+  runtime.globals.set("__popcorn_files", JSON.stringify(files));
+  const payload = runtime.runPython(`
+import json
+from popcorn_lang.migrate import migrate_braces
+
+__changed = {}
+for __path, __source in json.loads(__popcorn_files).items():
+    if not isinstance(__source, str) or "{" not in __source:
+        continue
+    try:
+        __migrated = migrate_braces(__source)
+    except Exception:
+        continue
+    if __migrated != __source:
+        __changed[__path] = __migrated
+json.dumps(__changed, ensure_ascii=False)
+`);
+  self.postMessage({ type: "migrated-files", files: JSON.parse(payload) });
+}
+
 self.addEventListener("message", (event) => {
   const message = event.data ?? {};
   if (message.type === "input-result") {
@@ -279,6 +303,13 @@ self.addEventListener("message", (event) => {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       });
+    });
+    return;
+  }
+
+  if (message.type === "migrate-files") {
+    migrateFiles(message.files ?? {}).catch(() => {
+      self.postMessage({ type: "migrated-files", files: {} });
     });
     return;
   }

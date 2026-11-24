@@ -1028,7 +1028,7 @@ function formatDocument(text, indentSize = 4) {
     return formatted.join(eol);
 }
 
-module.exports = {
+const exported = {
     analyzeDocument,
     findUpdatePropertyOffsets,
     findUpdateScopeRanges,
@@ -1053,3 +1053,9 @@ module.exports = {
     tokenAtOffset,
     typeFlowSummary
 };
+// `:` のブロックで書いたテキストも、解析できるようにする（layout-view.js）。整形は、元のテキストのまま
+const LAYOUT_NEUTRAL = new Set(["formatDocument", "isVariableName", "typeFlowSummary"]);
+module.exports = require("./layout-view").wrapExports(
+    exported,
+    Object.keys(exported).filter(name => typeof exported[name] === "function" && !LAYOUT_NEUTRAL.has(name))
+);

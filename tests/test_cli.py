@@ -29,3 +29,13 @@ def test_script_arguments_reach_the_args_function(tmp_path, capsys):
     assert capsys.readouterr().out.strip() == '["a", "b"]'
     assert main([str(script)]) == 0
     assert capsys.readouterr().out.strip() == "[]"
+
+
+def test_migrate_rewrites_brace_blocks_in_place(tmp_path, capsys):
+    script = tmp_path / "old.pop"
+    script.write_text("[1, 2] >> Map as x { x * 2. } >> d.\nd >> Display.\n", encoding="utf-8")
+    assert main([str(script), "--migrate"]) == 0
+    assert script.read_text(encoding="utf-8") == "[1, 2] >> Map as x:\n    x * 2.\n>> d.\nd >> Display.\n"
+    capsys.readouterr()
+    assert main([str(script)]) == 0
+    assert capsys.readouterr().out.strip() == "[2, 4]"
