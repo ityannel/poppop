@@ -6,6 +6,7 @@ from typing import Any
 
 from .ast_nodes import *
 from .environment import Environment
+from .modules import FileModuleLoader, ModuleLoader
 
 _SKIPPED = object()
 
@@ -169,6 +170,11 @@ class Evaluator:
     def __init__(self):
         self.global_env = Environment()
         self.trace_path = os.environ.get("POPCORN_TRACE_FILE")
+        # `Use` でほかのファイルを読む。current_module は、いま評価しているファイル（なければ None）
+        self.module_loader: ModuleLoader = FileModuleLoader()
+        self.current_module: str | None = None
+        self._module_exports: dict[str, dict[str, Any]] = {}
+        self._modules_loading: list[str] = []
 
     def trace_pipeline_value(self, node, value, input_value=None, progress=None):
         """Emit optional, compact execution data for the VS Code flow view."""
@@ -206,12 +212,17 @@ class Evaluator:
         raise PopCornError("RuntimeError", f"No eval method for {type(node).__name__}")
 
     async def eval_Program(self, node: Program, env: Environment):
+        # `Use` は、どこに書いてあっても、プログラムを動かす前に読む（関数の定義と同じく、順番に関係なく呼べる）
+        await self._import_modules(node, env)
+
         for stmt in node.statements:
             if isinstance(stmt, FunctionDefNode):
                 env.set_function(stmt.name, (stmt, None, env))
 
         result = None
         for stmt in node.statements:
+            if isinstance(stmt, UseNode):
+                continue
             if isinstance(stmt, FunctionDefNode):
                 env.set_function(stmt.name, (stmt, dict(env.variables), env))
             else:
@@ -222,6 +233,94 @@ class Evaluator:
 
         env.set_current(result)
         return result
+
+    async def _import_modules(self, node: Program, env: Environment) -> None:
+        uses = [stmt for stmt in node.statements if isinstance(stmt, UseNode)]
+        if not uses:
+            return
+        local_names = {
+            stmt.name for stmt in node.statements if isinstance(stmt, FunctionDefNode)
+        }
+        origins: dict[str, tuple[str, str]] = {}  # 名前 -> (読んだファイルの key, 書いたとおりのパス)
+        for use in uses:
+            key = self.module_loader.resolve(use.path, self.current_module)
+            exports = await self._load_module(key, use)
+            names = use.names if use.names is not None else list(exports)
+            for name in names:
+                if name not in exports:
+                    raise PopCornError(
+                        "NameError",
+                        f"'{use.path}' has no function '{name}'",
+                        use.line,
+                        use.column,
+                    )
+                if name in local_names:
+                    raise PopCornError(
+                        "NameError",
+                        f"Function '{name}' is defined in this file and also comes from "
+                        f"'{use.path}'; rename one, or choose names with Use(...)",
+                        use.line,
+                        use.column,
+                    )
+                previous = origins.get(name)
+                if previous is not None and previous[0] != key:
+                    raise PopCornError(
+                        "NameError",
+                        f"Function '{name}' comes from both '{previous[1]}' and '{use.path}'; "
+                        f"choose names with Use(...)",
+                        use.line,
+                        use.column,
+                    )
+                origins[name] = (key, use.path)
+                env.set_function(name, exports[name])
+
+    async def _load_module(self, key: str, use: UseNode) -> dict[str, Any]:
+        """ファイルを 1 回だけ評価して、そのファイルで `pop` した関数を返す。"""
+        if key in self._module_exports:
+            return self._module_exports[key]
+        if key in self._modules_loading:
+            chain = self._modules_loading[self._modules_loading.index(key):] + [key]
+            raise PopCornError(
+                "RuntimeError",
+                "Files use each other in a circle: "
+                + " -> ".join(self.module_loader.display(k) for k in chain),
+                use.line,
+                use.column,
+            )
+        source = self.module_loader.read(key, use.path)
+
+        from .lexer import Lexer, LexerError
+        from .parser import ParseError, Parser
+
+        shown = self.module_loader.display(key)
+        try:
+            program = Parser(Lexer(source).tokenize()).parse()
+        except LexerError as exc:
+            raise LexerError(f"{shown}: {exc}") from None
+        except ParseError as exc:
+            raise ParseError(f"{shown}: {exc}") from None
+
+        module_env = Environment()
+        previous_module = self.current_module
+        self._modules_loading.append(key)
+        self.current_module = key
+        try:
+            await self.eval_Program(program, module_env)
+        except PopCornError as exc:
+            if not exc.message.startswith(f"{shown}: "):
+                exc.message = f"{shown}: {exc.message}"
+                exc.args = (f"{exc.err_type}: {exc.message}",)
+            raise
+        finally:
+            self.current_module = previous_module
+            self._modules_loading.pop()
+
+        defined = [
+            stmt.name for stmt in program.statements if isinstance(stmt, FunctionDefNode)
+        ]
+        exports = {name: module_env.functions[name] for name in defined}
+        self._module_exports[key] = exports
+        return exports
 
     async def eval_ConditionalStatementNode(
         self, node: ConditionalStatementNode, env: Environment

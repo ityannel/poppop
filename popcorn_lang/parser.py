@@ -217,7 +217,70 @@ class Parser:
     def parse_top_level_statement(self) -> ASTNode:
         if self._is_function_def():
             return self.parse_function_def()
+        if self._is_use_statement():
+            return self.parse_use()
         return self.parse_statement()
+
+    def _is_use_statement(self) -> bool:
+        """`"lib/math.pop" >> Use` で始まる文（ファイルのいちばん外側だけ）。"""
+        curr = self.current()
+        if curr is None or curr.type not in ("STRING", "INTERP_STRING"):
+            return False
+        arrow = self.peek(1)
+        verb = self.peek(2)
+        return (
+            arrow is not None
+            and arrow.type == "STREAM_OP"
+            and verb is not None
+            and verb.type == "VERB"
+            and verb.value == "Use"
+        )
+
+    def parse_use(self) -> UseNode:
+        path_tok = self.current()
+        line, col = path_tok.line, path_tok.column
+        if path_tok.type != "STRING":
+            raise ParseError(
+                f"The file name for Use cannot contain {{...}}; write it as it is "
+                f"(for example \"lib/math.pop\") at line {line}, column {col}"
+            )
+        if not path_tok.value.strip():
+            raise ParseError(f"The file name for Use is empty at line {line}, column {col}")
+        self.advance()
+        self.expect("STREAM_OP")
+        use_tok = self.expect("VERB")
+        names: Optional[List[str]] = None
+        if self.match("LPAREN"):
+            names = []
+            while True:
+                tok = self.current()
+                if tok is None or tok.type != "VERB":
+                    loc = f"at line {tok.line}, column {tok.column}" if tok else "at EOF"
+                    raise ParseError(
+                        f"Use(...) takes the names of the processes to use, "
+                        f"like Use(Square, Cube) {loc}"
+                    )
+                names.append(tok.value)
+                self.advance()
+                if self.match("RPAREN"):
+                    break
+                self.expect("COMMA")
+                if self.match("RPAREN"):
+                    break
+        tok = self.current()
+        if tok is not None and tok.type == "STREAM_OP":
+            raise ParseError(
+                f"Use is a statement of its own; nothing can follow it with '>>' "
+                f"at line {tok.line}, column {tok.column}"
+            )
+        if tok is not None and tok.type == "WHEN":
+            raise ParseError(
+                f"Use cannot be conditional ('when'); files are read before the program runs "
+                f"at line {tok.line}, column {tok.column}"
+            )
+        if tok is not None:
+            self.expect("DOT")
+        return UseNode(line, col, path_tok.value, names)
 
     def parse_statement(self, end_tokens=None) -> ASTNode:
         if self._is_function_def():
@@ -498,6 +561,13 @@ class Parser:
                     f"Return does not accept extra arguments at line {line}, column {col}"
                 )
             return ReturnNode(line, col)
+
+        if name == "Use":
+            raise ParseError(
+                f"Use is written on its own line at the top of the file, like "
+                f"\"lib/math.pop\" >> Use. (not inside a block, and the file name must be "
+                f"written directly as a string) at line {line}, column {col}"
+            )
 
         if name == "Break":
             self.advance()

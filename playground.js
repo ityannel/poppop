@@ -848,9 +848,15 @@ doubled >> Display.`;
     selectResultTab("output");
     announce("実行を開始しました");
     elements.checkLessonButton.disabled = true;
+    const source = getSource();
+    // `"lib/math.pop" >> Use.` で、ほかのファイルを読めるように、すべてのファイルを渡す
+    const runFiles = { ...files };
+    if (files[activeFile] !== undefined) runFiles[activeFile] = source;
     worker.postMessage({
       type: "run",
-      source: getSource(),
+      source,
+      path: files[activeFile] !== undefined ? activeFile : null,
+      files: runFiles,
       lessonId:
         currentSidePanel === "lesson" && !currentLesson()?.dynamic
           ? activeLessonId
