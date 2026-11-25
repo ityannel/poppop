@@ -13,6 +13,13 @@ class ParseError(Exception):
     pass
 
 
+def _rooted_at_current(node: ASTNode) -> bool:
+    """`@::a::b` や `@[0]` のように、たどった先の根が `@` かどうか"""
+    while isinstance(node, IndexAccessNode):
+        node = node.target
+    return isinstance(node, ImplicitVariableNode)
+
+
 class Parser:
     def __init__(self, tokens: List[Token], *, legacy_braces: bool = False):
         self.tokens = tokens
@@ -666,7 +673,9 @@ class Parser:
                 step = self.parse_expression()
                 if isinstance(step, VariableNode):
                     step = BindNode(step.line, step.column, step, None)
-                elif isinstance(step, IndexAccessNode):
+                elif isinstance(step, IndexAccessNode) and not _rooted_at_current(step):
+                    # `>> d::key.` は代入のつもりの書き方なので、評価時にわかりやすいエラーにする。
+                    # `>> @::city` のように `@` から読む形は、ふつうの式として値を取り出す
                     step = BindNode(step.line, step.column, step, None)
                 elif isinstance(step, ArgumentListNode) and all(
                     isinstance(item, VariableNode) for item in step.items
