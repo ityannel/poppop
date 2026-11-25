@@ -1,4 +1,4 @@
-"""Command-line interface for the PopCorn interpreter."""
+﻿"""Command-line interface for the PopCorn interpreter."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 from .evaluator import Evaluator, EvaluatorError, PopCornError
 from .lexer import Lexer, LexerError
 from .migrate import MigrationError, migrate_braces
+from .modules import VirtualModuleLoader
 from .parser import ParseError, Parser
 from .version import DISPLAY_VERSION, VERSION
 
@@ -36,10 +37,29 @@ def get_warnings(source: str) -> list[str]:
     return list(lexer.warnings)
 
 
-async def evaluate(source: str, evaluator: Evaluator | None = None, args: list[str] | None = None):
+async def evaluate(
+    source: str,
+    evaluator: Evaluator | None = None,
+    args: list[str] | None = None,
+    *,
+    path: str | Path | None = None,
+    files: dict[str, str] | None = None,
+):
+    """source を動かす。
+
+    path は source のファイル（`Use` のパスは、このファイルのフォルダーから探す）。
+    files を渡すと、ディスクの代わりにこの辞書から読む（Playground）。
+    """
     runtime = evaluator or Evaluator()
     if args is not None:
         runtime.script_args = list(args)  # 標準関数 Args が返す
+    if files is not None:
+        runtime.module_loader = VirtualModuleLoader(files)
+        runtime.current_module = (
+            runtime.module_loader.resolve(str(path), None) if path is not None else None
+        )
+    elif path is not None:
+        runtime.current_module = runtime.module_loader.resolve(str(path), None)
     return await runtime.eval(parse_source(source), runtime.global_env)
 
 
@@ -156,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.ast:
             print(get_ast_json(source))
         else:
-            asyncio.run(evaluate(source, args=args.args))
+            asyncio.run(evaluate(source, args=args.args, path=args.file))
         return 0
     except MigrationError as exc:
         print(f"SyntaxError: {exc}")

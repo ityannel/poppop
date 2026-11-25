@@ -23,7 +23,7 @@ PopCorn 1 は、次の性質を組み合わせたデータフロー言語です�
 | 型システム | 強い動的型付け（型注釈は不要だが、暗黙の真偽値変換などは禁止） |
 | 評価とスコープ | 先行評価（`and`/`or` は短絡評価）・レキシカルスコープ |
 | 構文の向き | 代入・関数定義・加工のすべてが左から右（`>>`）に統一 |
-| 主な用途 | 単一ファイル完結の API・JSON 加工、自動化スクリプト、プログラミング入門 |
+| 主な用途 | API・JSON 加工、自動化スクリプト、プログラミング入門（関数はファイルに分けて `Use` で読めます） |
 
 ```
 42 >> answer.
@@ -61,7 +61,7 @@ answer >> Display.
 
 ```
 Map  Filter  Count  Reduce  Sort  SortDesc  Group  Fork  Update  Check  Loop  Try  Catch
-Break  Return  Zip  Bool  Str  List  Dict  Num  Type
+Break  Return  Use  Zip  Bool  Str  List  Dict  Num  Type
 ```
 
 次の語は小文字の予約語です。
@@ -374,7 +374,7 @@ arr >> Break when i >= n - 1.
 
 ```
 Program            = { TopLevelStatement } .
-TopLevelStatement  = FunctionDefinition | Statement .
+TopLevelStatement  = FunctionDefinition | UseStatement | Statement .
 Statement          = Pipeline [ "when" Expression ] "." | BlockTerminatedPipeline .
 BlockTailStatement = Pipeline [ "when" Expression ] [ "." ] | BlockTerminatedPipeline .
 Block              = { Statement } [ BlockTailStatement ] .
@@ -428,6 +428,7 @@ TryBlock           = "Try" [ AliasClause ] Body
                      "Catch" [ AliasClause ] Body .
 
 FunctionDefinition = [ ParameterList ">>" ] "pop" ProcessName Body .
+UseStatement       = StringLiteral ">>" "Use" [ "(" ProcessName { "," ProcessName } [ "," ] ")" ] "." .
 ParameterList      = "(" VariableName { "," ( VariableName | ProcessName ) } ")" .
                      (* 2 番目以降の大文字の名前は処理引数。13章「処理引数」を参照 *)
 
@@ -446,7 +447,7 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 ```
 
 * `SimpleStreamName ProcessCall`（`Map FizzBuzz`）は `SimpleStreamName "{" "@" ">>" ProcessCall "}"` と、`SimpleStreamName "(" Pipeline ")"`（`Map (@ >> FizzBuzz)`）は `SimpleStreamName "{" Pipeline "}"` と同じ意味です。`ProcessCall` には、`{ }` が必要な処理と `Return`・`Break` は書けません。
-* `FunctionDefinition` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中に関数定義は書けません。
+* `FunctionDefinition` と `UseStatement` は `TopLevelStatement` にだけ入っているため、ブロックや関数の中には書けません。`UseStatement` の `StringLiteral` は、`{…}` の補間を含まない文字列です（13章「ほかのファイルの関数を使う（`Use`）」）。
 * ブロックで終わる文の末尾（`Map: ...` や `pop 関数名: ...` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
 * `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Count`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のようにブロックが必要な処理は、この形では書けません。
@@ -986,6 +987,44 @@ x >> Check:
 
 `Break` が抜けるのはいちばん内側の `Loop`、`Return` が抜けるのはいちばん内側のユーザー関数です。
 
+### ほかのファイルの関数を使う（`Use`）
+
+関数は、別のファイルに分けて書き、`ファイル名 >> Use.` で読み込んで使えます。ファイル名を左に書き、`>>` で `Use` へ流す、ふつうのパイプラインと同じ向きです。
+
+```
+// lib/text.pop
+"*" >> mark.
+
+(text) >> pop Shout:
+    text >> Uppercase >> Decorate
+
+(text) >> pop Decorate:
+    "{mark} {text} {mark}"
+```
+
+```
+// main.pop
+"lib/text.pop" >> Use.
+
+"popcorn" >> Shout >> Display.     // * POPCORN *
+```
+
+使う関数を選ぶときは、補助引数に処理名を並べます。並べなかった関数は、このファイルからは見えません。
+
+```
+"lib/text.pop" >> Use(Shout).
+```
+
+* **書く場所:** `Use` はファイルのいちばん外側に、1 行の文として書きます。ブロックや関数の中、`when` つき、`>>` で後ろに続ける書き方はできません（`SyntaxError`）。ファイル名は、`{…}` を含まない文字列をそのまま書きます（変数や計算でファイル名を作ることはできません）。どこに書いても意味は同じですが、ファイルの先頭にまとめるのがおすすめです。
+* **ファイルの場所:** ファイル名は、`Use` を書いたファイルのあるフォルダーから見た相対パスです（`"../shared/util.pop"` のように `..` も使えます）。区切りは `/` です。REPL では、いまのフォルダーから探します。拡張子は省略できません。
+* **読むタイミング:** `Use` は、そのファイルのほかの文より先に処理します。そのため、関数の定義と同じく、`Use` より上の行からでも、読んだ関数を呼べます。
+* **1 回だけ評価:** 読まれたファイルは、1 回の実行で 1 回だけ、最初から最後まで評価します（同じファイルを何か所から `Use` しても、2 回は動きません）。そのファイルの `@` は `null` から始まります。そのファイルにある `Display` なども実行されるので、関数を集めたファイルには、関数と、関数が使う値だけを書くのがおすすめです。
+* **読み込まれるもの:** 読み込まれるのは、そのファイルで `pop` で定義した関数だけです。値の名前（上の `mark`）や、そのファイルがさらに `Use` した関数は、読み込まれません。必要なら、そのファイルを直接 `Use` します。
+* **関数の中から見えるもの:** 読んだ関数は、定義されたファイルの中で動きます。関数の中から見える値の名前とほかの関数は、そのファイルのものです（`Shout` が呼ぶ `Decorate` と `mark` は、`lib/text.pop` のもの）。読んだ側の同じ名前の値や関数には影響されません。
+* **名前の重なり:** 読んだ関数と同じ名前の関数を、そのファイルでも `pop` で定義していると `NameError` です。2 つのファイルから同じ名前の関数を読んだときも `NameError` です（`Use(…)` で、どちらかを選んでください）。標準処理と同じ名前の関数は、ふつうの関数と同じく、標準処理より優先されます。
+* **エラー:** ファイルが読めないときは `IOError`、`Use(…)` に書いた名前の関数がそのファイルにないときは `NameError`、ファイルどうしが輪のように `Use` しあっている（`a.pop` → `b.pop` → `a.pop`）ときは `RuntimeError` です。読んだファイルの中の構文エラーや評価のエラーには、そのファイルの名前が付きます。
+* **Playground:** Playground では、エクスプローラーのファイルを、同じ決まりで読みます（`samples/` の例から `"../main.pop" >> Use.` のように、ほかのフォルダーのファイルも読めます）。
+
 ## 14. 非破壊性と外部効果
 
 `List`・`Dict`・`Str` を加工する標準処理は、元の値を変えずに新しい値を返します。元の名前に結果をしまいたいときは、ふつうに束縛し直します。
@@ -1005,13 +1044,13 @@ value >> Reverse >> value.
 
 | 分類 | 起きる例 |
 |---|---|
-| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧、ブロックの字下げの誤り、`{ }` で書いたブロック、単独の `Func(...)` 呼び出し |
-| `NameError` | 未定義の変数や関数の参照 |
+| `SyntaxError` | 閉じていない文字列、文末の `.` の抜け、対応しない括弧、ブロックの字下げの誤り、`{ }` で書いたブロック、単独の `Func(...)` 呼び出し、いちばん外側以外の `Use` |
+| `NameError` | 未定義の変数や関数の参照、`Use` で読んだ関数の名前の重なり |
 | `TypeError` | 標準処理・演算子・`when`/`Filter` 条件に合わない型を渡したとき |
 | `IndexError` | `List` の範囲外アクセス、不正な `Slice` 範囲 |
 | `KeyError` | `Dict` にないキーへのアクセス（デフォルト値なしの `Get` や `::`） |
-| `RuntimeError` | 0 除算、`NaN`/`Infinity`、比較できない `Sort` キー、`Loop` 外の `Break`、関数外の `Return`、壊れた JSON |
-| `IOError` | `ReadFile` / `WriteFile` の失敗 |
+| `RuntimeError` | 0 除算、`NaN`/`Infinity`、比較できない `Sort` キー、`Loop` 外の `Break`、関数外の `Return`、壊れた JSON、輪になった `Use` |
+| `IOError` | `ReadFile` / `WriteFile` の失敗、`Use` するファイルが読めないとき |
 | `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` の通信失敗や HTTP エラー |
 | `UserError` | `Throw` を評価したとき |
 | `AssertionError` | `Expect`・`Assert`・`ExpectError` で確かめたことが成り立たなかったとき（17章） |
@@ -1091,14 +1130,14 @@ calc_test.pop
 
 ### PopCorn 1 の非目標（Non-goals）
 
-PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スクリプトを主な用途としています。そのため、次の機能はあえて対象外にしています（将来版での拡張余地として残しています）。
+PopCorn 1 は、気軽に書けるデータ加工スクリプトを主な用途としています。そのため、次の機能はあえて対象外にしています（将来版での拡張余地として残しています）。
 
-* モジュール分割や外部ファイル読み込み構文（`import` / `Use` など）
+* 名前空間つきの読み込み（`math::Square` のような書き方）や、パッケージの配布・取得（関数を別のファイルに分けて読むことは、`Use` でできます）
 * 第一級関数（無名関数リテラルや、関数を変数・`List` に入れる機能）
 
 ### 検討中の機能（PopCorn 1 には入っていません）
 
-`Retry`・タイムアウト、`Fork` の並列化、Python との連携は、設計のメモ（リポジトリの `docs/design`）で検討しています。どれも、PopCorn 1 の約束（評価の順序、非破壊、単一ファイル完結）を崩さないかどうかを確かめてから、決めます。
+`Retry`・タイムアウト、`Fork` の並列化、Python との連携は、設計のメモ（リポジトリの `docs/design`）で検討しています。どれも、PopCorn 1 の約束（評価の順序、非破壊、実行環境に依存しないこと）を崩さないかどうかを確かめてから、決めます。
 
 ### 推奨スタイルガイド
 
@@ -1106,6 +1145,7 @@ PopCorn 1 は、1 つのファイルで気軽に書けるデータ加工スク�
 * **対等なペア引数の書き方:** `Random` の `(minimum, maximum)` や `Zip` の複数 `List` のように、引数が対等な関数は `(1, 6) >> Random` のように値リストで渡すのがおすすめです。
 * **処理名だけで書くのは、入力がはっきりしているときだけ:** 入力を使わない処理（`Pi * 2`、`Now::year`）と、ブロックや処理名渡しの中で各要素に当てる処理（`words >> Map Length`、`Slice(-1, Length)`）は、処理名だけで書いてかまいません。それ以外で入力を使う処理（`Display`、`Sum` など）は、`value >> Sum` のように、`>>` で入力を見せて書くと、書き忘れに気づけます。
 * **否定の書き方:** 「含まれていない」は `x not in xs`、「等しくない」は `a != b` と書くのがおすすめです（`not x in xs` や `not (a == b)` も同じ意味ですが、読み違えやすいです）。
+* **ファイルの分け方:** 何度も使う関数は `lib/` などのファイルにまとめ、使う側のファイルの先頭に `"lib/text.pop" >> Use.` と書きます。読まれるファイルには、関数と、関数が使う値だけを書きます（`Display` などを書くと、読まれたときに動きます）。
 * **長いパイプラインの改行:** 3 段階以上つながるパイプラインは、`>>` の前で改行して縦に揃えると読みやすくなります。
 
 ## 付録 B. 参考にした仕様書の構成

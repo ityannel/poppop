@@ -37,3 +37,20 @@ def test_playground_uses_the_current_runtime_and_specification():
     assert '"lessons": public_lessons()' in worker
     assert '"gallery": public_gallery()' in worker
     assert "friendlySpecificationExamples" in application
+
+
+def test_playground_worker_loads_every_python_module_without_the_archive():
+    # popcorn-runtime.zip がないとき（ソースのまま配信）に読むファイルの一覧
+    worker = (ROOT / "playground-worker.js").read_text(encoding="utf-8")
+    for path in (ROOT / "popcorn_lang").glob("*.py"):
+        if path.name in {"__main__.py"}:
+            continue
+        assert f'"{path.name}"' in worker, path.name
+
+
+def test_playground_runs_with_every_file_for_use():
+    worker = (ROOT / "playground-worker.js").read_text(encoding="utf-8")
+    application = (ROOT / "playground.js").read_text(encoding="utf-8")
+    assert "files: runFiles" in application
+    assert "path=__popcorn_path" in worker
+    assert "files=json.loads(__popcorn_files)" in worker
