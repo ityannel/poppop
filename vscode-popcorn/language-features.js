@@ -95,6 +95,7 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Expect: { description: "テスト用。値が期待した値と == で等しいか確かめ、ちがえば AssertionError にします。等しければ値をそのまま渡します。", output: "same" },
     Assert: { description: "テスト用。条件が true か確かめ、false なら AssertionError にします（Assert(\"説明\") で説明つき）。", output: "真偽値" },
     ExpectError: { description: "テスト用。かっこの中の式を、入力を @ にして計算し、エラーになることを確かめます。エラーの {type, message} を返します。", output: "辞書" },
+    Use: { description: "ほかの .pop ファイルの関数を読み込みます（\"lib/math.pop\" >> Use、使う名前を選ぶときは Use(Square, Cube)）。ファイルのいちばん外側に書きます。", output: "same" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
     Count: { description: "条件に合う配列要素の数を返します。", output: "数値" },
@@ -991,7 +992,7 @@ function isBlockColon(code, index, innermostBracket) {
  *   * `:` のブロックの本体は、見出しの行より 1 段深く。見出しと同じか浅い行で、ブロックは終わります。
  *   * 丸括弧・角括弧・波括弧の中で改行した行は、括弧 1 つ（開いた行 1 つ）につき 1 段深く。
  *     閉じ括弧で、その中で開いたブロックも終わります。
- *   * コメントだけの行は、ブロックを閉じません。
+ *   * コメントだけの行は、ブロックを閉じません（字下げは、その行の字下げで残るブロックの段にそろえます）。
  *   * 行末の `:` のすぐ次の行は、字下げを忘れていても本体として 1 段下げます（本体のないブロックはないため）。
  *     そのときは、`>>` や `when` / `else` / `Catch` で始まる行、空行、それより浅い行までを本体とみなします。
  */
@@ -1049,7 +1050,17 @@ function formatDocument(text, indentSize = 4) {
             }
             previousBlank = false;
         }
-        const openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+        let openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+        if (isCommentOnly) {
+            // コメントだけの行はブロックを閉じないが、浅く書いたコメントは、その字下げで残るブロックの段にそろえる
+            let kept = 0;
+            for (const block of blocks.slice(0, openBlocks)) {
+                const inside = block.flushIndent === undefined ? rawIndent > block.indent : rawIndent >= block.flushIndent;
+                if (!inside) break;
+                kept += 1;
+            }
+            openBlocks = kept;
+        }
         const level = openBlocks + levelOf(visibleBrackets);
         const line = " ".repeat(level * indentSize) + normalizePipelineSpacing(trimmed, code);
 

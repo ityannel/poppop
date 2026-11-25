@@ -80,7 +80,7 @@
    *   * `:` のブロックの本体は、見出しの行より 1 段深く。見出しと同じか浅い行で、ブロックは終わります。
    *   * 丸括弧・角括弧・波括弧の中で改行した行は、括弧 1 つ（開いた行 1 つ）につき 1 段深く。
    *     閉じ括弧で、その中で開いたブロックも終わります。
-   *   * コメントだけの行は、ブロックを閉じません。
+   *   * コメントだけの行は、ブロックを閉じません（字下げは、その行の字下げで残るブロックの段にそろえます）。
    *   * 行末の `:` のすぐ次の行は、字下げを忘れていても本体として 1 段下げます（本体のないブロックはないため）。
    *     そのときは、`>>` や `when` / `else` / `Catch` で始まる行、空行、それより浅い行までを本体とみなします。
    */
@@ -137,7 +137,17 @@
         }
         previousBlank = false;
       }
-      const openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+      let openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+      if (isCommentOnly) {
+        // コメントだけの行はブロックを閉じないが、浅く書いたコメントは、その字下げで残るブロックの段にそろえる
+        let kept = 0;
+        for (const block of blocks.slice(0, openBlocks)) {
+          const inside = block.flushIndent === undefined ? rawIndent > block.indent : rawIndent >= block.flushIndent;
+          if (!inside) break;
+          kept += 1;
+        }
+        openBlocks = kept;
+      }
       const level = openBlocks + levelOf(visibleBrackets);
       const line = " ".repeat(level * indentSize) + normalizePipelineSpacing(trimmed, code);
 
