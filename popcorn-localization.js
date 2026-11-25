@@ -31,6 +31,14 @@
     return match ? Number(match[1]) : null;
   }
 
+  // パーサーは記号を '.' のように引用符つきで出すので、「」に入れるときは外す
+  function unquote(text) {
+    const quoted = /^'(.*)'$/.exec(text);
+    if (quoted) return quoted[1];
+    const names = { "a name": "名前", "a process name": "処理名", "a number": "数", "a string": "文字列", "an operator": "演算子", "the end of the file": "ファイルの終わり" };
+    return names[text] || text;
+  }
+
   function translateMessage(message) {
     const exact = new Map([
       ["Division by zero", "0 で割ることはできません。"],
@@ -90,7 +98,7 @@
     match = message.match(/^Expected an indented body after ':' in (.+)$/);
     if (match) return `「:」のあとに本体がありません。同じ行に書くか、次の行から字下げして書いてください（${match[1]}）。`;
     match = message.match(/^Expected ':' to start (.+?), but got (.+)$/);
-    if (match) return `${match[1]} の本体は「:」で始めてください（「${match[2]}」が見つかりました）。`;
+    if (match) return `${match[1]} の本体は「:」で始めてください（「${unquote(match[2])}」が見つかりました）。`;
     match = message.match(/^'(\w+) (\w+)' is not allowed as a process-name body; write a block: '.+'$/);
     if (match) return `「${match[2]}」は処理名渡しでは書けません。「${match[1]}:」のようにブロックで書いてください。`;
     match = message.match(/^Variable '([^']+)' is not defined\.?$/);
@@ -101,14 +109,34 @@
     if (match) return `関数「${match[1]}」は >> の右側で呼び出してください。`;
     match = message.match(/^Comparison operator '([^']+)' is non-associative$/);
     if (match) return `比較演算子「${match[1]}」は連続して並べられません。and でつないでください。`;
-    match = message.match(/^Integer overflow: (.+)$/);
-    if (match) return `整数の範囲（64ビット符号付き整数）を超えました: ${match[1]}`;
+    match = message.match(/^Recursion is too deep \(more than (\d+) nested function calls\)/);
+    if (match) return `関数の呼び出しが深すぎます（${match[1]} 段を超えました）。自分を呼ぶのを止める場合（Return や Check の分岐）があるか確かめてください`;
+    match = message.match(/^Missing '\.' at the end of the statement$/);
+    if (match) return "文の終わりに「.」がありません";
+    match = message.match(/^A pipeline cannot be followed by '([^']+)'; .*like '(.+)'$/);
+    if (match) return `パイプラインのあとに「${match[1]}」は続けられません。結果で計算するときは、パイプラインを ( ) で囲みます（例: ${match[2]}）`;
+    match = message.match(/^Expected '\.' at the end of the statement, but got (.+)$/);
+    if (match) return `文の終わりに「.」が必要ですが、${match[1]} が見つかりました`;
+    match = message.match(/^Sort keys cannot be compared: (\w+) and (\w+)$/);
+    if (match) return `Sort のキーの ${match[1]} と ${match[2]} は比べられません。キーの型をそろえてください`;
+    match = message.match(/^Sort keys must be Num, Str, or a List of them; got (\w+)$/);
+    if (match) return `Sort のキーには、数・文字列、またはそれらのリストを使います（${match[1]} が返されました）`;
+    match = message.match(/^Format has no value for \{(\d+)\} \((\d+) value\(s\) given\)$/);
+    if (match) return `Format の {${match[1]}} に入れる値がありません（渡された値は ${match[2]} 個です）`;
+    match = message.match(/^Cannot cast '(.*)' \((\w+)\) to Num$/);
+    if (match) return `「${match[1]}」（${match[2]}）は数に変換できません`;
+    match = message.match(/^Invalid Slice range \((-?\d+), (-?\d+)\): start comes after end$/);
+    if (match) return `Slice の範囲 (${match[1]}, ${match[2]}) は、始まりが終わりより後ろです`;
+    match = message.match(/^Update cannot set a field inside '([^']+)' because it is (\w+), not Dict$/);
+    if (match) return `「${match[1]}」は ${match[2]} なので、その中のフィールドは Update で書きかえられません`;
+    match = message.match(/^Invalid regular expression for (\w+): (.+)$/);
+    if (match) return `${match[1]} の正規表現が正しくありません（${match[2]}）`;
     match = message.match(/^Unexpected character (.+)$/);
     if (match) return `使用できない文字 ${match[1]} があります。`;
     match = message.match(/^Unexpected token ([^(]+)\s*\((.*)\)$/);
     if (match) return `予期しない記号「${match[2]}」があります。`;
     match = message.match(/^Expected ([^,]+), but got (.+)$/);
-    if (match) return `「${match[1]}」が必要ですが、「${match[2]}」が見つかりました。`;
+    if (match) return `「${unquote(match[1])}」が必要ですが、「${unquote(match[2])}」が見つかりました。`;
     match = message.match(/^Key '([^']+)' is not (?:defined|found in dict)\.?$/);
     if (match) return `辞書にキー「${match[1]}」がありません。`;
     match = message.match(/^Index (.+) out of bounds\.?$/);

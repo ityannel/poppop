@@ -122,8 +122,9 @@ def test_sort_and_sort_desc():
     by_name_desc = run_code(code + "users >> SortDesc as u:\n        u::name.")
     assert [u["name"] for u in by_name_desc] == ["Cara", "Bob", "Ada"]
 
-    expect_error('[1, "a"] >> Sort:\n    @.', "RuntimeError")
-    expect_error("[true, false] >> Sort:\n    @.", "RuntimeError")
+    # 比べられないキーは、< と同じく TypeError
+    expect_error('[1, "a"] >> Sort:\n    @.', "TypeError")
+    expect_error("[true, false] >> Sort:\n    @.", "TypeError")
 
 
 def test_group_pipeline():
@@ -331,7 +332,10 @@ def test_new_collection_builtins():
     expect_error("[1, 2, 3] >> Slice(-4).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(-1, 1).", "IndexError")
     expect_error("[1, 2, 3] >> Slice(2, 1).", "IndexError")
-    expect_error("[1, 2, 3] >> Slice(0, 5).", "IndexError")
+    # 長さをはみ出した範囲は、ある分だけを返す
+    assert run_code("[1, 2, 3] >> Slice(0, 5).") == [1, 2, 3]
+    assert run_code('"abc" >> Slice(1, 10).') == "bc"
+    assert run_code('"abc" >> Slice(5, 10).') == ""
     expect_error("[1, 2, 3] >> Slice(0.5, 2).", "TypeError")
     expect_error("[] >> Average.", "RuntimeError")
     expect_error("[] >> Max.", "RuntimeError")
@@ -932,7 +936,8 @@ def test_new_standard_functions_are_documented():
     root = Path(__file__).resolve().parents[1]
     spec = (root / "popcorn_specification.md").read_text(encoding="utf-8")
     hover = (root / "vscode-popcorn" / "language-features.js").read_text(encoding="utf-8")
-    new_names = ("Floor Ceil Sqrt Pow Exp Log Sin Cos Tan Pi E Trim Unique Flatten Enumerate FromEntries GetPath Env Args").split()
+    new_names = ("Floor Ceil Sqrt Pow Exp Log Sin Cos Tan Pi E Trim Unique Flatten Enumerate FromEntries GetPath Env Args "
+                 "Fixed StartsWith EndsWith IndexOf Prepend Insert First Last Repeat PadStart PadEnd Match FindAll ReplaceAll").split()
     for name in new_names:
         assert name in BUILTIN_REGISTRY, name
         assert f"| `{name}` |" in spec, f"{name} is missing from the spec table"
