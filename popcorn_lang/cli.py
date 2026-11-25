@@ -1,15 +1,17 @@
-"""Command-line interface for the PopCorn interpreter."""
+﻿"""Command-line interface for the PopCorn interpreter."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 from .evaluator import Evaluator, EvaluatorError, PopCornError
 from .lexer import Lexer, LexerError
 from .migrate import MigrationError, migrate_braces
+from .modules import VirtualModuleLoader
 from .parser import ParseError, Parser
 from .version import DISPLAY_VERSION, VERSION
 
@@ -35,10 +37,29 @@ def get_warnings(source: str) -> list[str]:
     return list(lexer.warnings)
 
 
-async def evaluate(source: str, evaluator: Evaluator | None = None, args: list[str] | None = None):
+async def evaluate(
+    source: str,
+    evaluator: Evaluator | None = None,
+    args: list[str] | None = None,
+    *,
+    path: str | Path | None = None,
+    files: dict[str, str] | None = None,
+):
+    """source を動かす。
+
+    path は source のファイル（`Use` のパスは、このファイルのフォルダーから探す）。
+    files を渡すと、ディスクの代わりにこの辞書から読む（Playground）。
+    """
     runtime = evaluator or Evaluator()
     if args is not None:
         runtime.script_args = list(args)  # 標準関数 Args が返す
+    if files is not None:
+        runtime.module_loader = VirtualModuleLoader(files)
+        runtime.current_module = (
+            runtime.module_loader.resolve(str(path), None) if path is not None else None
+        )
+    elif path is not None:
+        runtime.current_module = runtime.module_loader.resolve(str(path), None)
     return await runtime.eval(parse_source(source), runtime.global_env)
 
 
@@ -95,6 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="popcorn",
         description="Run a PopCorn source file or start the interactive REPL.",
+        epilog="Run tests with: popcorn test [files or folders]",
     )
     parser.add_argument("file", nargs="?", type=Path, help="a .pop or .popcorn file")
     parser.add_argument("args", nargs="*", help="arguments for the program (read them with Args)")
@@ -110,8 +132,34 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_test_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="popcorn test",
+        description=(
+            "Run the tests in PopCorn files. A test is a function whose name starts with "
+            "'Test' (pop TestAdd: ...). Folders are searched for files ending in _test.pop."
+        ),
+    )
+    parser.add_argument(
+        "paths", nargs="*", type=Path,
+        help="test files or folders (default: the current folder)",
+    )
+    return parser
+
+
+def run_tests_command(argv: list[str]) -> int:
+    from .testing import run_test_paths
+
+    args = build_test_parser().parse_args(argv)
+    return asyncio.run(run_test_paths(args.paths))
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw_args = sys.argv[1:] if argv is None else list(argv)
+    # `popcorn test …` はテストを実行する。test という名前のファイルがあるときは、そのファイルを実行する
+    if raw_args and raw_args[0] == "test" and not Path("test").is_file():
+        return run_tests_command(raw_args[1:])
+    args = build_parser().parse_args(raw_args)
     if args.file is None:
         return asyncio.run(repl())
 
@@ -128,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.ast:
             print(get_ast_json(source))
         else:
-            asyncio.run(evaluate(source, args=args.args))
+            asyncio.run(evaluate(source, args=args.args, path=args.file))
         return 0
     except MigrationError as exc:
         print(f"SyntaxError: {exc}")

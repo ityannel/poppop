@@ -1,0 +1,7 @@
+// 数のリストをまとめる関数。
+
+(xs) >> pop Average:
+    (xs >> Sum) / (xs >> Length)
+
+(xs) >> pop Spread:
+    (xs >> Max) - (xs >> Min)

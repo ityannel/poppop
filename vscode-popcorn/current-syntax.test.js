@@ -98,6 +98,9 @@ assert.ok(typo && typo.message.includes("'Filter'"), JSON.stringify(typo));
 assert.ok(!kindsOf("(x) >> pop Fliter:\n    x\n\n1 >> Fliter >> Display.").includes("unknown-process"), "自分で定義した名前");
 assert.ok(!kindsOf("1 >> SomethingImported >> Display.").includes("unknown-process"), "似た名前がなければ注意しない");
 assert.ok(!kindsOf("[1] >> Fliter (@) >> Display. // popcorn-ignore: unknown-process").includes("unknown-process"));
+assert.ok(!kindsOf('"lib/text.pop" >> Use(Shout).\n"hi" >> Shout >> Display.').includes("unknown-process"), "Use(…) で読み込んだ名前");
+assert.ok(!kindsOf('"lib/text.pop" >> Use.\n"hi" >> Shout >> Display.').includes("unknown-process"), "Use. はすべて読み込むので判断しない");
+assert.ok(!kindsOf("3 >> Expect(3).\ntrue >> Assert.").includes("unknown-process"), "テスト用の標準関数");
 
 const plain = analyzeDocument("'Hello {name}' >> t.\nt >> Display.");
 assert.deepStrictEqual(plain.map(d => d.kind), ["plain-string-interpolation"]);

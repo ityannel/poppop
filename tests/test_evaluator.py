@@ -1090,3 +1090,25 @@ def test_negative_indices_count_from_the_end_everywhere():
     assert run_code("[10, 20, 30] >> Get(-4, 0).") == 0
     assert run_code("[10, 20, 30] >> Set(-1, 99).") == [10, 20, 99]
     expect_error("[10] >> Get(-2).", "IndexError")
+
+
+def test_process_parameters_take_the_expression_unevaluated():
+    my_filter = "(xs, Keep) >> pop MyFilter:\n    xs >> Filter Keep.\n\n"
+    assert run_code(my_filter + "[1, 2, 3, 4] >> MyFilter(@ % 2 == 0).") == [2, 4]
+    is_even = "(n) >> pop IsEven:\n    n % 2 == 0\n\n"
+    assert run_code(is_even + my_filter + "[1, 2, 3, 4] >> MyFilter(IsEven).") == [2, 4]
+    fold = "(xs, init, Step) >> pop Fold:\n    xs >> Reduce(init) as (a, x):\n        (a, x) >> Step.\n\n"
+    assert run_code(fold + "[1, 2, 3] >> Fold(10, @[0] + @[1]).") == 16
+    assert run_code(fold + "3 >> k.\n[1, 2, 3] >> Fold(0, @[0] + @[1] * k).") == 18
+    assert run_code("(x, F) >> pop Twice:\n    x >> F >> F.\n\n5 >> Twice(@ * 3).") == 45
+    expect_error(my_filter + "([1, 2], 5) >> MyFilter.", "TypeError")
+    expect_error("(x, F) >> pop G:\n    x >> F(1).\n\n1 >> G(@).", "RuntimeError")
+
+
+def test_process_parameter_names_must_not_be_block_forms():
+    for code in ("(x, Map) >> pop F:\n    x.", "(X) >> pop F:\n    1."):
+        try:
+            run_code(code)
+        except Exception:
+            continue
+        raise AssertionError(f"must be rejected: {code}")

@@ -6,6 +6,7 @@ from typing import Any
 
 from .ast_nodes import *
 from .environment import Environment
+from .modules import FileModuleLoader, ModuleLoader
 
 _SKIPPED = object()
 
@@ -21,6 +22,16 @@ class PopCornError(EvaluatorError):
         self.line = line
         self.column = column
         super().__init__(f"{err_type}: {message}")
+
+
+class ProcessArgument:
+    """処理引数として渡された、まだ計算していない式と、それを書いた場所の環境。"""
+
+    __slots__ = ("expr", "env")
+
+    def __init__(self, expr, env):
+        self.expr = expr
+        self.env = env
 
 
 class ReturnException(BaseException):
@@ -169,6 +180,11 @@ class Evaluator:
     def __init__(self):
         self.global_env = Environment()
         self.trace_path = os.environ.get("POPCORN_TRACE_FILE")
+        # `Use` でほかのファイルを読む。current_module は、いま評価しているファイル（なければ None）
+        self.module_loader: ModuleLoader = FileModuleLoader()
+        self.current_module: str | None = None
+        self._module_exports: dict[str, dict[str, Any]] = {}
+        self._modules_loading: list[str] = []
 
     def trace_pipeline_value(self, node, value, input_value=None, progress=None):
         """Emit optional, compact execution data for the VS Code flow view."""
@@ -206,12 +222,17 @@ class Evaluator:
         raise PopCornError("RuntimeError", f"No eval method for {type(node).__name__}")
 
     async def eval_Program(self, node: Program, env: Environment):
+        # `Use` は、どこに書いてあっても、プログラムを動かす前に読む（関数の定義と同じく、順番に関係なく呼べる）
+        await self._import_modules(node, env)
+
         for stmt in node.statements:
             if isinstance(stmt, FunctionDefNode):
                 env.set_function(stmt.name, (stmt, None, env))
 
         result = None
         for stmt in node.statements:
+            if isinstance(stmt, UseNode):
+                continue
             if isinstance(stmt, FunctionDefNode):
                 env.set_function(stmt.name, (stmt, dict(env.variables), env))
             else:
@@ -222,6 +243,94 @@ class Evaluator:
 
         env.set_current(result)
         return result
+
+    async def _import_modules(self, node: Program, env: Environment) -> None:
+        uses = [stmt for stmt in node.statements if isinstance(stmt, UseNode)]
+        if not uses:
+            return
+        local_names = {
+            stmt.name for stmt in node.statements if isinstance(stmt, FunctionDefNode)
+        }
+        origins: dict[str, tuple[str, str]] = {}  # 名前 -> (読んだファイルの key, 書いたとおりのパス)
+        for use in uses:
+            key = self.module_loader.resolve(use.path, self.current_module)
+            exports = await self._load_module(key, use)
+            names = use.names if use.names is not None else list(exports)
+            for name in names:
+                if name not in exports:
+                    raise PopCornError(
+                        "NameError",
+                        f"'{use.path}' has no function '{name}'",
+                        use.line,
+                        use.column,
+                    )
+                if name in local_names:
+                    raise PopCornError(
+                        "NameError",
+                        f"Function '{name}' is defined in this file and also comes from "
+                        f"'{use.path}'; rename one, or choose names with Use(...)",
+                        use.line,
+                        use.column,
+                    )
+                previous = origins.get(name)
+                if previous is not None and previous[0] != key:
+                    raise PopCornError(
+                        "NameError",
+                        f"Function '{name}' comes from both '{previous[1]}' and '{use.path}'; "
+                        f"choose names with Use(...)",
+                        use.line,
+                        use.column,
+                    )
+                origins[name] = (key, use.path)
+                env.set_function(name, exports[name])
+
+    async def _load_module(self, key: str, use: UseNode) -> dict[str, Any]:
+        """ファイルを 1 回だけ評価して、そのファイルで `pop` した関数を返す。"""
+        if key in self._module_exports:
+            return self._module_exports[key]
+        if key in self._modules_loading:
+            chain = self._modules_loading[self._modules_loading.index(key):] + [key]
+            raise PopCornError(
+                "RuntimeError",
+                "Files use each other in a circle: "
+                + " -> ".join(self.module_loader.display(k) for k in chain),
+                use.line,
+                use.column,
+            )
+        source = self.module_loader.read(key, use.path)
+
+        from .lexer import Lexer, LexerError
+        from .parser import ParseError, Parser
+
+        shown = self.module_loader.display(key)
+        try:
+            program = Parser(Lexer(source).tokenize()).parse()
+        except LexerError as exc:
+            raise LexerError(f"{shown}: {exc}") from None
+        except ParseError as exc:
+            raise ParseError(f"{shown}: {exc}") from None
+
+        module_env = Environment()
+        previous_module = self.current_module
+        self._modules_loading.append(key)
+        self.current_module = key
+        try:
+            await self.eval_Program(program, module_env)
+        except PopCornError as exc:
+            if not exc.message.startswith(f"{shown}: "):
+                exc.message = f"{shown}: {exc.message}"
+                exc.args = (f"{exc.err_type}: {exc.message}",)
+            raise
+        finally:
+            self.current_module = previous_module
+            self._modules_loading.pop()
+
+        defined = [
+            stmt.name for stmt in program.statements if isinstance(stmt, FunctionDefNode)
+        ]
+        exports = {name: module_env.functions[name] for name in defined}
+        self._module_exports[key] = exports
+        return exports
 
     async def eval_ConditionalStatementNode(
         self, node: ConditionalStatementNode, env: Environment
@@ -243,6 +352,16 @@ class Evaluator:
             env.has_current_item = prev_has
 
     async def eval_Pipeline(self, node: Pipeline, env: Environment):
+        try:
+            return await self._eval_pipeline_stages(node, env)
+        except PopCornError as exc:
+            # 行番号がまだなければ、いちばん内側の文の行を覚えておく（テストの報告などで使う）
+            if exc.line is None and getattr(node, "line", None):
+                exc.line = node.line
+                exc.column = node.column
+            raise
+
+    async def _eval_pipeline_stages(self, node: Pipeline, env: Environment):
         val = await self.eval(node.nodes[0], env)
         env.set_current(val)
         self.trace_pipeline_value(node.nodes[0], val)
@@ -557,9 +676,37 @@ class Evaluator:
         name = node.name
         left_val = env.get_current()
 
+        function_entry = env.get_function(name)
+
+        # 0. 処理引数として受け取った式（関数の中で `x >> Keep` のように呼ぶ）
+        if isinstance(function_entry, ProcessArgument):
+            if node.args:
+                raise PopCornError(
+                    "RuntimeError", f"Process parameter '{name}' does not take extra arguments"
+                )
+            arg_env = Environment(parent=function_entry.env)
+            arg_env.set_current(left_val)
+            return await self.eval(function_entry.expr, arg_env)
+
+        process_positions = set()
+        if function_entry:
+            process_positions = {
+                index for index, param in enumerate(function_entry[0].params)
+                if param.type_name == "process"
+            }
+        else:
+            from .pop_builtins import BUILTIN_PROCESS_ARGUMENTS
+
+            # 標準処理のうち、補助引数を処理として受け取るもの（ExpectError など）
+            process_positions = BUILTIN_PROCESS_ARGUMENTS.get(name, set())
+
         if node.args:
             extra_vals = []
-            for arg_node in node.args:
+            for index, arg_node in enumerate(node.args, start=1):
+                if index in process_positions:
+                    # 処理引数は計算しない。関数の中で呼ばれるたびに、そのときの @ で計算する
+                    extra_vals.append(ProcessArgument(arg_node, env))
+                    continue
                 arg_env = Environment(parent=env)
                 arg_env.set_current(left_val)
                 extra_vals.append(await self.eval(arg_node, arg_env))
@@ -568,7 +715,6 @@ class Evaluator:
             current = left_val
 
         # 1. User-defined functions
-        function_entry = env.get_function(name)
         if function_entry:
             func_def, captured_vars, owner_env = function_entry
             closure_env = Environment()
@@ -603,7 +749,15 @@ class Evaluator:
                         f"Function '{name}' expects {n_params} values, got {len(current)}",
                     )
                 for param, arg_val in zip(func_def.params, current):
-                    call_env.set_var(param.name, arg_val)
+                    if param.type_name == "process":
+                        if not isinstance(arg_val, ProcessArgument):
+                            raise PopCornError(
+                                "TypeError",
+                                f"Pass '{param.name}' of '{name}' in parentheses: '>> {name}(…)'",
+                            )
+                        call_env.set_function(param.name, arg_val)
+                    else:
+                        call_env.set_var(param.name, arg_val)
 
             try:
                 return await self.eval_BlockNode(func_def.block, call_env)
@@ -614,9 +768,16 @@ class Evaluator:
         from .pop_builtins import BUILTIN_REGISTRY
 
         if name in BUILTIN_REGISTRY:
-            res = BUILTIN_REGISTRY[name](current, env, self)
-            if inspect.iscoroutine(res):
-                res = await res
+            try:
+                res = BUILTIN_REGISTRY[name](current, env, self)
+                if inspect.iscoroutine(res):
+                    res = await res
+            except PopCornError as exc:
+                # どこで起きたかを、テストの報告などで示せるように覚えておく
+                if exc.line is None:
+                    exc.line = node.line
+                    exc.column = node.column
+                raise
             return res
 
         raise PopCornError("NameError", f"Function '{name}' is not defined.")

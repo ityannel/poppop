@@ -807,7 +807,11 @@ doubled >> Display.`;
       track(message.ok ? "pc_ok" : "pc_error", message.elapsedMs < 50 ? "<50ms" : message.elapsedMs < 500 ? "<500ms" : message.elapsedMs < 3000 ? "<3s" : "3s+");
       if (message.ok) {
         elements.runState.textContent = "完了";
-        setRunFeedback("success", "できました", 1800);
+        setRunFeedback(
+          "success",
+          message.tests ? `テスト ${message.tests.total} 件すべて成功` : "できました",
+          1800,
+        );
         if (message.lesson) handleLessonResult(message.lesson);
         else if (
           currentLesson()?.dynamic &&
@@ -820,7 +824,8 @@ doubled >> Display.`;
         appendOutput(localizeError(message.error), true);
         elements.runState.textContent = "エラー";
         setRunFeedback("error", "確認が必要です", 2600);
-        selectResultTab("diagnostics");
+        // テストの失敗は、出力にある報告を見てもらう
+        if (!message.tests) selectResultTab("diagnostics");
         if (activeLessonId && currentSidePanel === "lesson") {
           recordLearning("failure", activeLessonId, localizeError(message.error));
           askRobot("runtime_error", {
@@ -876,9 +881,15 @@ doubled >> Display.`;
     selectResultTab("output");
     announce("実行を開始しました");
     elements.checkLessonButton.disabled = true;
+    const source = getSource();
+    // `"lib/math.pop" >> Use.` で、ほかのファイルを読めるように、すべてのファイルを渡す
+    const runFiles = { ...files };
+    if (files[activeFile] !== undefined) runFiles[activeFile] = source;
     worker.postMessage({
       type: "run",
-      source: getSource(),
+      source,
+      path: files[activeFile] !== undefined ? activeFile : null,
+      files: runFiles,
       lessonId:
         currentSidePanel === "lesson" && !currentLesson()?.dynamic
           ? activeLessonId
