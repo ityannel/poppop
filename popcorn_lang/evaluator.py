@@ -15,7 +15,9 @@ _SKIPPED = object()
 
 # 関数の呼び出しを、何段まで重ねられるか（再帰の深さの上限）。
 # これを超えると、Python の RecursionError ではなく、PopCorn の RuntimeError にする。
-MAX_CALL_DEPTH = 10000
+# Python 3.11 までは、Python の関数呼び出しが C のスタックも使うので、深くしすぎると
+# プロセスごと落ちる（Segmentation fault）。そのため、3.12 より前では浅くしておく。
+MAX_CALL_DEPTH = 10000 if sys.version_info >= (3, 12) else 300
 # PopCorn の 1 段の呼び出しは、Python の関数を何十段か使う。上限に届く前に Python が止まらないよう、余裕をもたせる。
 _PYTHON_FRAMES_PER_CALL = 40
 

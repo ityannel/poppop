@@ -1,5 +1,7 @@
 """言語の細かな改善（再帰の深さ、エラー文、補助引数、追加の標準関数）のテスト。"""
 
+import sys
+
 import pytest
 
 from popcorn_lang.evaluator import format_popcorn_num
@@ -25,7 +27,11 @@ COUNTDOWN = """
 
 
 def test_deep_recursion_works():
-    assert run_code(COUNTDOWN + "3000 >> Down.") == 0
+    from popcorn_lang.evaluator import MAX_CALL_DEPTH
+
+    depth = 3000 if sys.version_info >= (3, 12) else 250
+    assert depth < MAX_CALL_DEPTH
+    assert run_code(COUNTDOWN + f"{depth} >> Down.") == 0
 
 
 def test_endless_recursion_is_a_catchable_runtime_error():
