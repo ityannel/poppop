@@ -1170,17 +1170,14 @@ function sourceDiagnostics(text) {
     const knownProcesses = new Set([
         ...Object.keys(STANDARD_FUNCTIONS),
         ...functions.map(definition => definition.name),
-        ...functions.flatMap(definition => definition.params.filter(param => param.process).map(param => param.name))
+        ...functions.flatMap(definition => definition.params.filter(param => param.process).map(param => param.name)),
+        "Use",
+        // `"lib/x.pop" >> Use(Square, Shout).` で名前を書いて読み込んだ関数
+        ...[...text.matchAll(/>>\s*Use\s*\(([^)]*)\)/g)].flatMap(match => match[1].split(",").map(name => name.trim()).filter(Boolean))
     ]);
+    // `"lib/x.pop" >> Use.` は別のファイルの関数をすべて読み込むので、名前の書き間違いは判断できない
+    const importsEverything = /"[^"\n]*"\s*>>\s*Use\s*\./.test(text);
     const reportedUnknown = new Set();
-    // `"lib/x.pop" >> Use` で読み込む関数は、このファイルからは見えない。名前を選ばずに読み込むときは、書き間違いを調べない
-    let importsEverything = false;
-    for (const { code } of lines) {
-        const use = />>\s*Use\b(\s*\(([^)]*)\))?/.exec(code);
-        if (!use) continue;
-        if (!use[1]) importsEverything = true;
-        for (const name of (use[2] || "").match(/[A-Z][A-Za-z0-9_]*/g) || []) knownProcesses.add(name);
-    }
 
     for (const { code, lineStart } of lines) {
         const legacy = LEGACY_BRACE_BLOCK.exec(code);
