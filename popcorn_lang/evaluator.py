@@ -1,6 +1,7 @@
 ﻿import inspect
 import json
 import math
+import re
 import os
 from typing import Any
 
@@ -422,12 +423,16 @@ class Evaluator:
         return val
 
     def _show_tap(self, node: Pipeline, index: int, value: Any) -> None:
-        """`>?>`: いま流れている値を、場所といっしょに表示する（値は変えない）。"""
+        """`>?>`: いま流れている値を、行番号と左側のコードといっしょに表示する（値は変えない）。
+
+            [3行目] "実数: " >> Input >> Trim >> Num → 25 (Num)
+        """
         positions = getattr(node, "op_positions", None) or []
         line = positions[index - 1][0] if index - 1 < len(positions) else node.line
-        label = _stage_label(node.nodes[index - 1])
-        after = f" after {label}" if label else ""
-        print(f"[>?> line {line}{after}] ({popcorn_type_name(value)}) {format_popcorn_str(value)}")
+        sources = getattr(node, "tap_sources", None) or []
+        code = sources[index - 1] if index - 1 < len(sources) else None
+        left = f" {_shorten_tap_source(code)}" if code else ""
+        print(f"[{line}行目]{left} → {format_popcorn_str(value)} ({popcorn_type_name(value)})")
 
     async def _eval_stream_block(self, n: StreamBlockNode, val: Any, env: Environment) -> Any:
         if n.stream_type == "Map":
@@ -969,18 +974,13 @@ class Evaluator:
         return "".join(res)
 
 
-def _stage_label(node: ASTNode) -> str:
-    """`>?>` の表示で使う、直前の段階の名前（分からなければ空）。"""
-    if isinstance(node, StreamBlockNode):
-        return node.stream_type
-    if isinstance(node, FunctionCallNode):
-        return node.name
-    if isinstance(node, VariableNode):
-        return node.name
-    if isinstance(node, BindNode) and isinstance(node.target, VariableNode):
-        return node.target.name
-    if isinstance(node, (CheckBlock, LoopBlock)):
-        return "Check" if isinstance(node, CheckBlock) else "Loop"
-    if isinstance(node, TryCatchBlock):
-        return "Try"
-    return ""
+def _shorten_tap_source(code: str, limit: int = 48) -> str:
+    """長い左側のコードは、近いほう（うしろ）を残して、前を … にする。"""
+    if len(code) <= limit:
+        return code
+    tail = code[-(limit - 1):]
+    # 段階の途中で切れないように、次のパイプ演算子の前から始める
+    match = re.search(r" >[?!]?> ", tail)
+    if match:
+        tail = tail[match.start():]
+    return "…" + tail
