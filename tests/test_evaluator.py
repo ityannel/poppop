@@ -826,6 +826,32 @@ def test_math_standard_functions():
     assert run_code("-3.2 >> Ceil >> Str.") == "-3"  # -0 は出ない
 
 
+def test_round_floor_ceil_with_digits():
+    assert run_code("3.14159 >> Round(2).") == 3.14
+    assert run_code("1234 >> Round(-2).") == 1200
+    assert run_code("1250 >> Round(-2).") == 1300
+    assert run_code("3.7 >> Round.") == 4
+    assert run_code("3.7 >> Round(0).") == 4
+    assert run_code("(3.14159, 3) >> Round.") == 3.142
+    # 小数の表記どおりに四捨五入（2進数の誤差で 1.00 にならない）
+    assert run_code("1.005 >> Round(2).") == 1.01
+    assert run_code("2.675 >> Round(2).") == 2.68
+    assert run_code("-1.25 >> Round(1).") == -1.3
+    assert run_code("0.1 + 0.2 >> Round(2).") == 0.3
+    assert run_code("19.8 * 3 >> Round(1) >> Str.") == "59.4"
+    assert run_code("-0.001 >> Round(2) >> Str.") == "0"  # -0 は出ない
+    assert run_code("3.14159 >> Floor(2).") == 3.14
+    assert run_code("-3.14159 >> Floor(2).") == -3.15
+    assert run_code("1299 >> Floor(-2).") == 1200
+    assert run_code("3.14159 >> Ceil(2).") == 3.15
+    assert run_code("1201 >> Ceil(-2).") == 1300
+    assert run_code("5 >> Round(400).") == 5
+    assert run_code("5 >> Round(-400).") == 0
+    expect_error("3.1 >> Round(1.5).", "TypeError")
+    expect_error('3.1 >> Round("2").', "TypeError")
+    expect_error('"a" >> Floor(1).', "TypeError")
+
+
 def test_math_standard_functions_report_domain_errors():
     expect_error("-1 >> Sqrt.", "RuntimeError")
     expect_error("0 >> Log.", "RuntimeError")

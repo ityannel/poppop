@@ -1,6 +1,6 @@
 ﻿import asyncio
 import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_UP, localcontext
 import json
 import math
 import os
@@ -221,12 +221,38 @@ def builtin_Min(current, env, evaluator):
 BUILTIN_REGISTRY["Min"] = builtin_Min
 
 
-def builtin_Round(current, env, evaluator):
-    if _is_number(current):
+_MAX_ROUND_DIGITS = 308
+
+
+def _round_to_digits(current, name: str, rounding):
+    """Round / Floor / Ceil の共通処理。
+
+    `x >> Round` は整数へ、`x >> Round(2)` は小数第2位まで、
+    `x >> Round(-2)` は百の位までに丸めます（入力は `(x, digits)` の組）。
+    """
+    if isinstance(current, tuple) and len(current) == 2 and all(_is_number(v) for v in current):
+        num = _to_num(current[0])
+        digits = _to_num(current[1])
+        if not digits.is_integer():
+            _type_error(f"{name} digits must be a whole number (Num)")
+        digits = int(digits)
+    elif _is_number(current):
         num = _to_num(current)
-        rounded = int(Decimal(str(num)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-        return _to_num(rounded)
-    _type_error("Round requires Num")
+        digits = 0
+    else:
+        _type_error(f"{name} requires Num or (Num, digits)")
+    if digits > _MAX_ROUND_DIGITS:
+        # float の精度より細かい桁は、丸めても値が変わりません。
+        return num
+    digits = max(digits, -_MAX_ROUND_DIGITS)
+    with localcontext() as ctx:
+        ctx.prec = 2 * _MAX_ROUND_DIGITS + 20
+        rounded = Decimal(repr(num)).quantize(Decimal(1).scaleb(-digits), rounding=rounding)
+    return _to_num(rounded)
+
+
+def builtin_Round(current, env, evaluator):
+    return _round_to_digits(current, "Round", ROUND_HALF_UP)
 
 
 BUILTIN_REGISTRY["Round"] = builtin_Round
@@ -826,11 +852,11 @@ def _math_result(name: str, compute):
 
 
 def builtin_Floor(current, env, evaluator):
-    return _to_num(math.floor(_num_input(current, "Floor")))
+    return _round_to_digits(current, "Floor", ROUND_FLOOR)
 
 
 def builtin_Ceil(current, env, evaluator):
-    return _to_num(math.ceil(_num_input(current, "Ceil")))
+    return _round_to_digits(current, "Ceil", ROUND_CEILING)
 
 
 def builtin_Sqrt(current, env, evaluator):

@@ -207,10 +207,10 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 数値 | `Average` | 数値だけの空でない `List` | 平均を `Num` で返します。空 `List` は `RuntimeError`。 |
 | 数値 | `Max` | 比較できる値の空でない `List` | 最大値を返します。空 `List` は `RuntimeError`。 |
 | 数値 | `Min` | 比較できる値の空でない `List` | 最小値を返します。空 `List` は `RuntimeError`。 |
-| 数値 | `Round` | `Num` | いちばん近い整数値の `Num` を返します。中間値（`.5`）は 0 から遠い方向へ丸めます（四捨五入）。 |
+| 数値 | `Round` | `Num` または `(x, digits)` | いちばん近い整数値の `Num` を返します。中間値（`.5`）は 0 から遠い方向へ丸めます（四捨五入）。`x >> Round(digits)` と書くと、小数第 `digits` 位までに丸めます（`3.14159 >> Round(2)` は `3.14`）。`digits` が負なら整数の位で丸めます（`1234 >> Round(-2)` は `1200`）。`digits` は整数値の `Num` で、そうでなければ `TypeError`。 |
 | 数値 | `Abs` | `Num` | 絶対値の `Num` を返します。 |
-| 数値 | `Floor` | `Num` | 小数点以下を負の方向へ切り捨てた、整数値の `Num` を返します（`-3.2` は `-4`）。 |
-| 数値 | `Ceil` | `Num` | 小数点以下を正の方向へ切り上げた、整数値の `Num` を返します（`-3.7` は `-3`）。 |
+| 数値 | `Floor` | `Num` または `(x, digits)` | 小数点以下を負の方向へ切り捨てた、整数値の `Num` を返します（`-3.2` は `-4`）。`x >> Floor(digits)` と書くと、`Round` と同じ桁の数え方で切り捨てます（`3.14159 >> Floor(2)` は `3.14`）。 |
+| 数値 | `Ceil` | `Num` または `(x, digits)` | 小数点以下を正の方向へ切り上げた、整数値の `Num` を返します（`-3.7` は `-3`）。`x >> Ceil(digits)` と書くと、`Round` と同じ桁の数え方で切り上げます（`3.14159 >> Ceil(2)` は `3.15`）。 |
 | 数値 | `Sqrt` | `Num`（0 以上） | 平方根の `Num` を返します。負の値は `RuntimeError`。 |
 | 数値 | `Pow` | `(base, exponent)` | `base` の `exponent` 乗の `Num` を返します。結果が定まらないとき（負の数の小数乗、`0` の負の累乗）や、大きすぎるときは `RuntimeError`。 |
 | 数値 | `Exp` | `Num` | `e` の累乗（自然指数関数）の `Num` を返します。大きすぎるときは `RuntimeError`。 |

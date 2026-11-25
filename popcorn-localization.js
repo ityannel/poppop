@@ -42,6 +42,9 @@
       ["Sqrt requires a non-negative Num", "Sqrt には 0 以上の数を渡してください。"],
       ["Log requires a positive Num", "Log には 0 より大きい数を渡してください。"],
       ["Log base must be positive and not 1", "Log の底は、0 より大きく、1 以外の数にしてください。"],
+      ["Round digits must be a whole number (Num)", "Round の桁数には整数を指定してください（例: Round(2)）。"],
+      ["Floor digits must be a whole number (Num)", "Floor の桁数には整数を指定してください（例: Floor(2)）。"],
+      ["Ceil digits must be a whole number (Num)", "Ceil の桁数には整数を指定してください（例: Ceil(2)）。"],
       [
         "Single-quoted strings do not interpolate; use a double-quoted string to insert values",
         "単一引用符 ' の文字列では、{…} は補間されず、そのまま文字になります。値を入れたいときは、二重引用符 \" の文字列を使います。",
