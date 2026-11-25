@@ -7,8 +7,8 @@ const { forEachBrace, leadingCloseCount } = require("./layout-view");
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />[?!]?>/g;
-const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
-const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
+const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Any|All|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
+const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Any|All|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
     "and", "as", "else", "false", "in", "not", "null", "or", "pop", "true", "when"
 ]);
@@ -24,17 +24,17 @@ const STANDARD_FUNCTIONS = Object.freeze({
     PostFetch: { description: "URL へ HTTP POST リクエストを送り、応答本文を返します。", output: "文字列" },
     HttpRequest: { description: "任意の HTTP リクエストを送り、status・headers・body の辞書を返します。", output: "辞書" },
     Type: { description: "値の型名を文字列で返します。", output: "文字列" },
-    Sleep: { description: "指定秒数だけ待機し、値はそのまま渡します。", output: "same" },
+    Sleep: { description: "指定秒数だけ待機します。value >> Sleep(秒) なら、待ってから value をそのまま渡します。", output: "same" },
     Add: { description: "2 つの値を加算または連結します。", output: "数値" },
     Div: { description: "2 つの整数を 0 の方向へ切り捨てて整数除算します。", output: "数値" },
     Sum: { description: "数値の配列を合計します。", output: "数値" },
-    Max: { description: "配列の最大値を返します。", output: "要素" },
-    Min: { description: "配列の最小値を返します。", output: "要素" },
+    Max: { description: "配列の最大値を返します。(3, 5) >> Max のように値リストも使えます。", output: "要素" },
+    Min: { description: "配列の最小値を返します。(3, 5) >> Min のように値リストも使えます。", output: "要素" },
     Average: { description: "数値の配列の平均を Num で返します。", output: "数値" },
-    Round: { description: "数値を四捨五入して最も近い整数値の Num を返します。", output: "数値" },
+    Round: { description: "数値を四捨五入して最も近い整数値の Num を返します。x >> Round(2) なら小数第2位まで、Round(-2) なら百の位までに丸めます。", output: "数値" },
     Abs: { description: "数値の絶対値を返します。", output: "数値" },
-    Floor: { description: "小数点以下を負の方向へ切り捨てた整数値を返します。", output: "数値" },
-    Ceil: { description: "小数点以下を正の方向へ切り上げた整数値を返します。", output: "数値" },
+    Floor: { description: "小数点以下を負の方向へ切り捨てた整数値を返します。x >> Floor(2) なら小数第2位までに切り捨てます。", output: "数値" },
+    Ceil: { description: "小数点以下を正の方向へ切り上げた整数値を返します。x >> Ceil(2) なら小数第2位までに切り上げます。", output: "数値" },
     Sqrt: { description: "平方根を返します。負の値は RuntimeError です。", output: "数値" },
     Pow: { description: "(base, exponent) の累乗を返します。", output: "数値" },
     Exp: { description: "e の累乗を返します。", output: "数値" },
@@ -59,17 +59,17 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Array: { description: "指定した大きさの配列を 0 で埋めて作成します。", output: "配列" },
     Dict: { description: "値が辞書であることを確認して返します。", output: "辞書" },
     Length: { description: "文字列・配列・辞書・値リストの長さを返します。", output: "数値" },
-    Sort: { description: "配列をキーで昇順に安定ソートします。", output: "配列" },
-    SortDesc: { description: "配列をキーで降順に安定ソートします。", output: "配列" },
+    Sort: { description: "配列をキーで昇順に安定ソートします。キーを省くと値そのもの、List のキー [a, b] なら a、同じなら b の順で比べます。", output: "配列" },
+    SortDesc: { description: "配列をキーで降順に安定ソートします。キーを省くと値そのもので並べます。", output: "配列" },
     Reverse: { description: "配列または文字列を逆順にします。", output: "same" },
     Uppercase: { description: "文字列をすべて大文字にします。", output: "文字列" },
     Lowercase: { description: "文字列をすべて小文字にします。", output: "文字列" },
     Split: { description: "文字列を区切り文字で分割して配列にします。", output: "配列" },
     Replace: { description: "文字列内の文字列を置き換えます。", output: "文字列" },
     Join: { description: "配列の要素を文字列化して区切り文字で連結します。", output: "文字列" },
-    Get: { description: "辞書のキー、または配列の位置から値を取り出します（省略可能な既定値付き）。", output: "要素" },
+    Get: { description: "辞書のキー、配列や文字列の位置から値を取り出します（省略可能な既定値付き）。", output: "要素" },
     Set: { description: "辞書または配列の値を非破壊的に置き換えます。", output: "same" },
-    Remove: { description: "辞書から指定キーを取り除いた新しい辞書を返します。", output: "辞書" },
+    Remove: { description: "辞書から指定キーを、配列から指定位置の要素を取り除いた新しい値を返します。", output: "same" },
     Keys: { description: "辞書のキー一覧を挿入順の配列で返します。", output: "配列" },
     Values: { description: "辞書の値一覧を挿入順の配列で返します。", output: "配列" },
     Entries: { description: "辞書の [key, value] ペアを挿入順の配列で返します。", output: "配列" },
@@ -77,8 +77,8 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Contains: { description: "値やキー・部分文字列を含むかどうかを調べます。", output: "真偽値" },
     Append: { description: "配列の末尾に値を追加した新しい配列を返します。", output: "配列" },
     Slice: { description: "文字列または配列の一部を切り出します。", output: "same" },
-    Format: { description: "位置プレースホルダ {0}, {1} で文字列を整形します。", output: "文字列" },
-    Now: { description: "現在日時を辞書で取得します。", output: "辞書" },
+    Format: { description: "位置プレースホルダ {0}, {1} で文字列を整形します（\"…\" の中の {0} も補間されません）。", output: "文字列" },
+    Now: { description: "現在日時を辞書で取得します（year〜second、millisecond、weekday（0 が日曜）、timestamp）。", output: "辞書" },
     Random: { description: "指定範囲のランダムな整数を生成します。", output: "数値" },
     ToJson: { description: "値を JSON 文字列に変換します。", output: "文字列" },
     FromJson: { description: "JSON 文字列を PopCorn の値へ変換します。", output: "式" },
@@ -102,7 +102,23 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Reduce: { description: "配列を 1 つの値へ集約します。", output: "要素" },
     Zip: { description: "複数の配列を位置ごとにまとめます。", output: "配列" },
     Loop: { description: "状態値を Break まで繰り返し更新します。", output: "式" },
-    Update: { description: "辞書のキーを非破壊的に更新・追加します。", output: "辞書" }
+    Update: { description: "辞書のキーを非破壊的に更新・追加します。@::a::b のように入れ子のフィールドも書けます。", output: "辞書" },
+    Any: { description: "条件に合う要素が 1 つでもあれば true を返します。条件を省くと Bool の配列をそのまま調べます。", output: "真偽値" },
+    All: { description: "すべての要素が条件に合えば true を返します（空の配列は true）。", output: "真偽値" },
+    Fixed: { description: "数値を小数第 n 位までの文字列にします。足りない桁は 0 で補います（3.1 >> Fixed(2) は \"3.10\"）。", output: "文字列" },
+    StartsWith: { description: "文字列が指定した文字列で始まるかどうかを返します。", output: "真偽値" },
+    EndsWith: { description: "文字列が指定した文字列で終わるかどうかを返します。", output: "真偽値" },
+    IndexOf: { description: "配列の要素や部分文字列が最初に現れる位置を返します。見つからなければ null です。", output: "数値" },
+    Prepend: { description: "配列の先頭に値を追加した新しい配列を返します。", output: "配列" },
+    Insert: { description: "配列の指定位置に値を差し込んだ新しい配列を返します（Insert(位置, 値)）。", output: "配列" },
+    First: { description: "配列や文字列の最初の要素を返します。", output: "要素" },
+    Last: { description: "配列や文字列の最後の要素を返します。", output: "要素" },
+    Repeat: { description: "文字列や配列を指定回数くり返してつないだ値を返します。", output: "same" },
+    PadStart: { description: "文字列の先頭を埋めて指定の長さにします（\"5\" >> PadStart(3, \"0\") は \"005\"）。", output: "文字列" },
+    PadEnd: { description: "文字列の末尾を埋めて指定の長さにします。", output: "文字列" },
+    Match: { description: "文字列が正規表現に合う部分を含むかどうかを返します。", output: "真偽値" },
+    FindAll: { description: "正規表現に合う部分をすべて、文字列の配列で返します。", output: "配列" },
+    ReplaceAll: { description: "正規表現に合う部分をすべて置き換えます。置き換え後の文字列では $1 でグループを使えます。", output: "文字列" }
 });
 
 const SYSTEM_KEYWORDS = Object.freeze({
@@ -517,7 +533,7 @@ function findPropertyAtOffset(text, offset) {
 }
 
 function streamContextFromHeader(code) {
-    const match = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
+    const match = /(?:>>\s*(Map|Filter|Count|Any|All|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b(?:\s*\([^)]*\))?(?:\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\)))?\s*\{/.exec(code);
     if (!match) return undefined;
     const stream = match[1] || match[2];
     const paramText = match[3] || match[4] || "";
@@ -1092,15 +1108,15 @@ function formatDocument(text, indentSize = 4) {
 
 // ---- ここから下の関数は、元のテキスト（`:` のブロックのまま）を読みます ----
 
-const STREAM_NAMES = ["Map", "Filter", "Count", "Reduce", "Loop", "Sort", "SortDesc", "Group", "Fork", "Update", "Check", "Try", "Catch"];
+const STREAM_NAMES = ["Map", "Filter", "Count", "Any", "All", "Reduce", "Loop", "Sort", "SortDesc", "Group", "Fork", "Update", "Check", "Try", "Catch"];
 // `:` の同じ行に本体を書けないブロック（書けるのは when / else と pop だけ）
 const NEXT_LINE_BODY = new RegExp(
-    String.raw`(?:>>\s*(Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|^\s*(Catch))`
+    String.raw`(?:>>\s*(Map|Filter|Count|Any|All|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|^\s*(Catch))`
     + String.raw`(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?\s*:(?!:)\s*(\S)`
 );
 // 以前の `{ … }` のブロック
 const LEGACY_BRACE_BLOCK = new RegExp(
-    String.raw`(?:>>\s*(Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)`
+    String.raw`(?:>>\s*(Map|Filter|Count|Any|All|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)`
     + String.raw`(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?`
     + String.raw`|\bpop\s+([A-Z][a-zA-Z0-9_]*)|(?:^|\}\s*)(Catch)(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?`
     + String.raw`|^\s*(?:\}\s*)?(when\b[^{]*?|else))\s*\{`

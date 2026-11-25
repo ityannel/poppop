@@ -23,6 +23,8 @@ STREAM_BLOCKS = (
     "Group",
     "Fork",
     "Update",
+    "Any",
+    "All",
 )
 CONTROL_BLOCKS = ("Check", "Loop", "Try", "Catch")
 SPECIAL_FORMS = STREAM_BLOCKS + CONTROL_BLOCKS
