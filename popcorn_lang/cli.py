@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 from .evaluator import Evaluator, EvaluatorError, PopCornError
@@ -115,6 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="popcorn",
         description="Run a PopCorn source file or start the interactive REPL.",
+        epilog="Run tests with: popcorn test [files or folders]",
     )
     parser.add_argument("file", nargs="?", type=Path, help="a .pop or .popcorn file")
     parser.add_argument("args", nargs="*", help="arguments for the program (read them with Args)")
@@ -130,8 +132,34 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_test_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="popcorn test",
+        description=(
+            "Run the tests in PopCorn files. A test is a function whose name starts with "
+            "'Test' (pop TestAdd: ...). Folders are searched for files ending in _test.pop."
+        ),
+    )
+    parser.add_argument(
+        "paths", nargs="*", type=Path,
+        help="test files or folders (default: the current folder)",
+    )
+    return parser
+
+
+def run_tests_command(argv: list[str]) -> int:
+    from .testing import run_test_paths
+
+    args = build_test_parser().parse_args(argv)
+    return asyncio.run(run_test_paths(args.paths))
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw_args = sys.argv[1:] if argv is None else list(argv)
+    # `popcorn test …` はテストを実行する。test という名前のファイルがあるときは、そのファイルを実行する
+    if raw_args and raw_args[0] == "test" and not Path("test").is_file():
+        return run_tests_command(raw_args[1:])
+    args = build_parser().parse_args(raw_args)
     if args.file is None:
         return asyncio.run(repl())
 

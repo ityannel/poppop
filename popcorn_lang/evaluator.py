@@ -24,6 +24,16 @@ class PopCornError(EvaluatorError):
         super().__init__(f"{err_type}: {message}")
 
 
+class ProcessArgument:
+    """処理引数として渡された、まだ計算していない式と、それを書いた場所の環境。"""
+
+    __slots__ = ("expr", "env")
+
+    def __init__(self, expr, env):
+        self.expr = expr
+        self.env = env
+
+
 class ReturnException(BaseException):
     def __init__(self, value: Any):
         self.value = value
@@ -342,6 +352,16 @@ class Evaluator:
             env.has_current_item = prev_has
 
     async def eval_Pipeline(self, node: Pipeline, env: Environment):
+        try:
+            return await self._eval_pipeline_stages(node, env)
+        except PopCornError as exc:
+            # 行番号がまだなければ、いちばん内側の文の行を覚えておく（テストの報告などで使う）
+            if exc.line is None and getattr(node, "line", None):
+                exc.line = node.line
+                exc.column = node.column
+            raise
+
+    async def _eval_pipeline_stages(self, node: Pipeline, env: Environment):
         val = await self.eval(node.nodes[0], env)
         env.set_current(val)
         self.trace_pipeline_value(node.nodes[0], val)
@@ -656,9 +676,37 @@ class Evaluator:
         name = node.name
         left_val = env.get_current()
 
+        function_entry = env.get_function(name)
+
+        # 0. 処理引数として受け取った式（関数の中で `x >> Keep` のように呼ぶ）
+        if isinstance(function_entry, ProcessArgument):
+            if node.args:
+                raise PopCornError(
+                    "RuntimeError", f"Process parameter '{name}' does not take extra arguments"
+                )
+            arg_env = Environment(parent=function_entry.env)
+            arg_env.set_current(left_val)
+            return await self.eval(function_entry.expr, arg_env)
+
+        process_positions = set()
+        if function_entry:
+            process_positions = {
+                index for index, param in enumerate(function_entry[0].params)
+                if param.type_name == "process"
+            }
+        else:
+            from .pop_builtins import BUILTIN_PROCESS_ARGUMENTS
+
+            # 標準処理のうち、補助引数を処理として受け取るもの（ExpectError など）
+            process_positions = BUILTIN_PROCESS_ARGUMENTS.get(name, set())
+
         if node.args:
             extra_vals = []
-            for arg_node in node.args:
+            for index, arg_node in enumerate(node.args, start=1):
+                if index in process_positions:
+                    # 処理引数は計算しない。関数の中で呼ばれるたびに、そのときの @ で計算する
+                    extra_vals.append(ProcessArgument(arg_node, env))
+                    continue
                 arg_env = Environment(parent=env)
                 arg_env.set_current(left_val)
                 extra_vals.append(await self.eval(arg_node, arg_env))
@@ -667,7 +715,6 @@ class Evaluator:
             current = left_val
 
         # 1. User-defined functions
-        function_entry = env.get_function(name)
         if function_entry:
             func_def, captured_vars, owner_env = function_entry
             closure_env = Environment()
@@ -702,7 +749,15 @@ class Evaluator:
                         f"Function '{name}' expects {n_params} values, got {len(current)}",
                     )
                 for param, arg_val in zip(func_def.params, current):
-                    call_env.set_var(param.name, arg_val)
+                    if param.type_name == "process":
+                        if not isinstance(arg_val, ProcessArgument):
+                            raise PopCornError(
+                                "TypeError",
+                                f"Pass '{param.name}' of '{name}' in parentheses: '>> {name}(…)'",
+                            )
+                        call_env.set_function(param.name, arg_val)
+                    else:
+                        call_env.set_var(param.name, arg_val)
 
             try:
                 return await self.eval_BlockNode(func_def.block, call_env)
@@ -713,9 +768,16 @@ class Evaluator:
         from .pop_builtins import BUILTIN_REGISTRY
 
         if name in BUILTIN_REGISTRY:
-            res = BUILTIN_REGISTRY[name](current, env, self)
-            if inspect.iscoroutine(res):
-                res = await res
+            try:
+                res = BUILTIN_REGISTRY[name](current, env, self)
+                if inspect.iscoroutine(res):
+                    res = await res
+            except PopCornError as exc:
+                # どこで起きたかを、テストの報告などで示せるように覚えておく
+                if exc.line is None:
+                    exc.line = node.line
+                    exc.column = node.column
+                raise
             return res
 
         raise PopCornError("NameError", f"Function '{name}' is not defined.")

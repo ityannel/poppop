@@ -90,6 +90,9 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Catch: { description: "Try ブロックで起きたエラーを受け取って回復します。", output: "式" },
     Debug: { description: "デバッグ用に型と値を表示し、そのまま渡します。", output: "same" },
     Throw: { description: "指定した内容で UserError を発生させます。", output: "エラー" },
+    Expect: { description: "テスト用。値が期待した値と == で等しいか確かめ、ちがえば AssertionError にします。等しければ値をそのまま渡します。", output: "same" },
+    Assert: { description: "テスト用。条件が true か確かめ、false なら AssertionError にします（Assert(\"説明\") で説明つき）。", output: "真偽値" },
+    ExpectError: { description: "テスト用。かっこの中の式を、入力を @ にして計算し、エラーになることを確かめます。エラーの {type, message} を返します。", output: "辞書" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
     Count: { description: "条件に合う配列要素の数を返します。", output: "数値" },
@@ -112,6 +115,19 @@ const SYSTEM_KEYWORDS = Object.freeze({
     not: "Bool を否定します。",
     in: "要素・キー・部分文字列の含有判定（Bool）を行います。"
 });
+
+// `Name(…)` の補助引数の中か。補助引数の中の @ は、左から流れてくる値（処理引数なら、呼ばれたときの値）
+function isInsideCallArguments(code, index) {
+    const stack = [];
+    for (let i = 0; i < index; i += 1) {
+        if (code[i] === "(") {
+            stack.push(/[A-Z][A-Za-z0-9_]*$/.test(code.slice(0, i)));
+        } else if (code[i] === ")") {
+            stack.pop();
+        }
+    }
+    return stack.includes(true);
+}
 
 function scanLines(text, callback) {
     const lines = text.split("\n");
@@ -902,7 +918,7 @@ function analyzeDocument(text) {
         for (let index = 0; index < code.length; index += 1) {
             if (code[index] === "@") {
                 const inlineStream = STREAM_BLOCK.test(code);
-                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream) {
+                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream && !isInsideCallArguments(code, index)) {
                     diagnostics.push({
                         kind: "implicit-variable-scope",
                         severity: "warning",
