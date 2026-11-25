@@ -1,0 +1,13 @@
+// 文字列を飾る関数をまとめたファイル。
+// main.pop から "lib/text.pop" >> Use. で読みます。
+
+"*" >> mark.            // このファイルの関数だけが使う値
+
+(text) >> pop Shout:
+    text >> Uppercase >> Decorate
+
+(text) >> pop Whisper:
+    text >> Lowercase >> Decorate
+
+(text) >> pop Decorate:
+    "{mark} {text} {mark}"

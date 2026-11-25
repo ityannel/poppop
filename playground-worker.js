@@ -20,6 +20,8 @@ const SOURCE_FILES = [
   "pop_builtins.py",
   "cli.py",
   "migrate.py",
+  "modules.py",
+  "testing.py",
 ];
 
 let pyodide = null;
@@ -118,7 +120,7 @@ json.dumps({
   return readyPromise;
 }
 
-async function runProgram(source, lessonId = null) {
+async function runProgram(source, lessonId = null, path = null, files = null) {
   const runtime = await boot();
   runtime.setStdout({
     batched: (text) => self.postMessage({ type: "stream", channel: "stdout", text }),
@@ -128,21 +130,40 @@ async function runProgram(source, lessonId = null) {
   });
   runtime.globals.set("__popcorn_source", source);
   runtime.globals.set("__popcorn_lesson_id", lessonId);
+  runtime.globals.set("__popcorn_path", path);
+  runtime.globals.set("__popcorn_files", JSON.stringify(files ?? {}));
 
   const payload = await runtime.runPythonAsync(`
 import json
 import time
 from popcorn_lang.cli import evaluate, format_error, get_ast_json
+from popcorn_lang.evaluator import Evaluator
 from popcorn_lang.lessons import validate_lesson
+from popcorn_lang.testing import run_tests_after_program
 
 __started = time.perf_counter()
 try:
-    __result = await evaluate(__popcorn_source)
+    __evaluator = Evaluator()
+    __result = await evaluate(
+        __popcorn_source,
+        __evaluator,
+        path=__popcorn_path,
+        files=json.loads(__popcorn_files),
+    )
     __payload = {
         "ok": True,
         "result": __result,
         "ast": json.loads(get_ast_json(__popcorn_source)),
     }
+    # Test で始まる関数があれば、実行のあとでテストとして呼ぶ（popcorn test と同じ）
+    __tests = None if __popcorn_lesson_id else await run_tests_after_program(
+        __evaluator, __popcorn_source
+    )
+    if __tests is not None:
+        __payload["tests"] = __tests
+        if __tests["error"]:
+            __payload["ok"] = False
+            __payload["error"] = __tests["error"]
     if __popcorn_lesson_id:
         __payload["lesson"] = validate_lesson(
             __popcorn_lesson_id, __popcorn_source, __result
@@ -271,6 +292,8 @@ self.addEventListener("message", (event) => {
     runProgram(
       String(message.source ?? ""),
       message.lessonId ? String(message.lessonId) : null,
+      message.path ? String(message.path) : null,
+      message.files && typeof message.files === "object" ? message.files : null,
     ).catch((error) => {
       self.postMessage({
         type: "result",

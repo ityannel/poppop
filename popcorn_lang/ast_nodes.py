@@ -181,6 +181,13 @@ class FunctionDefNode(ASTNode):
 
 
 @dataclass
+class UseNode(ASTNode):
+    """`"lib/math.pop" >> Use.` / `"lib/math.pop" >> Use(Square, Cube).`"""
+    path: str
+    names: Optional[List[str]] = None
+
+
+@dataclass
 class ReturnNode(ASTNode):
     pass
 

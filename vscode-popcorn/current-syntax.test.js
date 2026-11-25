@@ -154,3 +154,13 @@ assert.strictEqual(formatDocument('"a" >> Try:\n@ >> Num\nCatch as e:\n0\n>> n.'
 assert.strictEqual(formatDocument('1 >> Check:\n    when @ > 0: "a"\n    else: "b"\n>> r.'), '1 >> Check:\n    when @ > 0: "a"\n    else: "b"\n>> r.');
 
 console.log("Current syntax tests passed.");
+
+// ---- ファイルの読み込み（Use）とテスト関数 ----
+assert.deepStrictEqual(analyzeDocument('"lib/math.pop" >> Use.\n3 >> Sums >> Display.'), [], "読み込んだ関数は書き間違いにしない");
+assert.ok(!kindsOf('"lib/math.pop" >> Use(Sums).\n3 >> Sums >> Display.').includes("unknown-process"));
+assert.ok(kindsOf('"lib/math.pop" >> Use(Cube).\n3 >> Sums >> Display.').includes("unknown-process"));
+assert.deepStrictEqual(
+    analyzeDocument("pop TestAdd:\n    (1, 2) >> Add >> Expect(3).\n    true >> Assert.\n    0 >> ExpectError(1 / @, \"RuntimeError\")"),
+    []
+);
+console.log("Use and test syntax tests passed.");

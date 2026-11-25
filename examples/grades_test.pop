@@ -1,0 +1,37 @@
+// テストの例: popcorn test examples
+// 名前が Test で始まる、引数のない関数がテストです。
+
+// --- テストされる処理 ---------------------------------------
+
+(score) >> pop Grade:
+    score >> Check:
+        when @ >= 80: "A"
+        when @ >= 60: "B"
+        else: "C"
+
+(scores) >> pop Summary:
+    scores >> Fork:
+        best: scores >> Max.
+        average: scores >> Average >> Round.
+        grades: scores >> Map Grade.
+
+// --- テスト ---------------------------------------------------
+
+pop TestGradeBoundaries:
+    80 >> Grade >> Expect("A").
+    79 >> Grade >> Expect("B").
+    60 >> Grade >> Expect("B").
+    59 >> Grade >> Expect("C").
+
+pop TestSummary:
+    [90, 70, 50] >> Summary >> result.
+    result::best >> Expect(90).
+    result::average >> Expect(70).
+    result::grades >> Expect(["A", "B", "C"]).
+
+pop TestSummaryKeepsOrder:
+    [50, 90] >> Summary >> result.
+    (result >> Keys) == ["best", "average", "grades"] >> Assert("キーは書いた順のはず").
+
+pop TestEmptyListIsAnError:
+    [] >> ExpectError(@ >> Summary, "RuntimeError").

@@ -1,0 +1,13 @@
+// ほかのファイルの関数を使う例。
+//   popcorn examples/modules/main.pop
+// パスは、このファイルのフォルダーから見た場所です。
+
+"lib/text.pop" >> Use(Shout, Whisper).   // 使う関数を選ぶ
+"lib/numbers.pop" >> Use.                // 全部使う
+
+"popcorn" >> Shout >> Display.
+"PopCorn" >> Whisper >> Display.
+
+[3, 8, 4] >> scores.
+scores >> Average >> Display.
+scores >> Spread >> Display.

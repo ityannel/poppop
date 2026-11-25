@@ -92,6 +92,10 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Catch: { description: "Try ブロックで起きたエラーを受け取って回復します。", output: "式" },
     Debug: { description: "デバッグ用に型と値を表示し、そのまま渡します。", output: "same" },
     Throw: { description: "指定した内容で UserError を発生させます。", output: "エラー" },
+    Expect: { description: "テスト用。値が期待した値と == で等しいか確かめ、ちがえば AssertionError にします。等しければ値をそのまま渡します。", output: "same" },
+    Assert: { description: "テスト用。条件が true か確かめ、false なら AssertionError にします（Assert(\"説明\") で説明つき）。", output: "真偽値" },
+    ExpectError: { description: "テスト用。かっこの中の式を、入力を @ にして計算し、エラーになることを確かめます。エラーの {type, message} を返します。", output: "辞書" },
+    Use: { description: "ほかの .pop ファイルの関数を読み込みます（\"lib/math.pop\" >> Use、使う名前を選ぶときは Use(Square, Cube)）。ファイルのいちばん外側に書きます。", output: "same" },
     Map: { description: "配列の各要素を変換します。", output: "配列" },
     Filter: { description: "条件に合う配列要素だけを残します。", output: "配列" },
     Count: { description: "条件に合う配列要素の数を返します。", output: "数値" },
@@ -114,6 +118,19 @@ const SYSTEM_KEYWORDS = Object.freeze({
     not: "Bool を否定します。",
     in: "要素・キー・部分文字列の含有判定（Bool）を行います。"
 });
+
+// `Name(…)` の補助引数の中か。補助引数の中の @ は、左から流れてくる値（処理引数なら、呼ばれたときの値）
+function isInsideCallArguments(code, index) {
+    const stack = [];
+    for (let i = 0; i < index; i += 1) {
+        if (code[i] === "(") {
+            stack.push(/[A-Z][A-Za-z0-9_]*$/.test(code.slice(0, i)));
+        } else if (code[i] === ")") {
+            stack.pop();
+        }
+    }
+    return stack.includes(true);
+}
 
 function scanLines(text, callback) {
     const lines = text.split("\n");
@@ -872,7 +889,7 @@ function analyzeDocument(text) {
         for (let index = 0; index < code.length; index += 1) {
             if (code[index] === "@") {
                 const inlineStream = STREAM_BLOCK.test(code);
-                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream) {
+                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream && !isInsideCallArguments(code, index)) {
                     diagnostics.push({
                         kind: "implicit-variable-scope",
                         severity: "warning",
@@ -975,7 +992,7 @@ function isBlockColon(code, index, innermostBracket) {
  *   * `:` のブロックの本体は、見出しの行より 1 段深く。見出しと同じか浅い行で、ブロックは終わります。
  *   * 丸括弧・角括弧・波括弧の中で改行した行は、括弧 1 つ（開いた行 1 つ）につき 1 段深く。
  *     閉じ括弧で、その中で開いたブロックも終わります。
- *   * コメントだけの行は、ブロックを閉じません。
+ *   * コメントだけの行は、ブロックを閉じません（字下げは、その行の字下げで残るブロックの段にそろえます）。
  *   * 行末の `:` のすぐ次の行は、字下げを忘れていても本体として 1 段下げます（本体のないブロックはないため）。
  *     そのときは、`>>` や `when` / `else` / `Catch` で始まる行、空行、それより浅い行までを本体とみなします。
  */
@@ -1033,7 +1050,17 @@ function formatDocument(text, indentSize = 4) {
             }
             previousBlank = false;
         }
-        const openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+        let openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+        if (isCommentOnly) {
+            // コメントだけの行はブロックを閉じないが、浅く書いたコメントは、その字下げで残るブロックの段にそろえる
+            let kept = 0;
+            for (const block of blocks.slice(0, openBlocks)) {
+                const inside = block.flushIndent === undefined ? rawIndent > block.indent : rawIndent >= block.flushIndent;
+                if (!inside) break;
+                kept += 1;
+            }
+            openBlocks = kept;
+        }
         const level = openBlocks + levelOf(visibleBrackets);
         const line = " ".repeat(level * indentSize) + normalizePipelineSpacing(trimmed, code);
 
@@ -1146,6 +1173,14 @@ function sourceDiagnostics(text) {
         ...functions.flatMap(definition => definition.params.filter(param => param.process).map(param => param.name))
     ]);
     const reportedUnknown = new Set();
+    // `"lib/x.pop" >> Use` で読み込む関数は、このファイルからは見えない。名前を選ばずに読み込むときは、書き間違いを調べない
+    let importsEverything = false;
+    for (const { code } of lines) {
+        const use = />>\s*Use\b(\s*\(([^)]*)\))?/.exec(code);
+        if (!use) continue;
+        if (!use[1]) importsEverything = true;
+        for (const name of (use[2] || "").match(/[A-Z][A-Za-z0-9_]*/g) || []) knownProcesses.add(name);
+    }
 
     for (const { code, lineStart } of lines) {
         const legacy = LEGACY_BRACE_BLOCK.exec(code);
@@ -1180,7 +1215,7 @@ function sourceDiagnostics(text) {
         // 標準関数にも、このファイルの関数にもない大文字の名前で、知っている名前に近いもの（書き間違い）
         for (const match of code.matchAll(/(?<![A-Za-z0-9_:@])[A-Z][A-Za-z0-9_]*\b/g)) {
             const name = match[0];
-            if (knownProcesses.has(name)) continue;
+            if (importsEverything || knownProcesses.has(name)) continue;
             const similar = similarProcessName(name, knownProcesses);
             if (!similar) continue;
             const key = `${name}:${lineStart + match.index}`;

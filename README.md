@@ -44,6 +44,30 @@ Start the REPL by running `popcorn` without a file. Use `:quit` to exit.
 
 From a source checkout, `python popcorn.py program.pop` is also supported.
 
+## Test
+
+A test is a function whose name starts with `Test`. Check results with
+`Expect`, `Assert` and `ExpectError`, then run `popcorn test`:
+
+```popcorn
+(a, b) >> pop AddTwo:
+    a + b.
+
+pop TestAddTwo:
+    (1, 2) >> AddTwo >> Expect(3).
+    0 >> ExpectError(10 / @, "RuntimeError").
+```
+
+```bash
+popcorn test                   # every *_test.pop under the current folder
+popcorn test examples          # a folder
+popcorn test calc_test.pop     # one file
+```
+
+Failures are reported in Japanese with the expected and actual values and a
+hint. In the Playground, the Run button runs the tests after the program.
+See chapter 17 of the specification.
+
 ## Playground
 
 The browser Playground runs the same Python lexer, parser, evaluator, and
