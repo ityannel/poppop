@@ -37,6 +37,8 @@ class Program(ASTNode):
 class Pipeline(ASTNode):
     nodes: List[ASTNode]
     ops: List[str] = field(default_factory=list)
+    # 演算子ごとの (行, 列)。`>?>` の表示に使う
+    op_positions: List[tuple] = field(default_factory=list)
 
 
 @dataclass

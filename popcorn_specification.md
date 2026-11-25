@@ -41,7 +41,7 @@ answer >> Display.
 | 分類 | 記号 |
 |---|---|
 | 文とブロック | `.`、`:` |
-| パイプ | `>>` |
+| パイプ | `>>`、`>?>`（途中を覗く）、`>!>`（失敗したら差し替える） |
 | グループ | `( )`、`[ ]`、`{ }`（`{ }` は辞書だけ） |
 | 区切り | `,` |
 | アクセス | `::`、`@` |
@@ -254,7 +254,7 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 時間 | `Sleep` | 秒数を表す `Num` | 指定した秒数だけ待ってから、入力値をそのまま返します。負の値は `RuntimeError`。外部効果あり。 |
 | 入出力 | `Display` | 任意の値 | 値を `Str` 変換して表示し、元の値をそのまま返します。外部効果あり。 |
 | 入出力 | `Input` | 表示するプロンプト（`Str`） | ユーザーが入力した `Str` を返します。外部効果あり。 |
-| 入出力 | `Debug` | 任意の値 | デバッグ用に型と値を表示し、元の値をそのまま返します。外部効果あり。 |
+| 入出力 | `Debug` | 任意の値 | デバッグ用に型と値を表示し、元の値をそのまま返します。外部効果あり。パイプラインの途中では、場所も表示する `>?>` が便利です（4章）。 |
 | 入出力 | `ReadFile` | ファイルパスを表す `Str` | ローカルファイルの中身を UTF-8 の `Str` で返します。失敗時は `IOError`。外部効果あり。 |
 | 入出力 | `WriteFile` | `(content, path)` | 内容をファイルへ書き込み、`content` をそのまま返します。失敗時は `IOError`。外部効果あり。 |
 | 入出力 | `Fetch` | URL を表す `Str` | HTTP GET の応答本文を `Str` で返します。通信失敗や 4xx/5xx は `NetworkError`。外部効果あり。 |
@@ -379,7 +379,7 @@ Statement          = Pipeline [ "when" Expression ] "." | BlockTerminatedPipelin
 BlockTailStatement = Pipeline [ "when" Expression ] [ "." ] | BlockTerminatedPipeline .
 Block              = { Statement } [ BlockTailStatement ] .
 
-Pipeline           = Expression { ">>" PipelineStage } .
+Pipeline           = Expression { ( ">>" | ">?>" ) PipelineStage | ">!>" Expression } .
 PipelineStage      = ProcessCall | Binding | StreamBlock .
 ProcessCall        = ProcessName [ "(" ArgumentList ")" ] .
 ArgumentList       = Pipeline { "," Pipeline } [ "," ] .
@@ -407,7 +407,8 @@ SimpleStreamName   = "Map" | "Filter" | "Count" | "Sort" | "SortDesc" | "Group" 
 
 ReduceBlock        = "Reduce" [ "(" Expression ")" ] ( [ AliasClause ] Body | ProcessCall ) .
 
-ForkBlock          = "Fork" [ AliasClause ] ":" ( ForkListBody | ForkDictBody ) .
+ForkBlock          = "Fork" [ AliasClause ] ":" ( ForkListBody | ForkDictBody )
+                   | "Fork" [ AliasClause ] "(" ArgumentList ")" .
 ForkListBody       = { Statement } BlockTailStatement .
 ForkDictBody       = { ForkEntry } ForkTailEntry .
 ForkEntry          = VariableName ":" Statement .
@@ -451,6 +452,7 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 * ブロックで終わる文の末尾（`Map: ...` や `pop 関数名: ...` など）と、ブロック内の最後に書かれた文（1文だけの場合を含む）では、文末の `.` を省略できます。
 * `BlockTerminatedPipeline` の `}` のすぐあとに `>>` が続くときは、外側のパイプラインがそのまま続き、最後が `StreamBlock` でなければ `.` で閉じます。
 * `InlineProcessCall` は、`@ >> ProcessName`（補助引数があれば `@ >> ProcessName(…)`）と同じ意味です。`Map`、`Filter`、`Count`、`Reduce`、`Sort`、`SortDesc`、`Group`、`Fork`、`Update`、`Check`、`Loop`、`Try`、`Catch` のようにブロックが必要な処理は、この形では書けません。
+* `>!>` の右は、いつも `Expression` です。名前を書いても束縛にはならず、その名前の値を読みます。`UpdateStatement` の `>>`、`UseStatement` の `>>`、`FunctionDefinition` の `>>` には、`>?>` や `>!>` は書けません。
 * `PrimaryExpr` に `"(" Pipeline ")"` があるため、式の途中でも丸括弧で囲んでパイプラインを使えます（例: `([1, 2] >> Length) + 1`）。
 
 ### パイプラインの評価
@@ -462,6 +464,38 @@ InlineProcessCall  = ProcessName [ "(" ArgumentList ")" ] .   (* "@ >> " を省�
 ```
 
 上の文では `-5` → `Abs` → `result` の順に評価します。`result` には `5` が入り、文全体の結果も `5` です。
+
+### 途中を覗く（`>?>`）
+
+`>?>` は `>>` と同じく、左の値を右の段階へ渡します。そのとき、渡す値を、行番号と直前の段階の名前を付けて表示します。値は変えません。`>> Debug >>` と同じ働きに、場所の表示を足したものです。確認が終わったら、`?` を消して `>>` に戻します。
+
+```
+(1, 6) >> Range >?> Filter (@ % 2 == 0) >?> Map (@ * 10) >> tens.
+```
+
+```
+[>?> line 1 after Range] (List) [1, 2, 3, 4, 5, 6]
+[>?> line 1 after Filter] (List) [2, 4, 6]
+```
+
+* 表示の形は `[>?> line 行番号 after 段階の名前] (型名) 値` です。直前の段階に名前がない（リテラルや式の）ときは、`after …` を省きます。値の書き方は `Debug` と同じです。
+* `>?>` のあとにも、`>>` と同じく段階が必要です。名前を書けば束縛になります（`"7" >> Num >?> d.`）。
+* `popcorn test` は、`>?>` が残っているファイルに、行番号付きで注意を出します（17章）。テストの成否は変えません。
+
+### 失敗したら差し替える（`>!>`）
+
+`>!>` は、それより左の段階のどこかでエラーが起きたとき、パイプラインを止めずに、右の式の値に差し替えて続けます。エラーが起きなければ、右の式は計算せず、左の値をそのまま次へ渡します。
+
+```
+"https://api.example.com/user" >> Fetch >> FromJson >!> {"name": "guest"} >> user.
+"実数: " >> Input >> Trim >> Num >!> 200 >> c.
+```
+
+* 守る範囲は、同じパイプラインの、`>!>` より左ぜんぶです（最初の式も含みます）。右側より先で起きたエラーは守りません。`>!>` を 2 つ書くと、2 つ目は、1 つ目の差し替えも含めた左ぜんぶを守ります。
+* 右の式の中の `@` は、`Catch` と同じ `{"type": Str, "message": Str}` の `Dict` です（`>!> "失敗: {@::message}"`）。
+* 捕まえるエラーは `Try` / `Catch` と同じです（`SyntaxError` 以外の実行時エラー）。`Return` と `Break` はエラーではないので、そのまま通ります。
+* 右に名前を書いても束縛にはなりません。値を読むだけです（`>!> fallback >> x.` は、変数 `fallback` の値に差し替えて `x` に束縛します）。
+* 書き間違いによる `TypeError` なども、黙って差し替えます。エラーの種類で分けたいとき、記録を残したいとき、回復に何文も必要なときは、`Try` / `Catch`（12章）を使います。
 
 ## 5. 現在値、別名、アクセス、スコープ
 
@@ -689,7 +723,7 @@ words >> Sort Lowercase >> sorted.
 * 処理名渡しで書けるのは、ふつうの処理（標準関数と `pop` で定義した関数）だけです。`Check`、`Map`、`Loop`、`Return`、`Break` などは書けません（`Map:` のように、ブロックで書きます）。
 * `as` をつけたときは、処理名渡しは使えません。式渡しか `:` のブロックで書きます。
 * `Reduce` の補助引数は初期値なので、`Reduce` は式渡しを持ちません（`Reduce(10) Add` のように、初期値と処理名渡しは組み合わせられます）。
-* `Loop`、`Fork`、`Update`、`Check`、`Try` は、式渡しも処理名渡しも持ちません。
+* `Loop`、`Fork`、`Update`、`Check`、`Try` は、式渡しも処理名渡しも持ちません（`Fork` には、丸括弧に分岐を並べる 1 行の形があります。`Fork` の節を見てください）。
 
 ### `Map`
 
@@ -790,6 +824,15 @@ users >> SortDesc as user:
 >> stats.
 stats::total >> Display.
 ```
+
+分岐が短い式だけなら、丸括弧の中に、`,` で区切って 1 行で書けます。ふつうの処理の補助引数と同じく丸括弧の中なので、それぞれにパイプラインも書けます。各分岐は、`@`（または `as` の別名）を入力値にして、書いた順に計算し、ラベルなし形式と同じ `List` を返します。
+
+```
+[3, 8, 4] >> Fork(Sum, Average, Max - Min) >> (total, avg, spread).
+"a,b" >> Fork as s (s >> Split(","), s >> Length) >> parts.   // [["a", "b"], 3]
+```
+
+* 1 行の形にはラベルを付けられません。ラベル付き形式は `Fork:` のブロックで書きます。
 
 ### `Update`
 
@@ -893,6 +936,7 @@ x >> Check:
 * `Try` ブロックがエラーなく終われば、その結果がそのまま次のパイプ段階へ渡ります。
 * `Try` ブロックの中でエラーが起きると、`Catch` ブロックへ移ります。`Catch` ブロックの現在値（および `as` 別名）には、`{"type": Str, "message": Str}` の `Dict` が渡されます。
 * `Catch` ブロックの中で別のエラーが起きた場合は、外側の `Try` またはトップレベルへ伝わります。
+* 失敗したときに決まった値へ差し替えるだけなら、`>!>` で 1 行に書けます（4章「失敗したら差し替える（`>!>`）」）。
 
 ```
 "https://api.example.com/user"
@@ -1121,6 +1165,8 @@ calc_test.pop
 
 結果: 2 件中 1 件成功、1 件失敗。直すところがあります
 ```
+
+確認用の `>?>`（4章）が残っているファイルには、`⚠ 確認用の >?> が残っています（3 行目）。` のように注意を出します。注意だけで、テストの成否と終了コードは変えません。
 
 `popcorn calc_test.pop` のように、ふつうに実行したときは、テスト関数は呼ばれません（定義されるだけです）。
 

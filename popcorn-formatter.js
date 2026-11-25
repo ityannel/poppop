@@ -52,7 +52,7 @@
     let result = "";
     let index = 0;
     while (index < line.length) {
-      const match = /^(>>)/.exec(code.slice(index));
+      const match = /^(>[?!]?>)/.exec(code.slice(index));
       if (match) {
         result = result.replace(/[ \t]+$/, "");
         result += ` ${match[1]} `;
@@ -125,7 +125,7 @@
               ends = rawIndent <= block.indent;
             } else if (previousBlank || rawIndent < block.flushIndent) {
               ends = true;
-            } else if (!siblingUsed && /^\s*(?:>>|(?:when|else|Catch)\b)/.test(code)) {
+            } else if (!siblingUsed && /^\s*(?:>[?!]?>|(?:when|else|Catch)\b)/.test(code)) {
               ends = true;
               siblingUsed = true;
             } else {

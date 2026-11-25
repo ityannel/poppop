@@ -68,6 +68,12 @@ const colonForm = [
 const colonMessy = colonForm.replace(/\n {8}/g, "\n   ").replace(/\n {4}/g, "\n  ").replace(">> Range >>", ">>Range>>");
 assert.strictEqual(formatInPlayground(colonForm), colonForm);
 assert.strictEqual(formatInPlayground(colonMessy), colonForm);
+
+// `>?>` と `>!>` も、`>>` と同じく前後の空白を 1 つにそろえる
+const tapMessy = '"abc">>Num>!>200   >?>c.\n"x"  >?>   Display.';
+const tapForm = '"abc" >> Num >!> 200 >?> c.\n"x" >?> Display.';
+assert.strictEqual(formatInPlayground(tapMessy), tapForm);
+assert.strictEqual(formatInExtension(tapMessy), tapForm);
 assert.strictEqual(formatInExtension(colonMessy), colonForm);
 
 

@@ -5,7 +5,7 @@ const { findInterpolatedVariables } = require("./popcorn-strings");
 const { forEachBrace } = require("./layout-view");
 
 const VARIABLE_IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
-const PIPELINE_OPERATOR = />>/g;
+const PIPELINE_OPERATOR = />[?!]?>/g;
 // 式渡し `Map (…)` の丸括弧（複数行にまたがってもよい）。Reduce(初期値) の中の @ も、流れてきた List
 const EXPRESSION_BODY_OPEN = />>\s*(?:Map|Filter|Count|Sort|SortDesc|Group|Reduce)(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?\s*\(/g;
 const IMPLICIT_SCOPE_HEADER = /(?:>>\s*(?:Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\b[^\r\n]*\{/;

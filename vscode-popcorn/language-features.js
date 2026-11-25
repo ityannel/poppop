@@ -6,7 +6,7 @@ const { findInterpolatedVariables, findPlainStringInterpolations } = require("./
 const { forEachBrace, leadingCloseCount } = require("./layout-view");
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
-const PIPELINE_OPERATOR = />>/g;
+const PIPELINE_OPERATOR = />[?!]?>/g;
 const STREAM_BLOCK = /(?:>>\s*(Map|Filter|Count|Reduce|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|(Catch))\b/;
 const STREAM_ALIAS_PATTERN = /(?:>>\s*(?:Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|Catch)\s+as\s+(?:([a-z_][a-zA-Z0-9_]*)|\(\s*([^)]+)\))/g;
 const RESERVED_WORDS = new Set([
@@ -566,7 +566,7 @@ function implicitValueAtOffset(text, offset) {
     if (line[markerIndex] !== "@") return undefined;
 
     const before = line.slice(0, markerIndex).replace(/\/\/.*$/, "");
-    const operators = [...before.matchAll(/>>/g)];
+    const operators = [...before.matchAll(/>[?!]?>/g)];
     const currentOperator = operators.at(-1);
     if (!currentOperator) return undefined;
     const previousOperator = operators.at(-2);
@@ -784,7 +784,7 @@ function pipelineDiagnostics(text) {
                     severity: "warning",
                     start: lineStart + operators[index].index,
                     length: operators[index][0].length,
-                    message: "'>>' の後に処理または代入先を指定してください。"
+                    message: `'${operators[index][0]}' の後に処理または代入先を指定してください。`
                 });
                 continue;
             }
@@ -964,7 +964,7 @@ function normalizePipelineSpacing(line, code) {
     let result = "";
     let index = 0;
     while (index < line.length) {
-        const match = /^(>>)/.exec(code.slice(index));
+        const match = /^(>[?!]?>)/.exec(code.slice(index));
         if (match) {
             result = result.replace(/[ \t]+$/, "");
             result += ` ${match[1]} `;

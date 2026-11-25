@@ -104,7 +104,7 @@ function variableInsight(text, name) {
     if (assignment && Number.isInteger(assignment.lineStart)) {
         const lineEnd = text.indexOf('\n', assignment.lineStart);
         const line = text.slice(assignment.lineStart, lineEnd === -1 ? text.length : lineEnd);
-        const operators = [...line.matchAll(/>>/g)];
+        const operators = [...line.matchAll(/>[?!]?>/g)];
         const lastOperator = operators.at(-1);
         if (lastOperator) {
             const pipeline = findPipelineAtOffset(text, assignment.lineStart + lastOperator.index + 1);
@@ -140,7 +140,7 @@ function flowNodeKind(label) {
 }
 
 function stagesFromLine(line, lineNumber) {
-    const operators = [...line.matchAll(/>>/g)];
+    const operators = [...line.matchAll(/>[?!]?>/g)];
     if (!operators.length) return [];
     const stages = [];
     const input = line.slice(0, operators[0].index).trim();
@@ -211,7 +211,7 @@ function selectedOriginFlow(editor) {
     const document = editor.document;
     const position = editor.selection.active;
     const line = document.lineAt(position.line).text;
-    const operator = />>/.exec(line);
+    const operator = />[?!]?>/.exec(line);
     if (!operator || position.character >= operator.index) return undefined;
     const pipeline = findPipelineAtOffset(document.getText(), document.offsetAt(new vscode.Position(position.line, operator.index + 1)));
     return pipeline && { text: document.getText().slice(pipeline.start, pipeline.end), firstLine: document.positionAt(pipeline.start).line + 1 };

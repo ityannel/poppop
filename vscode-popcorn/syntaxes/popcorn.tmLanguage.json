@@ -118,7 +118,7 @@
       "patterns": [
         {
           "name": "keyword.operator.pipeline.popcorn",
-          "match": ">>"
+          "match": ">[?!]?>"
         },
         {
           "name": "keyword.operator.comparison.popcorn",

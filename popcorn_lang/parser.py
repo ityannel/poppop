@@ -192,6 +192,7 @@ class Parser:
                         if (
                             p + 2 < len(self.tokens)
                             and self.tokens[p + 1].type == "STREAM_OP"
+                            and self.tokens[p + 1].value == ">>"
                             and self.tokens[p + 2].type == "POP"
                         ):
                             return True
@@ -231,6 +232,7 @@ class Parser:
         return (
             arrow is not None
             and arrow.type == "STREAM_OP"
+            and arrow.value == ">>"
             and verb is not None
             and verb.type == "VERB"
             and verb.value == "Use"
@@ -247,7 +249,7 @@ class Parser:
         if not path_tok.value.strip():
             raise ParseError(f"The file name for Use is empty at line {line}, column {col}")
         self.advance()
-        self.expect("STREAM_OP")
+        self._expect_plain_pipe()
         use_tok = self.expect("VERB")
         names: Optional[List[str]] = None
         if self.match("LPAREN"):
@@ -440,6 +442,30 @@ class Parser:
         if name == "Fork":
             self.advance()
             alias_names = self._parse_optional_alias_clause()
+            if self.current() is not None and self.current().type == "LPAREN":
+                # 1 行で書く形: `Fork(Sum, Average)`。丸括弧の中の式（パイプラインも可）を、それぞれ `@` を入力にして計算する
+                self.advance()
+                branches: List[ASTNode] = []
+                while True:
+                    tok = self.current()
+                    if tok is None or tok.type == "RPAREN":
+                        loc = f"at line {tok.line}, column {tok.column}" if tok else "at EOF"
+                        raise ParseError(f"Fork(...) requires at least one branch {loc}")
+                    if tok.type == "VARIABLE" and self.peek() is not None and self.peek().type == "COLON":
+                        raise ParseError(
+                            f"Fork(...) cannot have labels; write labeled branches as a block "
+                            f"'Fork:' at line {tok.line}, column {tok.column}"
+                        )
+                    # 補助引数と同じく、かっこの中なので、パイプラインもそのまま書ける
+                    branches.append(self.parse_pipeline())
+                    if self.match("RPAREN"):
+                        break
+                    self.expect("COMMA")
+                    if self.match("RPAREN"):
+                        break
+                return StreamBlockNode(
+                    line, col, "Fork", alias_names, BlockNode(line, col, branches)
+                )
             kind = self._open_body("Fork")
             end = self._body_end(kind)
             if self._at_end(end):
@@ -602,6 +628,13 @@ class Parser:
             return pipe.nodes[0]
         return GroupedPipelineNode(pipe.line, pipe.column, pipe)
 
+    def _expect_plain_pipe(self) -> None:
+        tok = self.expect("STREAM_OP")
+        if tok.value != ">>":
+            raise ParseError(
+                f"Expected '>>' here, got '{tok.value}' at line {tok.line}, column {tok.column}"
+            )
+
     def parse_pipeline(self) -> Pipeline:
         curr = self.current()
         if not curr:
@@ -610,17 +643,24 @@ class Parser:
 
         nodes = [self.parse_expression()]
         ops = []
+        op_positions = []
 
         while self.current() and self.current().type == "STREAM_OP":
-            op = self.current().value
+            op_tok = self.current()
+            op = op_tok.value
             ops.append(op)
+            op_positions.append((op_tok.line, op_tok.column))
             self.advance()
 
             curr = self.current()
-            if not curr:
-                raise ParseError("Expected pipeline stage after '>>' at EOF")
+            if not curr or curr.type in ("DOT", "WHEN"):
+                where = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
+                raise ParseError(f"Expected pipeline stage after '{op}' {where}")
 
-            if curr.type == "VERB":
+            if op == ">!>":
+                # `>!>` の右は、失敗したときの値（式）。名前を書いても束縛にはしない
+                step = self.parse_expression()
+            elif curr.type == "VERB":
                 step = self._parse_stream_block_or_call()
             else:
                 step = self.parse_expression()
@@ -636,7 +676,7 @@ class Parser:
                     )
             nodes.append(step)
 
-        return Pipeline(line, col, nodes, ops)
+        return Pipeline(line, col, nodes, ops, op_positions)
 
     def parse_expression(self) -> ASTNode:
         return self.parse_or()
@@ -946,7 +986,7 @@ class Parser:
                     continue
                 break
             self.expect("RPAREN")
-            self.expect("STREAM_OP")
+            self._expect_plain_pipe()
 
         self.expect("POP")
         name = self.expect("VERB").value
