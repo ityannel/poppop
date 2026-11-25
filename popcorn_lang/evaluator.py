@@ -1,8 +1,11 @@
-﻿import inspect
+﻿import functools
+import inspect
 import json
 import math
 import re
 import os
+import sys
+from decimal import Decimal
 from typing import Any
 
 from .ast_nodes import *
@@ -10,6 +13,31 @@ from .environment import Environment
 from .modules import FileModuleLoader, ModuleLoader
 
 _SKIPPED = object()
+
+# 関数の呼び出しを、何段まで重ねられるか（再帰の深さの上限）。
+# これを超えると、Python の RecursionError ではなく、PopCorn の RuntimeError にする。
+# Python 3.11 までは、Python の関数呼び出しが C のスタックも使うので、深くしすぎると
+# プロセスごと落ちる（Segmentation fault）。そのため、3.12 より前では浅くしておく。
+MAX_CALL_DEPTH = 10000 if sys.version_info >= (3, 12) else 300
+# PopCorn の 1 段の呼び出しは、Python の関数を何十段か使う。上限に届く前に Python が止まらないよう、余裕をもたせる。
+_PYTHON_FRAMES_PER_CALL = 40
+
+
+def _ensure_recursion_limit() -> None:
+    wanted = MAX_CALL_DEPTH * _PYTHON_FRAMES_PER_CALL
+    if sys.getrecursionlimit() < wanted:
+        try:
+            sys.setrecursionlimit(wanted)
+        except (ValueError, RecursionError):
+            pass
+
+
+def _too_deep_error() -> "PopCornError":
+    return PopCornError(
+        "RuntimeError",
+        f"Recursion is too deep (more than {MAX_CALL_DEPTH} nested function calls); "
+        "check that the function has a case that stops calling itself",
+    )
 
 
 class EvaluatorError(Exception):
@@ -93,12 +121,7 @@ def format_popcorn_str(value: Any, *, nested: bool = False) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if _is_number(value):
-        num = _to_num(value)
-        if num == 0.0:
-            return "0"
-        if num.is_integer() and abs(num) < 1e21:
-            return str(int(num))
-        return str(num)
+        return format_popcorn_num(_to_num(value))
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False) if nested else value
     if isinstance(value, list):
@@ -114,6 +137,29 @@ def format_popcorn_str(value: Any, *, nested: bool = False) -> str:
         inner = ", ".join(format_popcorn_str(item, nested=True) for item in value)
         return f"({inner})"
     raise PopCornError("TypeError", f"Cannot format unsupported value: {type(value).__name__}")
+
+
+def format_popcorn_num(num: float) -> str:
+    """Num の Str 変換（3章）。
+
+    いちばん短く元の値に戻せる 10 進表記を使う。`1e-6 <= |x| < 1e21` は、指数を使わずに書く
+    （`0.000001`、`123456789012345680`）。それ以外は `1e-7`、`1.5e+21` のように指数で書く。
+    """
+    if num == 0.0:
+        return "0"
+    if num.is_integer() and abs(num) < 1e21:
+        return str(int(num))
+    shortest = repr(num)  # 元の値に戻せる、いちばん短い表記
+    magnitude = abs(num)
+    if 1e-6 <= magnitude < 1e21:
+        if "e" in shortest or "E" in shortest:
+            return format(Decimal(shortest), "f")
+        return shortest
+    mantissa, _, exponent = format(Decimal(shortest), "E").partition("E")
+    if "." in mantissa:
+        mantissa = mantissa.rstrip("0").rstrip(".")
+    exp_num = int(exponent)
+    return f"{mantissa}e{'+' if exp_num >= 0 else '-'}{abs(exp_num)}"
 
 
 def _values_equal(left: Any, right: Any) -> bool:
@@ -163,18 +209,47 @@ def _bind_aliases(env: Environment, alias_names: list[str], value: Any) -> None:
         env.set_var(name, item)
 
 
-def _validate_sort_keys(keys: list[Any]) -> None:
-    if not keys:
-        return
-    first = keys[0]
-    if _is_number(first):
-        if not all(_is_number(k) for k in keys):
-            raise PopCornError("RuntimeError", "Sort keys are not mutually comparable")
-    elif isinstance(first, str):
-        if not all(isinstance(k, str) for k in keys):
-            raise PopCornError("RuntimeError", "Sort keys are not mutually comparable")
-    else:
-        raise PopCornError("RuntimeError", "Sort keys must be Num or Str values")
+def _sort_key_kind(key: Any) -> str:
+    if _is_number(key):
+        return "Num"
+    if isinstance(key, str):
+        return "Str"
+    if isinstance(key, (list, tuple)):
+        return "List"
+    raise PopCornError(
+        "TypeError",
+        f"Sort keys must be Num, Str, or a List of them; got {popcorn_type_name(key)}",
+    )
+
+
+def _compare_sort_keys(left: Any, right: Any) -> int:
+    """Sort のキーを比べる。List どうしは、先頭から順に比べる（辞書式）。"""
+    left_kind, right_kind = _sort_key_kind(left), _sort_key_kind(right)
+    if left_kind != right_kind:
+        raise PopCornError(
+            "TypeError",
+            f"Sort keys cannot be compared: {popcorn_type_name(left)} and {popcorn_type_name(right)}",
+        )
+    if left_kind == "List":
+        for a, b in zip(left, right):
+            result = _compare_sort_keys(a, b)
+            if result:
+                return result
+        return (len(left) > len(right)) - (len(left) < len(right))
+    if left_kind == "Num":
+        left, right = float(left), float(right)
+    return (left > right) - (left < right)
+
+
+def _sorted_by_keys(decorated: list, descending: bool) -> list:
+    # 安定ソート。降順も、同じキーの要素は、元の順のまま
+    def compare(a, b):
+        result = _compare_sort_keys(a[0], b[0])
+        return -result if descending else result
+
+    for key, _ in decorated:
+        _sort_key_kind(key)
+    return sorted(decorated, key=functools.cmp_to_key(compare))
 
 
 class Evaluator:
@@ -186,6 +261,8 @@ class Evaluator:
         self.current_module: str | None = None
         self._module_exports: dict[str, dict[str, Any]] = {}
         self._modules_loading: list[str] = []
+        self.call_depth = 0
+        _ensure_recursion_limit()
 
     def trace_pipeline_value(self, node, value, input_value=None, progress=None):
         """Emit optional, compact execution data for the VS Code flow view."""
@@ -447,6 +524,24 @@ class Evaluator:
                 mapped.append(await self.eval(n.block, item_env))
             return mapped
 
+        if n.stream_type in ("Any", "All"):
+            kind = n.stream_type
+            if not isinstance(val, list):
+                raise PopCornError("TypeError", f"{kind} stream requires a list")
+            for item in val:
+                item_env = Environment(parent=env)
+                item_env.set_current(item)
+                _bind_aliases(item_env, n.var_names, item)
+                res = await self.eval(n.block, item_env)
+                if not isinstance(res, bool):
+                    raise PopCornError("TypeError", f"{kind} block must return Bool")
+                # 答えが決まったところで止める（Any は true が 1 つ、All は false が 1 つ見つかれば）
+                if kind == "Any" and res:
+                    return True
+                if kind == "All" and not res:
+                    return False
+            return kind == "All"
+
         if n.stream_type in ("Filter", "Count"):
             kind = n.stream_type
             if not isinstance(val, list):
@@ -498,9 +593,7 @@ class Evaluator:
                 key = await self.eval(n.block, item_env)
                 keys.append(key)
                 decorated.append((key, item))
-            _validate_sort_keys(keys)
-            decorated.sort(key=lambda x: x[0], reverse=descending)
-            return [item for _, item in decorated]
+            return [item for _, item in _sorted_by_keys(decorated, descending)]
 
         if n.stream_type == "Group":
             if not isinstance(val, list):
@@ -553,25 +646,12 @@ class Evaluator:
                 target_node = statement.nodes[-1]
                 if isinstance(target_node, BindNode):
                     target_node = target_node.target
-                is_field_target = isinstance(target_node, IndexAccessNode)
-                is_implicit_target = is_field_target and isinstance(
-                    target_node.target, ImplicitVariableNode
-                )
-                is_named_target = (
-                    is_field_target
-                    and isinstance(target_node.target, VariableNode)
-                    and bool(var_name)
-                    and target_node.target.name == var_name
-                )
-                if not (
-                    is_field_target
-                    and (is_implicit_target or is_named_target)
-                    and isinstance(target_node.index, LiteralNode)
-                    and isinstance(target_node.index.value, str)
-                ):
+                path = _update_target_path(target_node, var_name)
+                if path is None:
                     raise PopCornError(
                         "RuntimeError",
-                        "Update target must be @::field or the block value name followed by ::field",
+                        "Update target must be @::field or the block value name followed by ::field "
+                        "(nested fields like @::a::b are allowed)",
                     )
 
                 value_pipeline = Pipeline(
@@ -585,7 +665,7 @@ class Evaluator:
                 if var_name:
                     update_env.set_var(var_name, new_dict)
                 res = await self.eval(value_pipeline, update_env)
-                new_dict[target_node.index.value] = res
+                new_dict = _set_dict_path(new_dict, path, res)
             return new_dict
 
         raise PopCornError("RuntimeError", f"Unknown stream block type {n.stream_type}")
@@ -810,10 +890,18 @@ class Evaluator:
                     else:
                         call_env.set_var(param.name, arg_val)
 
+            if self.call_depth >= MAX_CALL_DEPTH:
+                raise _too_deep_error()
+            self.call_depth += 1
             try:
                 return await self.eval_BlockNode(func_def.block, call_env)
             except ReturnException as exc:
                 return exc.value
+            except RecursionError:
+                # Python のほうが先に限界に来たとき（Playground など）も、PopCorn のエラーにする
+                raise _too_deep_error() from None
+            finally:
+                self.call_depth -= 1
 
         # 2. Built-in functions
         from .pop_builtins import BUILTIN_REGISTRY
@@ -854,6 +942,14 @@ class Evaluator:
                 raise PopCornError("IndexError", f"Index {whole_idx} out of bounds")
             return target[pos]
 
+        if isinstance(target, str):
+            # 文字列は、Unicode コードポイント単位で 1 文字を取り出す（"abc"[0] は "a"）
+            whole_idx = _as_whole_int(idx, "Str indices must be whole Num values")
+            pos = whole_idx + len(target) if whole_idx < 0 else whole_idx
+            if pos < 0 or pos >= len(target):
+                raise PopCornError("IndexError", f"Index {whole_idx} out of bounds")
+            return target[pos]
+
         if isinstance(target, dict):
             if not isinstance(idx, str):
                 raise PopCornError("TypeError", "Dict keys must be Str")
@@ -861,9 +957,10 @@ class Evaluator:
                 raise PopCornError("KeyError", f"Key '{idx}' is not defined")
             return target[idx]
 
+        shown = idx if isinstance(idx, str) else format_popcorn_str(idx, nested=True)
         raise PopCornError(
             "TypeError",
-            f"Cannot access index/key '{idx}' on {popcorn_type_name(target)}",
+            f"Cannot access index/key '{shown}' on {popcorn_type_name(target)}",
         )
 
     async def eval_BindNode(self, node: BindNode, env: Environment):
@@ -972,6 +1069,43 @@ class Evaluator:
                 evaluated = await self.eval(part, interp_env)
                 res.append(format_popcorn_str(evaluated))
         return "".join(res)
+
+
+def _update_target_path(target_node: ASTNode, var_name: str) -> list[str] | None:
+    """`@::a::b` や `user::a::b` から、["a", "b"] を取り出す（形が違えば None）。"""
+    path: list[str] = []
+    node = target_node
+    while isinstance(node, IndexAccessNode):
+        if not (isinstance(node.index, LiteralNode) and isinstance(node.index.value, str)):
+            return None
+        path.append(node.index.value)
+        node = node.target
+    if not path:
+        return None
+    if isinstance(node, ImplicitVariableNode):
+        return list(reversed(path))
+    if isinstance(node, VariableNode) and var_name and node.name == var_name:
+        return list(reversed(path))
+    return None
+
+
+def _set_dict_path(target: dict, path: list[str], value: Any) -> dict:
+    """入れ子の Dict の path の位置を value にした、新しい Dict を返す（途中にない Dict は作る）。"""
+    updated = dict(target)
+    key = path[0]
+    if len(path) == 1:
+        updated[key] = value
+        return updated
+    inner = updated.get(key)
+    if inner is None and key not in updated:
+        inner = {}
+    if not isinstance(inner, dict):
+        raise PopCornError(
+            "TypeError",
+            f"Update cannot set a field inside '{key}' because it is {popcorn_type_name(inner)}, not Dict",
+        )
+    updated[key] = _set_dict_path(inner, path[1:], value)
+    return updated
 
 
 def _shorten_tap_source(code: str, limit: int = 48) -> str:

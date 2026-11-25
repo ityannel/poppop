@@ -62,3 +62,20 @@ assert.equal(
 );
 
 console.log("Playground Japanese localization tests passed.");
+
+assert.equal(
+  localizeError("SyntaxError: Missing '.' at the end of the statement at line 1, column 6"),
+  "文法エラー: 文の終わりに「.」がありません。（1行目）",
+);
+assert.equal(
+  localizeError("SyntaxError: Expected ')', but got '2' at line 1, column 4"),
+  "文法エラー: 「)」が必要ですが、「2」が見つかりました。（1行目）",
+);
+assert.equal(
+  localizeError("RuntimeError: Recursion is too deep (more than 10000 nested function calls); check that the function has a case that stops calling itself"),
+  "実行時エラー: 関数の呼び出しが深すぎます（10000 段を超えました）。自分を呼ぶのを止める場合（Return や Check の分岐）があるか確かめてください。",
+);
+assert.equal(
+  localizeError("TypeError: Cannot cast 'true' (Bool) to Num"),
+  "型エラー: 「true」（Bool）は数に変換できません。",
+);

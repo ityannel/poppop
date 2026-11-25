@@ -1,6 +1,6 @@
 ﻿import asyncio
 import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_UP, localcontext
 import json
 import math
 import os
@@ -84,7 +84,8 @@ def builtin_Num(current, env, evaluator):
     if isinstance(current, str):
         if re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)", current):
             return _to_num(float(current))
-    _type_error(f"Cannot cast '{current}' to Num")
+    shown = current if isinstance(current, str) else format_popcorn_str(current, nested=True)
+    _type_error(f"Cannot cast '{shown}' ({popcorn_type_name(current)}) to Num")
 
 
 BUILTIN_REGISTRY["Num"] = builtin_Num
@@ -165,7 +166,15 @@ def builtin_Div(current, env, evaluator):
 BUILTIN_REGISTRY["Div"] = builtin_Div
 
 
+def _items_of(current):
+    """List、または値リスト（`(3, 5) >> Max`、`3 >> Max(5)`）を、要素の List にする。"""
+    if isinstance(current, tuple):
+        return list(current)
+    return current
+
+
 def builtin_Sum(current, env, evaluator):
+    current = _items_of(current)
     if not isinstance(current, list) or not all(_is_number(item) for item in current):
         _type_error("Sum requires a List of Num values")
     total = 0.0
@@ -178,6 +187,7 @@ BUILTIN_REGISTRY["Sum"] = builtin_Sum
 
 
 def builtin_Average(current, env, evaluator):
+    current = _items_of(current)
     if not isinstance(current, list) or not all(_is_number(item) for item in current):
         _type_error("Average requires a List of Num values")
     if not current:
@@ -192,6 +202,7 @@ BUILTIN_REGISTRY["Average"] = builtin_Average
 
 
 def builtin_Max(current, env, evaluator):
+    current = _items_of(current)
     if not isinstance(current, list):
         _type_error("Max requires a List of Num or Str values")
     if not current:
@@ -207,6 +218,7 @@ BUILTIN_REGISTRY["Max"] = builtin_Max
 
 
 def builtin_Min(current, env, evaluator):
+    current = _items_of(current)
     if not isinstance(current, list):
         _type_error("Min requires a List of Num or Str values")
     if not current:
@@ -221,12 +233,38 @@ def builtin_Min(current, env, evaluator):
 BUILTIN_REGISTRY["Min"] = builtin_Min
 
 
-def builtin_Round(current, env, evaluator):
-    if _is_number(current):
+_MAX_ROUND_DIGITS = 308
+
+
+def _round_to_digits(current, name: str, rounding):
+    """Round / Floor / Ceil の共通処理。
+
+    `x >> Round` は整数へ、`x >> Round(2)` は小数第2位まで、
+    `x >> Round(-2)` は百の位までに丸めます（入力は `(x, digits)` の組）。
+    """
+    if isinstance(current, tuple) and len(current) == 2 and all(_is_number(v) for v in current):
+        num = _to_num(current[0])
+        digits = _to_num(current[1])
+        if not digits.is_integer():
+            _type_error(f"{name} digits must be a whole number (Num)")
+        digits = int(digits)
+    elif _is_number(current):
         num = _to_num(current)
-        rounded = int(Decimal(str(num)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-        return _to_num(rounded)
-    _type_error("Round requires Num")
+        digits = 0
+    else:
+        _type_error(f"{name} requires Num or (Num, digits)")
+    if digits > _MAX_ROUND_DIGITS:
+        # float の精度より細かい桁は、丸めても値が変わりません。
+        return num
+    digits = max(digits, -_MAX_ROUND_DIGITS)
+    with localcontext() as ctx:
+        ctx.prec = 2 * _MAX_ROUND_DIGITS + 20
+        rounded = Decimal(repr(num)).quantize(Decimal(1).scaleb(-digits), rounding=rounding)
+    return _to_num(rounded)
+
+
+def builtin_Round(current, env, evaluator):
+    return _round_to_digits(current, "Round", ROUND_HALF_UP)
 
 
 BUILTIN_REGISTRY["Round"] = builtin_Round
@@ -323,16 +361,50 @@ def builtin_Join(current, env, evaluator):
 BUILTIN_REGISTRY["Join"] = builtin_Join
 
 
+def builtin_Fixed(current, env, evaluator):
+    """`3.1 >> Fixed(2)` は "3.10"。小数第 digits 位まで四捨五入し、足りない桁を 0 で補った Str。"""
+    if not (isinstance(current, tuple) and len(current) == 2 and all(_is_number(v) for v in current)):
+        _type_error("Fixed requires (Num, digits): 'x >> Fixed(2)'")
+    num = _to_num(current[0])
+    digits = _to_num(current[1])
+    if not digits.is_integer() or digits < 0 or digits > 100:
+        _type_error("Fixed digits must be a whole number from 0 to 100")
+    digits = int(digits)
+    with localcontext() as ctx:
+        ctx.prec = 2 * _MAX_ROUND_DIGITS + 20
+        rounded = Decimal(repr(num)).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
+    text = format(rounded, "f")
+    if rounded == 0 and text.startswith("-"):
+        text = text[1:]  # -0.00 は 0.00 にする
+    return text
+
+
+BUILTIN_REGISTRY["Fixed"] = builtin_Fixed
+
+
+_FORMAT_PLACEHOLDER = re.compile(r"\{\{|\}\}|\{([0-9]+)\}")
+
+
 def builtin_Format(current, env, evaluator):
-    if isinstance(current, tuple) and len(current) >= 2:
+    if isinstance(current, tuple) and len(current) >= 2 and isinstance(current[0], str):
         template = current[0]
-        values = current[1:]
-        if isinstance(template, str):
-            try:
-                formatted_values = [format_popcorn_str(v) for v in values]
-                return template.format(*formatted_values)
-            except Exception as exc:
-                raise PopCornError("RuntimeError", f"Format failed: {exc}")
+        values = [format_popcorn_str(v) for v in current[1:]]
+
+        def fill(match):
+            text = match.group(0)
+            if text == "{{":
+                return "{"
+            if text == "}}":
+                return "}"
+            index = int(match.group(1))
+            if index >= len(values):
+                raise PopCornError(
+                    "IndexError",
+                    f"Format has no value for {{{index}}} ({len(values)} value(s) given)",
+                )
+            return values[index]
+
+        return _FORMAT_PLACEHOLDER.sub(fill, template)
     _type_error("Format requires (template, value, ...)")
 
 
@@ -387,7 +459,20 @@ def builtin_Get(current, env, evaluator):
                 return default
             raise PopCornError("KeyError", f"Key '{key}' not found in dict")
 
-        _type_error(f"Cannot get '{key}' from {popcorn_type_name(target)}")
+        if isinstance(target, str):
+            whole_key = _as_whole_int(key, "Str indices must be whole Num values")
+            pos = whole_key + len(target) if whole_key < 0 else whole_key
+            if 0 <= pos < len(target):
+                return target[pos]
+            if has_default:
+                return default
+            raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
+
+        if target is None and has_default:
+            return default
+
+        shown = key if isinstance(key, str) else format_popcorn_str(key, nested=True)
+        _type_error(f"Cannot get '{shown}' from {popcorn_type_name(target)}")
     _type_error("Get requires (target, key) or (target, key, default)")
 
 
@@ -425,7 +510,14 @@ def builtin_Remove(current, env, evaluator):
             res = dict(target)
             res.pop(key, None)
             return res
-    _type_error("Remove requires (Dict, Str)")
+        if isinstance(target, list):
+            # List は、添字の位置の要素を取り除く（負の添字はうしろから）
+            whole_key = _as_whole_int(key, "List indices must be whole Num values")
+            pos = whole_key + len(target) if whole_key < 0 else whole_key
+            if pos < 0 or pos >= len(target):
+                raise PopCornError("IndexError", f"Index {whole_key} out of bounds")
+            return target[:pos] + target[pos + 1:]
+    _type_error("Remove requires (Dict, Str) or (List, index)")
 
 
 BUILTIN_REGISTRY["Remove"] = builtin_Remove
@@ -509,11 +601,14 @@ def builtin_Slice(current, env, evaluator):
         size = len(target)
         norm_start = start + size if start < 0 else start
         norm_end = end + size if end < 0 else end
-        if norm_start < 0 or norm_end < 0 or norm_start > norm_end or norm_end > size:
+        if norm_start > norm_end:
             raise PopCornError(
                 "IndexError",
-                f"Invalid Slice range ({start}, {end}) for length {size}",
+                f"Invalid Slice range ({start}, {end}): start comes after end",
             )
+        # 範囲が長さをはみ出したぶんは、ない要素として扱う（"abc" >> Slice(0, 10) は "abc"）
+        norm_start = min(max(norm_start, 0), size)
+        norm_end = min(max(norm_end, 0), size)
         return target[norm_start:norm_end]
     _type_error("Slice requires (target, end) or (target, start, end)")
 
@@ -599,6 +694,11 @@ def builtin_Now(current, env, evaluator):
         "hour": float(now.hour),
         "minute": float(now.minute),
         "second": float(now.second),
+        "millisecond": float(now.microsecond // 1000),
+        # 曜日は 0（日曜）から 6（土曜）
+        "weekday": float((now.weekday() + 1) % 7),
+        # 1970-01-01 00:00 UTC からの秒数（小数つき）。かかった時間を測るときに使う
+        "timestamp": _to_num(time.time()),
     }
 
 
@@ -606,13 +706,18 @@ BUILTIN_REGISTRY["Now"] = builtin_Now
 
 
 def builtin_Sleep(current, env, evaluator):
-    if not _is_number(current):
-        _type_error("Sleep requires Num")
-    seconds = _to_num(current)
+    # `value >> Sleep(1)` は、1 秒待ってから value をそのまま返す（パイプラインの途中に挟める）
+    if isinstance(current, tuple) and len(current) == 2:
+        result, seconds_value = current
+    else:
+        result, seconds_value = current, current
+    if not _is_number(seconds_value):
+        _type_error("Sleep requires Num seconds: 'seconds >> Sleep' or 'value >> Sleep(seconds)'")
+    seconds = _to_num(seconds_value)
     if seconds < 0:
         raise PopCornError("RuntimeError", "Sleep requires a non-negative number of seconds")
     time.sleep(seconds)
-    return seconds
+    return result
 
 
 BUILTIN_REGISTRY["Sleep"] = builtin_Sleep
@@ -826,11 +931,11 @@ def _math_result(name: str, compute):
 
 
 def builtin_Floor(current, env, evaluator):
-    return _to_num(math.floor(_num_input(current, "Floor")))
+    return _round_to_digits(current, "Floor", ROUND_FLOOR)
 
 
 def builtin_Ceil(current, env, evaluator):
-    return _to_num(math.ceil(_num_input(current, "Ceil")))
+    return _round_to_digits(current, "Ceil", ROUND_CEILING)
 
 
 def builtin_Sqrt(current, env, evaluator):
@@ -968,6 +1073,174 @@ def builtin_Args(current, env, evaluator):
     return list(getattr(evaluator, "script_args", []))  # 入力は使わない
 
 
+# --- 文字列・コレクションの小さな道具（PopCorn 1 の追加分） ---
+
+
+def _pair(current, name: str, usage: str):
+    if isinstance(current, tuple) and len(current) == 2:
+        return current
+    _type_error(f"{name} requires {usage}")
+
+
+def builtin_StartsWith(current, env, evaluator):
+    text, prefix = _pair(current, "StartsWith", "(Str, Str)")
+    if not (isinstance(text, str) and isinstance(prefix, str)):
+        _type_error("StartsWith requires (Str, Str)")
+    return text.startswith(prefix)
+
+
+def builtin_EndsWith(current, env, evaluator):
+    text, suffix = _pair(current, "EndsWith", "(Str, Str)")
+    if not (isinstance(text, str) and isinstance(suffix, str)):
+        _type_error("EndsWith requires (Str, Str)")
+    return text.endswith(suffix)
+
+
+def builtin_IndexOf(current, env, evaluator):
+    """最初に見つかった位置（0 から数える）。見つからなければ null（-1 は、うしろからの添字と紛らわしいため）。"""
+    target, item = _pair(current, "IndexOf", "(List, item) or (Str, Str)")
+    if isinstance(target, list):
+        for index, element in enumerate(target):
+            if _values_equal(element, item):
+                return _to_num(index)
+        return None
+    if isinstance(target, str):
+        if not isinstance(item, str):
+            _type_error("IndexOf on Str requires a Str to find")
+        pos = target.find(item)
+        return None if pos < 0 else _to_num(pos)
+    _type_error("IndexOf requires (List, item) or (Str, Str)")
+
+
+def builtin_Prepend(current, env, evaluator):
+    items, item = _pair(current, "Prepend", "(List, item)")
+    if not isinstance(items, list):
+        _type_error("Prepend requires (List, item)")
+    return [item] + items
+
+
+def builtin_Insert(current, env, evaluator):
+    if not (isinstance(current, tuple) and len(current) == 3 and isinstance(current[0], list)):
+        _type_error("Insert requires (List, index, item)")
+    items, index, item = current
+    whole = _as_whole_int(index, "List indices must be whole Num values")
+    pos = whole + len(items) + 1 if whole < 0 else whole  # -1 は末尾（Append と同じ位置）
+    if pos < 0 or pos > len(items):
+        raise PopCornError("IndexError", f"Index {whole} out of bounds")
+    return items[:pos] + [item] + items[pos:]
+
+
+def _first_or_last(current, name: str, pick):
+    if isinstance(current, (list, str, tuple)):
+        if not current:
+            raise PopCornError("IndexError", f"{name} requires a non-empty List or Str")
+        return pick(current)
+    _type_error(f"{name} requires List or Str")
+
+
+def builtin_First(current, env, evaluator):
+    return _first_or_last(current, "First", lambda items: items[0])
+
+
+def builtin_Last(current, env, evaluator):
+    return _first_or_last(current, "Last", lambda items: items[-1])
+
+
+def builtin_Repeat(current, env, evaluator):
+    target, times = _pair(current, "Repeat", "(Str or List, count)")
+    count = _as_whole_int(times, "Repeat count must be a whole Num")
+    if count < 0:
+        raise PopCornError("RuntimeError", "Repeat count must not be negative")
+    if isinstance(target, str):
+        return target * count
+    if isinstance(target, list):
+        return target * count
+    _type_error("Repeat requires (Str or List, count)")
+
+
+def _pad(current, name: str, at_start: bool):
+    if isinstance(current, tuple) and len(current) in (2, 3):
+        text, width = current[0], current[1]
+        fill = current[2] if len(current) == 3 else " "
+        if isinstance(text, str) and isinstance(fill, str):
+            size = _as_whole_int(width, f"{name} width must be a whole Num")
+            if len(fill) != 1:
+                _type_error(f"{name} fill must be one character")
+            padding = fill * max(size - len(text), 0)
+            return padding + text if at_start else text + padding
+        if not isinstance(text, str):
+            _type_error(f"{name} requires Str; convert first: 'value >> Str >> {name}(…)'")
+    _type_error(f"{name} requires (Str, width) or (Str, width, fill)")
+
+
+def builtin_PadStart(current, env, evaluator):
+    return _pad(current, "PadStart", True)
+
+
+def builtin_PadEnd(current, env, evaluator):
+    return _pad(current, "PadEnd", False)
+
+
+def _compile_pattern(pattern, name: str):
+    if not isinstance(pattern, str):
+        _type_error(f"{name} pattern must be Str")
+    try:
+        return re.compile(pattern)
+    except re.error as exc:
+        raise PopCornError("RuntimeError", f"Invalid regular expression for {name}: {exc}")
+
+
+def builtin_Match(current, env, evaluator):
+    text, pattern = _pair(current, "Match", "(Str, pattern)")
+    if not isinstance(text, str):
+        _type_error("Match requires (Str, pattern)")
+    return _compile_pattern(pattern, "Match").search(text) is not None
+
+
+def builtin_FindAll(current, env, evaluator):
+    text, pattern = _pair(current, "FindAll", "(Str, pattern)")
+    if not isinstance(text, str):
+        _type_error("FindAll requires (Str, pattern)")
+    return [m.group(0) for m in _compile_pattern(pattern, "FindAll").finditer(text)]
+
+
+_GROUP_REFERENCE = re.compile(r"\$\$|\$([0-9]+)")
+
+
+def builtin_ReplaceAll(current, env, evaluator):
+    if not (isinstance(current, tuple) and len(current) == 3):
+        _type_error("ReplaceAll requires (Str, pattern, replacement)")
+    text, pattern, replacement = current
+    if not (isinstance(text, str) and isinstance(replacement, str)):
+        _type_error("ReplaceAll requires (Str, pattern, replacement)")
+    compiled = _compile_pattern(pattern, "ReplaceAll")
+
+    def substitute(match):
+        def group_ref(ref):
+            if ref.group(0) == "$$":
+                return "$"
+            index = int(ref.group(1))
+            if index > compiled.groups:
+                raise PopCornError(
+                    "IndexError", f"ReplaceAll has no group ${index} in the pattern"
+                )
+            return match.group(index) or ""
+
+        return _GROUP_REFERENCE.sub(group_ref, replacement)
+
+    return compiled.sub(substitute, text)
+
+
+for _name, _fn in (
+    ("StartsWith", builtin_StartsWith), ("EndsWith", builtin_EndsWith), ("IndexOf", builtin_IndexOf),
+    ("Prepend", builtin_Prepend), ("Insert", builtin_Insert), ("First", builtin_First),
+    ("Last", builtin_Last), ("Repeat", builtin_Repeat), ("PadStart", builtin_PadStart),
+    ("PadEnd", builtin_PadEnd), ("Match", builtin_Match), ("FindAll", builtin_FindAll),
+    ("ReplaceAll", builtin_ReplaceAll),
+):
+    BUILTIN_REGISTRY[_name] = _fn
+
+
 for _name, _fn in (
     ("Floor", builtin_Floor), ("Ceil", builtin_Ceil), ("Sqrt", builtin_Sqrt), ("Pow", builtin_Pow),
     ("Exp", builtin_Exp), ("Log", builtin_Log), ("Sin", builtin_Sin), ("Cos", builtin_Cos),
@@ -1019,7 +1292,7 @@ def _difference_hint(expected, actual) -> str | None:
         if abs(expected_num - actual_num) <= 1e-9 * max(1.0, abs(expected_num), abs(actual_num)):
             return (
                 "小数の計算では、ごく小さな誤差が出ることがあります。"
-                "Round などで丸めてから比べましょう（例: @ * 100 >> Round）。"
+                "Round で桁をそろえてから比べましょう（例: @ >> Round(2)）。"
             )
         return None
     if expected_type == "Str":

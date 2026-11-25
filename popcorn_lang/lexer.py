@@ -131,6 +131,14 @@ class Lexer:
                         advance_char()
                         buf.append("{")
                         continue
+                    # `{0}`、`{12}` のように数字だけを囲んだものは、補間しない（Format の位置プレースホルダ）
+                    j = i + 1
+                    while j < n and code[j] in "0123456789":
+                        j += 1
+                    if j > i + 1 and j < n and code[j] == "}":
+                        while i <= j:
+                            buf.append(advance_char())
+                        continue
                     # Start interpolation expression
                     if buf:
                         parts.append(("text", "".join(buf)))

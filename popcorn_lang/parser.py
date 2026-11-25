@@ -4,7 +4,30 @@ from .language_meta import KEYWORDS, SPECIAL_FORMS
 from .ast_nodes import *
 
 _KEYWORD_TOKEN_TYPES = {kw.upper() for kw in KEYWORDS}
-_SIMPLE_STREAM_NAMES = {"Map", "Filter", "Count", "Sort", "SortDesc", "Group"}
+_SIMPLE_STREAM_NAMES = {"Map", "Filter", "Count", "Sort", "SortDesc", "Group", "Any", "All"}
+# 本体を省くと、要素そのもの（`@`）を使う処理: `[3, 1, 2] >> Sort`、`flags >> Any`
+_BARE_STREAM_NAMES = {"Sort", "SortDesc", "Any", "All"}
+# エラーメッセージで、トークンの種類の代わりに見せる記号
+_TOKEN_SYMBOLS = {
+    "DOT": "'.'", "COMMA": "','", "COLON": "':'", "DOUBLE_COLON": "'::'",
+    "LPAREN": "'('", "RPAREN": "')'", "LBRACKET": "'['", "RBRACKET": "']'",
+    "LBRACE": "'{'", "RBRACE": "'}'", "STREAM_OP": "'>>'", "STRING": "a string",
+    "INTERP_STRING": "a string", "NUMBER": "a number", "VARIABLE": "a name",
+    "VERB": "a process name", "IMPLICIT_VAR": "'@'", "OPERATOR": "an operator",
+}
+
+
+def _describe_token(tok) -> str:
+    if tok is None:
+        return "the end of the file"
+    if tok.type in ("VARIABLE", "VERB", "NUMBER", "OPERATOR", "STREAM_OP") or tok.type in _KEYWORD_TOKEN_TYPES:
+        value = tok.value
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        return f"'{value}'"
+    if tok.type in ("STRING", "INTERP_STRING"):
+        return "a string"
+    return _TOKEN_SYMBOLS.get(tok.type, f"'{tok.value}'")
 # `Map Name` の省略形で、処理名として書けない名前（ブロックや制御の形をもつもの）
 _NOT_SHORTHAND_NAMES = set(SPECIAL_FORMS) | {"Return", "Break"}
 
@@ -108,8 +131,7 @@ class Parser:
             self.advance()
             return "brace"
         loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
-        got = curr.type if curr else "EOF"
-        raise ParseError(f"Expected ':' to start {what}, but got {got} {loc}")
+        raise ParseError(f"Expected ':' to start {what}, but got {_describe_token(curr)} {loc}")
 
     def _close_body(self, kind: str) -> None:
         if kind == "brace":
@@ -164,8 +186,31 @@ class Parser:
             self.advance()
             return curr
         loc = f"at line {curr.line}, column {curr.column}" if curr else "at EOF"
+        expected = _TOKEN_SYMBOLS.get(token_type, token_type)
+        raise ParseError(f"Expected {expected}, but got {_describe_token(curr)} {loc}")
+
+    def _expect_statement_end(self) -> None:
+        """文の終わりの `.`。ないときは、よくある原因に合わせて案内する。"""
+        curr = self.current()
+        if curr is not None and curr.type == "DOT":
+            self.advance()
+            return
+        prev = self.tokens[self.pos - 1] if self.pos > 0 else None
+        if curr is None or (prev is not None and curr.line > prev.line):
+            where_line = prev.line if prev is not None else 1
+            where_col = prev.column if prev is not None else 1
+            raise ParseError(
+                f"Missing '.' at the end of the statement at line {where_line}, column {where_col}"
+            )
+        if curr.type == "OPERATOR":
+            raise ParseError(
+                f"A pipeline cannot be followed by '{curr.value}'; to calculate with its result, "
+                f"wrap the pipeline in ( ), like '([1, 2] >> Max) {curr.value} 1' "
+                f"at line {curr.line}, column {curr.column}"
+            )
         raise ParseError(
-            f"Expected {token_type}, but got {curr.type if curr else 'EOF'} {loc}"
+            f"Expected '.' at the end of the statement, but got {_describe_token(curr)} "
+            f"at line {curr.line}, column {curr.column}"
         )
 
     def parse(self) -> Program:
@@ -313,13 +358,13 @@ class Parser:
                 return ConditionalStatementNode(
                     pipeline.line, pipeline.column, pipeline, cond
                 )
-            self.expect("DOT")
+            self._expect_statement_end()
         if self._expect_dot_or_block_end(pipeline):
             return pipeline
         if end_set and self._at_end(end_set):
             return pipeline
         self._reject_branch_on_body_line(end_set)
-        self.expect("DOT")
+        self._expect_statement_end()
         return pipeline
 
     def _reject_branch_on_body_line(self, end_tokens, kinds=("ELSE",)) -> None:
@@ -377,7 +422,7 @@ class Parser:
             self.expect("RPAREN")
             return names
         raise ParseError(
-            f"Expected alias variable name or '(a, b)' after 'as', got {curr.type} at line {curr.line}, column {curr.column}"
+            f"Expected alias variable name or '(a, b)' after 'as', got {_describe_token(curr)} at line {curr.line}, column {curr.column}"
         )
 
     def _parse_short_body(
@@ -419,6 +464,11 @@ class Parser:
             self.advance()
             alias_names = self._parse_optional_alias_clause()
             block = self._parse_short_body(name, alias_names)
+            if block is None and name in _BARE_STREAM_NAMES and not alias_names and (
+                self.current() is None or self.current().type != "COLON"
+            ):
+                implicit = ImplicitVariableNode(line, col, "@")
+                block = BlockNode(line, col, [Pipeline(line, col, [implicit], [])])
             if block is None:
                 block = self._parse_body(name)
             return StreamBlockNode(line, col, name, alias_names, block)
@@ -898,7 +948,7 @@ class Parser:
             if self.match("RBRACKET"):
                 return LiteralNode(line, col, items)
             while True:
-                items.append(self.parse_expression())
+                items.append(self._parse_argument())  # かっこの中なので、パイプラインも書ける
                 if self.match("RBRACKET"):
                     break
                 self.expect("COMMA")
@@ -916,7 +966,7 @@ class Parser:
                 key_token = self.expect("STRING")
                 keys.append(key_token.value)
                 self.expect("COLON")
-                values.append(self.parse_expression())
+                values.append(self._parse_argument())
                 if self.match("RBRACE"):
                     break
                 self.expect("COMMA")
@@ -939,7 +989,7 @@ class Parser:
                     self.advance()
                     if self.current() and self.current().type == "RPAREN":
                         break
-                    items.append(self.parse_expression())
+                    items.append(self._parse_argument())
                 self.expect("RPAREN")
                 if len(items) < 2:
                     raise ParseError(
@@ -984,7 +1034,7 @@ class Parser:
                         else "at EOF"
                     )
                     raise ParseError(
-                        f"Expected property name after ::, got {prop_token.type if prop_token else 'EOF'} {loc}"
+                        f"Expected property name after ::, got {_describe_token(prop_token)} {loc}"
                     )
         return node
 
@@ -1018,7 +1068,7 @@ class Parser:
                         else "at EOF"
                     )
                     raise ParseError(
-                        f"Expected parameter name in function def, got {param_token.type if param_token else 'EOF'} {loc}"
+                        f"Expected parameter name in function def, got {_describe_token(param_token)} {loc}"
                     )
                 if self.match("COMMA"):
                     continue
