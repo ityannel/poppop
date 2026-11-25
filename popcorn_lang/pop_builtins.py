@@ -1045,7 +1045,7 @@ def _difference_hint(expected, actual) -> str | None:
         if abs(expected_num - actual_num) <= 1e-9 * max(1.0, abs(expected_num), abs(actual_num)):
             return (
                 "小数の計算では、ごく小さな誤差が出ることがあります。"
-                "Round などで丸めてから比べましょう（例: @ * 100 >> Round）。"
+                "Round で桁をそろえてから比べましょう（例: @ >> Round(2)）。"
             )
         return None
     if expected_type == "Str":
