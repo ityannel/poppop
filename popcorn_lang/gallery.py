@@ -346,6 +346,27 @@ GALLERY = (
             '"今日のおやつは {snack} です。" >> Display.'
         ),
     },
+    {
+        "id": "write-tests",
+        "category": "テスト",
+        "title": "テスト｜関数が正しいか確かめよう",
+        "description": "Test で始まる関数を書くと、実行のあとでテストとして呼ばれます。Expect の数を変えて、失敗の表示も見てみましょう。",
+        "interactive": False,
+        "code": (
+            "(price, rate) >> pop Discount:\n"
+            "    price * (100 - rate) / 100 >> Round.\n"
+            "\n"
+            "pop TestDiscount:\n"
+            "    1000 >> Discount(20) >> Expect(800).\n"
+            "    999 >> Discount(10) >> Expect(899).\n"
+            "\n"
+            "pop TestNoDiscount:\n"
+            "    500 >> Discount(0) >> Expect(500).\n"
+            "\n"
+            "pop TestPriceIsNumber:\n"
+            '    "千円" >> ExpectError(@ >> Discount(10), "TypeError").'
+        ),
+    },
 )
 
 
