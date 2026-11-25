@@ -187,3 +187,21 @@ assert.strictEqual(formatDocument("1>>value.\n[1]>>Map as item {\nitem>>Display.
 ].join("\n"));
 
 console.log("Language feature tests passed.");
+
+// `@` in auxiliary arguments (including process parameters) is the piped value, not a misuse
+const processParameter = [
+    "(xs, Keep) >> pop MyFilter:",
+    "    xs >> Filter Keep.",
+    "",
+    "[1, 2] >> MyFilter(@ > 1) >> r.",
+    "r >> Display."
+].join("\n");
+assert.deepStrictEqual(
+    analyzeDocument(processParameter).filter(d => d.kind === "implicit-variable-scope"),
+    []
+);
+assert.strictEqual(
+    analyzeDocument("1 >> x.\n(@ + 1) >> y.\ny >> Display.").filter(d => d.kind === "implicit-variable-scope").length,
+    1,
+    "a bare @ outside a call is still reported"
+);

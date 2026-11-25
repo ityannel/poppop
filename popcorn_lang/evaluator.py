@@ -23,6 +23,16 @@ class PopCornError(EvaluatorError):
         super().__init__(f"{err_type}: {message}")
 
 
+class ProcessArgument:
+    """処理引数として渡された、まだ計算していない式と、それを書いた場所の環境。"""
+
+    __slots__ = ("expr", "env")
+
+    def __init__(self, expr, env):
+        self.expr = expr
+        self.env = env
+
+
 class ReturnException(BaseException):
     def __init__(self, value: Any):
         self.value = value
@@ -557,9 +567,32 @@ class Evaluator:
         name = node.name
         left_val = env.get_current()
 
+        function_entry = env.get_function(name)
+
+        # 0. 処理引数として受け取った式（関数の中で `x >> Keep` のように呼ぶ）
+        if isinstance(function_entry, ProcessArgument):
+            if node.args:
+                raise PopCornError(
+                    "RuntimeError", f"Process parameter '{name}' does not take extra arguments"
+                )
+            arg_env = Environment(parent=function_entry.env)
+            arg_env.set_current(left_val)
+            return await self.eval(function_entry.expr, arg_env)
+
+        process_positions = set()
+        if function_entry:
+            process_positions = {
+                index for index, param in enumerate(function_entry[0].params)
+                if param.type_name == "process"
+            }
+
         if node.args:
             extra_vals = []
-            for arg_node in node.args:
+            for index, arg_node in enumerate(node.args, start=1):
+                if index in process_positions:
+                    # 処理引数は計算しない。関数の中で呼ばれるたびに、そのときの @ で計算する
+                    extra_vals.append(ProcessArgument(arg_node, env))
+                    continue
                 arg_env = Environment(parent=env)
                 arg_env.set_current(left_val)
                 extra_vals.append(await self.eval(arg_node, arg_env))
@@ -568,7 +601,6 @@ class Evaluator:
             current = left_val
 
         # 1. User-defined functions
-        function_entry = env.get_function(name)
         if function_entry:
             func_def, captured_vars, owner_env = function_entry
             closure_env = Environment()
@@ -603,7 +635,15 @@ class Evaluator:
                         f"Function '{name}' expects {n_params} values, got {len(current)}",
                     )
                 for param, arg_val in zip(func_def.params, current):
-                    call_env.set_var(param.name, arg_val)
+                    if param.type_name == "process":
+                        if not isinstance(arg_val, ProcessArgument):
+                            raise PopCornError(
+                                "TypeError",
+                                f"Pass '{param.name}' of '{name}' in parentheses: '>> {name}(…)'",
+                            )
+                        call_env.set_function(param.name, arg_val)
+                    else:
+                        call_env.set_var(param.name, arg_val)
 
             try:
                 return await self.eval_BlockNode(func_def.block, call_env)

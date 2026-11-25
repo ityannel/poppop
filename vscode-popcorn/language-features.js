@@ -113,6 +113,19 @@ const SYSTEM_KEYWORDS = Object.freeze({
     in: "要素・キー・部分文字列の含有判定（Bool）を行います。"
 });
 
+// `Name(…)` の補助引数の中か。補助引数の中の @ は、左から流れてくる値（処理引数なら、呼ばれたときの値）
+function isInsideCallArguments(code, index) {
+    const stack = [];
+    for (let i = 0; i < index; i += 1) {
+        if (code[i] === "(") {
+            stack.push(/[A-Z][A-Za-z0-9_]*$/.test(code.slice(0, i)));
+        } else if (code[i] === ")") {
+            stack.pop();
+        }
+    }
+    return stack.includes(true);
+}
+
 function scanLines(text, callback) {
     const lines = text.split("\n");
     const state = { inBlockComment: false };
@@ -902,7 +915,7 @@ function analyzeDocument(text) {
         for (let index = 0; index < code.length; index += 1) {
             if (code[index] === "@") {
                 const inlineStream = STREAM_BLOCK.test(code);
-                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream) {
+                if (!isInsideRange(lineStart + index, implicitScopes) && !inlineStream && !isInsideCallArguments(code, index)) {
                     diagnostics.push({
                         kind: "implicit-variable-scope",
                         severity: "warning",

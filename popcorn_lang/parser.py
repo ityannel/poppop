@@ -855,6 +855,14 @@ class Parser:
                 if param_token and param_token.type == "VARIABLE":
                     params.append(ParamDef("any", param_token.value))
                     self.advance()
+                elif param_token and param_token.type == "VERB" and params:
+                    # 大文字で始まる引数は「処理引数」: 呼ぶ側の式を、計算せずに処理として受け取る
+                    if param_token.value in SPECIAL_FORMS or param_token.value in ("Return", "Break"):
+                        raise ParseError(
+                            f"'{param_token.value}' cannot be a parameter name at line {param_token.line}, column {param_token.column}"
+                        )
+                    params.append(ParamDef("process", param_token.value))
+                    self.advance()
                 else:
                     loc = (
                         f"at line {param_token.line}, column {param_token.column}"
