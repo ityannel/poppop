@@ -51,6 +51,7 @@ class FileResult:
     cases: list[CaseResult] = field(default_factory=list)
     error: str | None = None      # ファイルそのものを実行できなかったとき
     error_line: int | None = None
+    tap_lines: list[int] = field(default_factory=list)  # 消し忘れた `>?>` の行
 
     def count(self, status: str) -> int:
         return sum(1 for case in self.cases if case.status == status)
@@ -113,7 +114,9 @@ async def run_defined_tests(evaluator: Evaluator, program) -> list[CaseResult]:
 async def run_test_source(source: str, path: str = "<source>", args: list[str] | None = None) -> FileResult:
     result = FileResult(path)
     try:
-        program = Parser(Lexer(source).tokenize()).parse()
+        tokens = Lexer(source).tokenize()
+        result.tap_lines = [tok.line for tok in tokens if tok.type == "STREAM_OP" and tok.value == ">?>"]
+        program = Parser(tokens).parse()
     except (LexerError, ParseError) as exc:
         _, result.error, result.error_line = _describe_error(exc)
         return result
@@ -163,8 +166,15 @@ def format_case(case: CaseResult) -> str:
     return f"  {mark} {case.name}{where}\n{_indent(case.message, '      ')}"
 
 
+def format_tap_warning(tap_lines: list[int]) -> str:
+    where = "、".join(f"{line} 行目" for line in sorted(set(tap_lines)))
+    return f"  ⚠ 確認用の >?> が残っています（{where}）。確認が終わったら >> に戻しましょう"
+
+
 def format_file_result(result: FileResult) -> str:
     lines = [result.path]
+    if result.tap_lines:
+        lines.append(format_tap_warning(result.tap_lines))
     if result.error is not None:
         where = f"（{result.error_line} 行目）" if result.error_line else ""
         lines.append(f"  ! ファイルを実行できませんでした{where}")
@@ -227,10 +237,12 @@ async def run_tests_after_program(evaluator: Evaluator, source: str) -> dict | N
     テスト関数がなければ None。あれば {"passed": …, "total": …, "error": …} を返す
     （すべて成功なら error は None）。
     """
-    program = Parser(Lexer(source).tokenize()).parse()
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
     if not find_test_functions(program):
         return None
     result = FileResult("テスト")
+    result.tap_lines = [tok.line for tok in tokens if tok.type == "STREAM_OP" and tok.value == ">?>"]
     result.cases = await run_defined_tests(evaluator, program)
     print()
     print(format_file_result(result))

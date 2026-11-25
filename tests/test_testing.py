@@ -11,6 +11,7 @@ from popcorn_lang.testing import (
     FAILED,
     PASSED,
     collect_test_files,
+    format_file_result,
     is_test_name,
     run_test_source,
 )
@@ -248,3 +249,19 @@ def test_testing_functions_are_documented():
         assert f"| `{name}` |" in spec
         assert f"    {name}: {{ description:" in hover
     assert "| `AssertionError` |" in spec
+
+
+# --- `>?>` の消し忘れ ------------------------------------------------------
+
+
+def test_leftover_tap_pipe_is_warned_but_does_not_fail(capsys):
+    result = run_tests('pop TestTap:\n    "abc" >> Num >!> 0 >?> Expect(0).\n')
+    assert result.ok
+    assert result.tap_lines == [2]
+    assert "2 行目" in format_file_result(result)
+
+
+def test_no_tap_warning_without_tap_pipe():
+    result = run_tests("pop TestPlain:\n    1 >> Expect(1).\n")
+    assert result.tap_lines == []
+    assert ">?>" not in format_file_result(result)

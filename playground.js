@@ -194,18 +194,18 @@ doubled >> Display.`;
             { token: "string", regex: '"(?:\\\\.|[^"\\\\])*"|\\\'(?:\\\\.|[^\\\'\\\\])*\\\'|`[^`\\n]*`' },
             {
               token: ["keyword.operator", "text", "variable.assignment.final"],
-              regex: "(>>)(\\s*)(\\(\\s*[a-z_][a-zA-Z0-9_]*\\s*(?:,\\s*[a-z_][a-zA-Z0-9_]*\\s*)+\\))(?=\\s*\\.\\s*(?://.*)?$)",
+              regex: "(>\\??>)(\\s*)(\\(\\s*[a-z_][a-zA-Z0-9_]*\\s*(?:,\\s*[a-z_][a-zA-Z0-9_]*\\s*)+\\))(?=\\s*\\.\\s*(?://.*)?$)",
             },
             {
               token: ["keyword.operator", "text", "variable.assignment.final"],
-              regex: "(>>)(\\s*)([a-z_][a-zA-Z0-9_]*)(?=\\s*(?:\\[[^\\]\\r\\n]*\\]\\s*)*\\.\\s*(?://.*)?$)",
+              regex: "(>\\??>)(\\s*)([a-z_][a-zA-Z0-9_]*)(?=\\s*(?:\\[[^\\]\\r\\n]*\\]\\s*)*\\.\\s*(?://.*)?$)",
             },
             { token: "constant.language", regex: "\\b(?:true|false|null)\\b" },
             { token: "keyword.control", regex: "\\b(?:pop|when|else|as|and|or|not|in)\\b" },
             { token: "support.function", regex: "\\b[A-Z][A-Za-z0-9_]*\\b" },
             { token: "variable.language", regex: "@" },
             { token: "constant.numeric", regex: "\\b\\d+(?:\\.\\d+)?\\b" },
-            { token: "keyword.operator", regex: ">>|::|==|!=|>=|<=|[+\\-*\\/%><]" },
+            { token: "keyword.operator", regex: ">[?!]?>|::|==|!=|>=|<=|[+\\-*\\/%><]" },
             { token: "punctuation.operator", regex: "[.():,\\[\\]{}]" },
           ],
         };

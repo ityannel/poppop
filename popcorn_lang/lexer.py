@@ -284,6 +284,15 @@ class Lexer:
                     self.tokens.append(Token("VARIABLE", word, start_line, start_col))
                 continue
 
+            # Three-character pipes: `>?>`（流れている値を表示して、そのまま次へ）と
+            # `>!>`（左がエラーになったら、右の値に差し替える）
+            three = code[i : i + 3]
+            if three in (">?>", ">!>"):
+                for _ in range(3):
+                    advance_char()
+                self.tokens.append(Token("STREAM_OP", three, start_line, start_col))
+                continue
+
             # Two-character symbols
             two = code[i : i + 2]
             if two == ">>":

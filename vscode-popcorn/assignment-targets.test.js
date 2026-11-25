@@ -27,4 +27,15 @@ assert.deepStrictEqual(targets, [
     "visible"
 ]);
 
+// `>?>` binds like `>>`; the value after `>!>` is a fallback, not a binding.
+const pipeSource = [
+    "\"7\" >> Num >?> tapped.",
+    "\"x\" >> Num >!> fallback.",
+    "\"x\" >> Num >!> 0 >> after."
+].join("\n");
+assert.deepStrictEqual(
+    findFinalAssignmentTargetOffsets(pipeSource).map(({ start, length }) => pipeSource.slice(start, start + length)),
+    ["tapped", "after"]
+);
+
 console.log("Assignment-target detection tests passed.");

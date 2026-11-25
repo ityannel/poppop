@@ -68,15 +68,22 @@ function lastNonWhitespaceIndex(text) {
     return -1;
 }
 
-function lastPipelineOperatorIndex(text, endIndex) {
-    let operatorIndex = -1;
+// Returns the offset just after the last pipe operator (`>>`, `>?>` or `>!>`)
+// before endIndex. The value after `>!>` is a fallback, never a binding, so
+// that case returns -1.
+function lastPipelineOperatorEnd(text, endIndex) {
+    let operatorEnd = -1;
     for (let index = 0; index < endIndex; index += 1) {
-        if (text[index] === ">" && text[index + 1] === ">") {
-            operatorIndex = index;
+        if (text[index] !== ">") continue;
+        if (text[index + 1] === ">") {
+            operatorEnd = index + 2;
             index += 1;
+        } else if ((text[index + 1] === "?" || text[index + 1] === "!") && text[index + 2] === ">") {
+            operatorEnd = text[index + 1] === "!" ? -1 : index + 3;
+            index += 2;
         }
     }
-    return operatorIndex;
+    return operatorEnd;
 }
 
 function isVariableName(name) {
@@ -127,9 +134,9 @@ function findFinalAssignmentTargetOffsets(text) {
 
         // A binding target is only final when it ends a completed pipeline.
         if (terminatorIndex !== -1 && code[terminatorIndex] === ".") {
-            const operatorIndex = lastPipelineOperatorIndex(code, terminatorIndex);
-            if (operatorIndex !== -1) {
-                const targetStart = operatorIndex + 2;
+            const operatorEnd = lastPipelineOperatorEnd(code, terminatorIndex);
+            if (operatorEnd !== -1) {
+                const targetStart = operatorEnd;
                 const targetText = code.slice(targetStart, terminatorIndex);
                 const targetOffsets = [
                     ...directTargetOffsets(targetText),

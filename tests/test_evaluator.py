@@ -1112,3 +1112,102 @@ def test_process_parameter_names_must_not_be_block_forms():
         except Exception:
             continue
         raise AssertionError(f"must be rejected: {code}")
+
+
+# ---- パイプラインの `>?>`（途中を覗く）と `>!>`（失敗したら差し替える） ----
+
+
+def test_tap_pipe_shows_the_value_with_its_line_and_passes_it_on(capsys):
+    result = run_code("(1, 4) >> Range\n    >?> Filter (@ % 2 == 0) >?> Map (@ * 10) >> out.\nout.")
+    assert result == [20, 40]
+    assert capsys.readouterr().out == (
+        "[>?> line 2 after Range] (List) [1, 2, 3, 4]\n"
+        "[>?> line 2 after Filter] (List) [2, 4]\n"
+    )
+
+
+def test_tap_pipe_before_a_binding(capsys):
+    assert run_code('"7" >> Num >?> d.\nd + 1.') == 8
+    assert capsys.readouterr().out == "[>?> line 1 after Num] (Num) 7\n"
+
+
+def test_tap_pipe_needs_a_next_stage():
+    from popcorn_lang.parser import ParseError
+
+    try:
+        Parser(Lexer('"x" >?> .').tokenize()).parse()
+    except ParseError as exc:
+        assert ">?>" in str(exc)
+    else:
+        assert False, "expected ParseError"
+
+
+def test_fallback_pipe_replaces_an_error_on_its_left():
+    assert run_code('"abc" >> Trim >> Num >!> 200 >> c.\nc.') == 200
+    assert run_code('" 5 " >> Trim >> Num >!> 200 >> c.\nc.') == 5
+
+
+def test_fallback_pipe_gives_the_error_as_current_value():
+    assert run_code('"abc" >> Num >!> "{@::type}: failed".') == "TypeError: failed"
+
+
+def test_fallback_pipe_right_side_runs_only_on_error():
+    assert run_code('0 >> n.\n1 >> Num >!> (1 >> n) >> x.\nn.') == 0
+
+
+def test_fallback_pipe_covers_everything_on_its_left_and_only_that():
+    # 左ぜんぶ（Input の代わりに Throw）を守る
+    assert run_code('"boom" >> Throw >> Num >!> 1.') == 1
+    # 右側のあとで起きたエラーは、守らない
+    expect_error('"abc" >> Num >!> 0 >> Throw.', "UserError")
+    # 2 つ目の >!> は、1 つ目の差し替えも含めた左ぜんぶを守る
+    assert run_code('"abc" >> Num >!> "x" >> Num >!> 9.') == 9
+
+
+def test_fallback_pipe_value_is_not_a_binding():
+    expect_error('"abc" >> Num >!> fallback.', "NameError")
+
+
+def test_fallback_pipe_lets_break_and_return_through():
+    code = "pop F:\n    1 >> Return >!> 2.\n    3.\nF."
+    assert run_code(code) == 1
+
+
+def test_user_input_example_with_tap_and_fallback(monkeypatch, capsys):
+    answers = iter([" 42 ", "abc"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    code = (
+        '"整数: " >> Input >> Trim >> Num >?> d.\n'
+        '"実数: " >> Input >> Trim >> Num >!> 200 >?> c.\n'
+        "(d, c)."
+    )
+    assert run_code(code) == (42, 200)
+    out = capsys.readouterr().out
+    assert "[>?> line 1 after Num] (Num) 42" in out
+    assert "[>?> line 2] (Num) 200" in out
+
+
+# ---- Fork の 1 行書き ----
+
+
+def test_fork_one_line_form_returns_a_list_in_order():
+    assert run_code("[1, 2, 3] >> Fork(Sum, Average, Max * 10).") == [6, 2, 30]
+
+
+def test_fork_one_line_form_destructures():
+    assert run_code("[4, 8] >> Fork(Min, Max) >> (low, high).\nhigh - low.") == 4
+
+
+def test_fork_one_line_form_with_alias_and_pipelines():
+    assert run_code('"a,b" >> Fork as s (s >> Split(","), s >> Length).') == [["a", "b"], 3]
+
+
+def test_fork_one_line_form_rejects_labels():
+    from popcorn_lang.parser import ParseError
+
+    try:
+        Parser(Lexer("[1] >> Fork(total: Sum).").tokenize()).parse()
+    except ParseError as exc:
+        assert "Fork:" in str(exc)
+    else:
+        assert False, "expected ParseError"

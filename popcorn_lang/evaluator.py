@@ -362,15 +362,53 @@ class Evaluator:
             raise
 
     async def _eval_pipeline_stages(self, node: Pipeline, env: Environment):
-        val = await self.eval(node.nodes[0], env)
-        env.set_current(val)
-        self.trace_pipeline_value(node.nodes[0], val)
+        return await self._eval_stages_until(node, env, len(node.nodes))
 
-        for i in range(1, len(node.nodes)):
+    async def _eval_stages_until(self, node: Pipeline, env: Environment, end: int):
+        """`node.nodes[0:end]` を順に計算する。
+
+        `>!>` は、それより左の段階ぜんぶを守る。いちばん右の `>!>` から見て、
+        左側を（再帰で）計算し、エラーになったら右の式で差し替える。
+        """
+        ops = node.ops
+        fallback_at = None
+        for j in range(end - 2, -1, -1):
+            if j < len(ops) and ops[j] == ">!>":
+                fallback_at = j
+                break
+
+        if fallback_at is None:
+            val = await self.eval(node.nodes[0], env)
+            env.set_current(val)
+            self.trace_pipeline_value(node.nodes[0], val)
+            start = 1
+        else:
+            try:
+                val = await self._eval_stages_until(node, env, fallback_at + 1)
+            except PopCornError as exc:
+                err_dict = {"type": exc.err_type, "message": exc.message}
+            except EvaluatorError as exc:
+                err_dict = {"type": "RuntimeError", "message": str(exc)}
+            except OSError as exc:
+                err_dict = {"type": "IOError", "message": str(exc)}
+            else:
+                err_dict = None
+            if err_dict is not None:
+                fallback_node = node.nodes[fallback_at + 1]
+                fallback_env = Environment(parent=env)
+                fallback_env.set_current(err_dict)
+                val = await self.eval(fallback_node, fallback_env)
+                env.set_current(val)
+                self.trace_pipeline_value(fallback_node, val, err_dict)
+            start = fallback_at + 2
+
+        for i in range(start, end):
             n = node.nodes[i]
-            op = node.ops[i - 1] if i - 1 < len(node.ops) else ">>"
-            if op != ">>":
-                raise PopCornError("RuntimeError", "Only >> is a valid pipeline operator")
+            op = ops[i - 1] if i - 1 < len(ops) else ">>"
+            if op == ">?>":
+                self._show_tap(node, i, val)
+            elif op != ">>":
+                raise PopCornError("RuntimeError", f"Unknown pipeline operator {op}")
 
             input_value = val
             if isinstance(n, StreamBlockNode):
@@ -382,6 +420,14 @@ class Evaluator:
             self.trace_pipeline_value(n, val, input_value)
 
         return val
+
+    def _show_tap(self, node: Pipeline, index: int, value: Any) -> None:
+        """`>?>`: いま流れている値を、場所といっしょに表示する（値は変えない）。"""
+        positions = getattr(node, "op_positions", None) or []
+        line = positions[index - 1][0] if index - 1 < len(positions) else node.line
+        label = _stage_label(node.nodes[index - 1])
+        after = f" after {label}" if label else ""
+        print(f"[>?> line {line}{after}] ({popcorn_type_name(value)}) {format_popcorn_str(value)}")
 
     async def _eval_stream_block(self, n: StreamBlockNode, val: Any, env: Environment) -> Any:
         if n.stream_type == "Map":
@@ -921,3 +967,20 @@ class Evaluator:
                 evaluated = await self.eval(part, interp_env)
                 res.append(format_popcorn_str(evaluated))
         return "".join(res)
+
+
+def _stage_label(node: ASTNode) -> str:
+    """`>?>` の表示で使う、直前の段階の名前（分からなければ空）。"""
+    if isinstance(node, StreamBlockNode):
+        return node.stream_type
+    if isinstance(node, FunctionCallNode):
+        return node.name
+    if isinstance(node, VariableNode):
+        return node.name
+    if isinstance(node, BindNode) and isinstance(node.target, VariableNode):
+        return node.target.name
+    if isinstance(node, (CheckBlock, LoopBlock)):
+        return "Check" if isinstance(node, CheckBlock) else "Loop"
+    if isinstance(node, TryCatchBlock):
+        return "Try"
+    return ""

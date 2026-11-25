@@ -54,7 +54,7 @@ def _shape(node: Any) -> Any:
             tuple(
                 (f.name, _shape(getattr(node, f.name)))
                 for f in dataclasses.fields(node)
-                if f.name not in ("line", "column")
+                if f.name not in ("line", "column", "op_positions")
             ),
         )
     if isinstance(node, (list, tuple)):
