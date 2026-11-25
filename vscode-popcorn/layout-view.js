@@ -5,7 +5,8 @@
 // 解析の前に、`:` のブロックを、同じ意味の `{ … }` に見立てたテキスト（ブレース・ビュー）へ置きかえ、
 // 結果の位置を、元のテキストの位置へ戻します。
 //   * ブロックを開く `:` は、同じ位置の `{` に置きかえます（長さは変わりません）。
-//   * ブロックが終わる行の先頭（字下げのあと）に `} ` を差しこみます。行の数は変わりません。
+//   * ブロックが終わる行の先頭（字下げのあと）に `} ` を差しこみます。
+//   * ファイルの終わりで閉じるブロックだけは、最後に `}` の行を 1 行足します（行の番号は、それより前は変わりません）。
 
 // assignment-targets.js もこのファイルを読むので、maskNonCode は使うときに読む（循環を避ける）
 function maskNonCode(line, state) {
@@ -76,7 +77,9 @@ function toBraceView(text) {
     if (!changed) return { text, ...IDENTITY };
     let braceText = outLines.join("\n");
     if (stack.length) {
-        const insert = " }".repeat(stack.length);
+        // ファイルの終わりで閉じるブロックは、最後の行のあとに、閉じる行を 1 行足す
+        // （最後の行の中で閉じると、その行が範囲の外に出てしまうため）
+        const insert = "\n" + "} ".repeat(stack.length).trimEnd();
         inserts.push([text.length, insert.length]);
         braceText += insert;
     }
@@ -138,4 +141,17 @@ function wrapExports(exportsObject, names) {
     return wrapped;
 }
 
-module.exports = { toBraceView, toView, fromView, wrapExports };
+// 行の中の `{` と `}` を、出てきた順に open() / close() へ渡す（from より前は読まない）
+function forEachBrace(code, { open, close }, from = 0) {
+    for (let index = from; index < code.length; index += 1) {
+        if (code[index] === "{") open();
+        else if (code[index] === "}") close();
+    }
+}
+
+// 行頭（空白を除く）に続く `}` の数
+function leadingCloseCount(code) {
+    return (/^[\s}]*/.exec(code)[0].match(/\}/g) || []).length;
+}
+
+module.exports = { toBraceView, toView, fromView, wrapExports, forEachBrace, leadingCloseCount };

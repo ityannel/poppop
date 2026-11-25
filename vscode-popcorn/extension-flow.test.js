@@ -97,7 +97,10 @@ const vscode = {
     Hover: class Hover { constructor(contents, range) { this.contents = contents; this.range = range; } },
     TextEdit: { replace: () => ({}) },
     DocumentSymbol: class DocumentSymbol {},
-    FoldingRange: class FoldingRange {},
+    FoldingRange: class FoldingRange { constructor(start, end) { this.start = start; this.end = end; } },
+    CompletionItem: class CompletionItem { constructor(label, kind) { this.label = label; this.kind = kind; } },
+    CompletionItemKind: { Function: 2, Keyword: 13, Variable: 5, Property: 9, TypeParameter: 24, Snippet: 14 },
+    SnippetString: class SnippetString { constructor(value) { this.value = value; } },
     SymbolKind: { Function: 12, Method: 5, Namespace: 3 },
     commands: { registerCommand: () => noopDisposable },
     languages: {
@@ -108,7 +111,8 @@ const vscode = {
         registerHoverProvider: (_selector, provider) => { providers.hover = provider; return noopDisposable; },
         registerDocumentFormattingEditProvider: (_selector, provider) => { providers.format = provider; return noopDisposable; },
         registerDocumentSymbolProvider: (_selector, provider) => { providers.symbols = provider; return noopDisposable; },
-        registerFoldingRangeProvider: (_selector, provider) => { providers.folding = provider; return noopDisposable; }
+        registerFoldingRangeProvider: (_selector, provider) => { providers.folding = provider; return noopDisposable; },
+        registerCompletionItemProvider: (_selector, provider) => { providers.completion = provider; return noopDisposable; }
     },
     workspace: {
         getConfiguration: () => ({ get: (_key, defaultValue) => defaultValue }),
@@ -156,6 +160,15 @@ assert.strictEqual(
     providers.hover.provideHover(document, positionAt(text.indexOf("password") + 1)),
     undefined,
     "文字列内の単語を変数として扱わない。"
+);
+
+const completions = providers.completion.provideCompletionItems(document, positionAt(text.indexOf("Display")));
+assert.ok(completions.some(item => item.label === "value" && item.kind === 5), "変数を補完する");
+assert.ok(completions.some(item => item.label === "Map:" && item.insertText.value.startsWith("Map:\n")), "ブロックのひな形");
+assert.deepStrictEqual(
+    providers.completion.provideCompletionItems(document, positionAt(text.indexOf("password") + 3)),
+    [],
+    "文字列の中では補完しない"
 );
 
 console.log("Cursor-driven variable flow highlighting test passed.");

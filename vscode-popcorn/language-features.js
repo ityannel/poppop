@@ -2,6 +2,8 @@
 
 const { findFinalAssignmentTargetOffsets, maskNonCode } = require("./assignment-targets");
 const { findImplicitVariableScopeRanges, findVariableReferenceOffsets, variableAtOffset } = require("./semantic-highlights");
+const { findInterpolatedVariables, findPlainStringInterpolations } = require("./popcorn-strings");
+const { forEachBrace, leadingCloseCount } = require("./layout-view");
 
 const IDENTIFIER = /\b[a-z_][a-zA-Z0-9_]*\b/g;
 const PIPELINE_OPERATOR = />>/g;
@@ -263,6 +265,11 @@ function describeBlockHeader(code) {
         return { kind: "function", name: functionMatch[1] };
     }
 
+    const branchMatch = /^\s*(?:\}\s*)*(when\b[^{]*?|else)\s*\{/.exec(code);
+    if (branchMatch) {
+        return { kind: "branch", name: branchMatch[1].trim() };
+    }
+
     const streamMatch = STREAM_BLOCK.exec(code);
     if (streamMatch) {
         const name = streamMatch[1] || streamMatch[2];
@@ -280,33 +287,14 @@ function findBlockRanges(text) {
 
     scanLines(text, ({ code, lineNumber }) => {
         lastLine = lineNumber;
-        const trimmed = code.trim();
-        const startsWithClose = /^\}/.test(trimmed);
-
-        if (startsWithClose) {
-            const block = stack.pop();
-            if (block) {
-                blocks.push({ ...block, endLine: lineNumber });
-            }
-        }
-
-        const openCount = (code.match(/\{/g) || []).length;
-        const closeCount = (code.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-
-        if (netOpens > 0) {
-            for (let i = 0; i < netOpens; i += 1) {
-                stack.push({ ...describeBlockHeader(code), startLine: lineNumber });
-            }
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) {
+        // `{` と `}` を、行の中で出てきた順に読む（`} } (x) >> pop F{` のように、閉じと開きが同じ行にある）
+        forEachBrace(code, {
+            open: () => stack.push({ ...describeBlockHeader(code), startLine: lineNumber }),
+            close: () => {
                 const block = stack.pop();
-                if (block) {
-                    blocks.push({ ...block, endLine: lineNumber });
-                }
+                if (block) blocks.push({ ...block, endLine: lineNumber });
             }
-        }
+        });
     });
 
     for (const block of stack) {
@@ -399,7 +387,10 @@ function findPipelineAtOffset(text, offset) {
     let pipelineStart = expressionStartOffset(text, line.lineStart + start);
     let pipelineEnd = line.lineStart + end + 1;
     const blocks = findBlockRanges(text);
-    const block = blocks.find(candidate => candidate.startLine === line.lineNumber || candidate.endLine === line.lineNumber);
+    // `:` のブロックは、いくつも同じ行で閉じることがある。いちばん外側のブロックが、この行のパイプラインの入力
+    const block = blocks
+        .filter(candidate => candidate.startLine === line.lineNumber || candidate.endLine === line.lineNumber)
+        .sort((left, right) => left.startLine - right.startLine)[0];
     if (block) {
         const blockStartLine = lineInfoAtLineNumber(text, block.startLine);
         const blockEndLine = lineInfoAtLineNumber(text, block.endLine);
@@ -446,7 +437,11 @@ function allVariableOccurrences(text) {
             }
         }
     });
-    return occurrences;
+    // "…{name}…" の補間の中で使った変数も、利用として数える
+    for (const occurrence of findInterpolatedVariables(text)) {
+        if (isVariableName(occurrence.name)) occurrences.push(occurrence);
+    }
+    return occurrences.sort((left, right) => left.start - right.start);
 }
 
 function namedImplicitVariables(text) {
@@ -542,22 +537,10 @@ function implicitContextAtOffset(text, offset) {
     let context;
     scanLines(text, ({ code, lineStart }) => {
         if (context || lineStart > offset) return;
-        const trimmed = code.trim();
-        const startsWithClose = /^\}/.test(trimmed);
-        if (startsWithClose) {
-            stack.pop();
-        }
-        const openCount = (code.match(/\{/g) || []).length;
-        const closeCount = (code.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-        if (netOpens > 0) {
-            for (let i = 0; i < netOpens; i += 1) {
-                stack.push({ streamContext: streamContextFromHeader(code) });
-            }
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) stack.pop();
-        }
+        forEachBrace(code, {
+            open: () => stack.push({ streamContext: streamContextFromHeader(code) }),
+            close: () => stack.pop()
+        });
         if (offset >= lineStart && offset <= lineStart + code.length) {
             context = [...stack].reverse().find(block => block.streamContext)?.streamContext;
         }
@@ -637,11 +620,9 @@ function findUpdatePropertyOffsets(text) {
     const stack = [];
 
     scanLines(text, ({ code, lineStart }) => {
-        const trimmed = code.trim();
-        const startsWithClose = /^\}/.test(trimmed);
-        if (startsWithClose) {
-            stack.pop();
-        }
+        // 行頭の `}` で閉じてから、この行のキーを調べる
+        const leading = leadingCloseCount(code);
+        for (let i = 0; i < leading; i += 1) stack.pop();
 
         const updateBlock = [...stack].reverse().find(block => block.kind === "update");
         if (updateBlock) {
@@ -656,22 +637,15 @@ function findUpdatePropertyOffsets(text) {
             }
         }
 
-        const openCount = (code.match(/\{/g) || []).length;
-        const closeCount = (code.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-        if (netOpens > 0) {
-            const updateMatch = />>\s*Update(?:\s+as\s+([a-z_][a-zA-Z0-9_]*))?\s*\{/.exec(code);
-            for (let i = 0; i < netOpens; i += 1) {
-                stack.push(
-                    updateMatch
-                        ? { kind: "update", alias: updateMatch[1] || "" }
-                        : { kind: "block", alias: "" }
-                );
-            }
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) stack.pop();
-        }
+        const updateMatch = />>\s*Update(?:\s+as\s+([a-z_][a-zA-Z0-9_]*))?\s*\{/.exec(code);
+        forEachBrace(code, {
+            open: () => stack.push(
+                updateMatch
+                    ? { kind: "update", alias: updateMatch[1] || "" }
+                    : { kind: "block", alias: "" }
+            ),
+            close: () => stack.pop()
+        }, leading);
     });
     return properties;
 }
@@ -716,29 +690,16 @@ function findUpdateScopeRanges(text) {
     const ranges = [];
     const stack = [];
     scanLines(text, ({ code, lineStart }) => {
-        const trimmed = code.trim();
-        const startsWithClose = /^\}/.test(trimmed);
-        if (startsWithClose) {
-            const block = stack.pop();
-            if (block?.kind === "update") ranges.push({ start: block.start, end: lineStart });
-        }
-        const openCount = (code.match(/\{/g) || []).length;
-        const closeCount = (code.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-        if (netOpens > 0) {
-            for (let i = 0; i < netOpens; i += 1) {
-                stack.push({
-                    kind: />>\s*Update\b/.test(code) ? "update" : "block",
-                    start: lineStart
-                });
-            }
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) {
+        forEachBrace(code, {
+            open: () => stack.push({
+                kind: />>\s*Update\b/.test(code) ? "update" : "block",
+                start: lineStart
+            }),
+            close: () => {
                 const block = stack.pop();
                 if (block?.kind === "update") ranges.push({ start: block.start, end: lineStart });
             }
-        }
+        });
     });
     for (const block of stack) {
         if (block.kind === "update") ranges.push({ start: block.start, end: text.length });
@@ -913,7 +874,16 @@ function analyzeDocument(text) {
     const implicitScopes = findImplicitVariableScopeRanges(text);
     const scannedLines = [];
     scanLines(text, info => scannedLines.push(info));
-    scannedLines.forEach(({ code, lineStart }, lineIndex) => {
+    // 丸括弧・角括弧の深さ（行の始めと終わり）。括弧の中で改行した行は、文の終わりではない
+    let bracketDepth = 0;
+    for (const info of scannedLines) {
+        for (const ch of info.code) {
+            if (ch === "(" || ch === "[") bracketDepth += 1;
+            else if ((ch === ")" || ch === "]") && bracketDepth > 0) bracketDepth -= 1;
+        }
+        info.depthAfter = bracketDepth;
+    }
+    scannedLines.forEach(({ code, lineStart, depthAfter }, lineIndex) => {
         const trimmed = code.trim();
         for (let index = 0; index < code.length; index += 1) {
             if (code[index] === "@") {
@@ -946,6 +916,7 @@ function analyzeDocument(text) {
                 || /^(?:when\b[\s\S]*|else)\s*:\s*$/.test(nextTrimmed);
             if (
                 end !== -1
+                && depthAfter === 0
                 && code[end] !== "."
                 && !trimmed.endsWith("{")
                 && !trimmed.endsWith("}")
@@ -1003,51 +974,407 @@ function normalizePipelineSpacing(line, code) {
             index += 1;
         }
     }
-    return result.trimEnd();
+    // 行頭の `>>`（ブロックのあとに外側のパイプラインを続ける行）の前には、空白を入れない
+    return result.trim();
 }
 
+// 行の中の、ブロックを開く `:`（`::`、辞書のキー、Fork のラベルは除く）。辞書・リストの括弧の中の `:` は、ブロックではない
+function isBlockColon(code, index, innermostBracket) {
+    if (innermostBracket === "{" || innermostBracket === "[") return false;
+    if (code[index + 1] === ":" || code[index - 1] === ":") return false;
+    const label = /^\s*([a-z_][a-zA-Z0-9_]*)\s*:/.exec(code);
+    return !(label && label[0].length - 1 === index && !/^(when|else)$/.test(label[1]));
+}
+
+/**
+ * 字下げをそろえ、`>>` の前後の空白を 1 つにします。
+ *   * `:` のブロックの本体は、見出しの行より 1 段深く。見出しと同じか浅い行で、ブロックは終わります。
+ *   * 丸括弧・角括弧・波括弧の中で改行した行は、括弧 1 つ（開いた行 1 つ）につき 1 段深く。
+ *     閉じ括弧で、その中で開いたブロックも終わります。
+ *   * コメントだけの行は、ブロックを閉じません。
+ *   * 行末の `:` のすぐ次の行は、字下げを忘れていても本体として 1 段下げます（本体のないブロックはないため）。
+ *     そのときは、`>>` や `when` / `else` / `Catch` で始まる行、空行、それより浅い行までを本体とみなします。
+ */
 function formatDocument(text, indentSize = 4) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     const rawLines = text.split(/\r?\n/);
     const state = { inBlockComment: false };
-    // "block" は { }、数は `:` の字下げブロック（見出しの行の、元の字下げ）
-    const stack = [];
-    const popBrace = () => {
-        while (stack.length && stack[stack.length - 1] !== "block") stack.pop();
-        stack.pop();
-    };
-    const formatted = rawLines.map(rawLine => {
+    // { indent: 見出しの行の元の字下げ, depth: 開いたときの括弧の深さ,
+    //   awaitingBody: 行末が `:`（本体は次の行から）, flushIndent: 字下げを忘れた本体の、元の字下げ }
+    const blocks = [];
+    const brackets = [];    // 開いている括弧ごとに { ch: 括弧, line: 開いた行の番号 }
+    const levelOf = openBrackets => new Set(openBrackets.map(bracket => bracket.line)).size;
+
+    let previousBlank = false;
+
+    const formatted = rawLines.map((rawLine, lineIndex) => {
         const trimmed = rawLine.trim();
-        if (!trimmed) return "";
-
-        const trimmedCode = maskNonCode(trimmed, state);
-        // `:` で始めた字下げブロックは、元の字下げが見出しの行と同じか浅くなったら閉じる
-        const rawIndent = rawLine.length - rawLine.trimStart().length;
-        while (stack.length && stack[stack.length - 1] !== "block" && rawIndent <= stack[stack.length - 1]) stack.pop();
-        const startsWithClose = /^\}/.test(trimmedCode);
-        if (startsWithClose) popBrace();
-
-        const line = " ".repeat(stack.length * indentSize) + normalizePipelineSpacing(trimmed, trimmedCode);
-        const lineCode = maskNonCode(line.trim(), { inBlockComment: false });
-        const openCount = (lineCode.match(/\{/g) || []).length;
-        const closeCount = (lineCode.match(/\}/g) || []).length;
-        const remainingCloses = Math.max(0, closeCount - (startsWithClose ? 1 : 0));
-        const netOpens = openCount - remainingCloses;
-
-        if (netOpens > 0) {
-            for (let i = 0; i < netOpens; i += 1) stack.push("block");
-        } else if (netOpens < 0) {
-            for (let i = 0; i < -netOpens; i += 1) popBrace();
+        if (!trimmed) {
+            previousBlank = true;
+            return "";
         }
-        if (/:\s*$/.test(lineCode)) stack.push(rawIndent);
 
+        const code = maskNonCode(trimmed, state);
+        const rawIndent = rawLine.length - rawLine.trimStart().length;
+        const isCommentOnly = trimmed.startsWith("//");
+        // 行頭の閉じ括弧は、開いた行と同じ段にそろえる
+        const leadingCloses = (/^[)\]}]+/.exec(code.replace(/\s+/g, "")) || [""])[0].length;
+        const visibleBrackets = brackets.slice(0, Math.max(0, brackets.length - leadingCloses));
+        if (!isCommentOnly) {
+            const top = blocks[blocks.length - 1];
+            if (top?.awaitingBody) {
+                // 行末の `:` の次の行は、いつも本体
+                top.awaitingBody = false;
+                if (rawIndent <= top.indent) top.flushIndent = rawIndent;
+            } else {
+                // 同じ括弧の中で開いたブロックは、見出しと同じか浅い字下げの行で終わる
+                // `>>`、`when` / `else` / `Catch` の行は、字下げを忘れた本体を 1 つだけ閉じる
+                let siblingUsed = false;
+                while (blocks.length && blocks[blocks.length - 1].depth === visibleBrackets.length) {
+                    const block = blocks[blocks.length - 1];
+                    let ends;
+                    if (block.flushIndent === undefined) {
+                        ends = rawIndent <= block.indent;
+                    } else if (previousBlank || rawIndent < block.flushIndent) {
+                        ends = true;
+                    } else if (!siblingUsed && /^\s*(?:>>|(?:when|else|Catch)\b)/.test(code)) {
+                        ends = true;
+                        siblingUsed = true;
+                    } else {
+                        ends = false;
+                    }
+                    if (!ends) break;
+                    blocks.pop();
+                }
+            }
+            previousBlank = false;
+        }
+        const openBlocks = blocks.filter(block => block.depth <= visibleBrackets.length).length;
+        const level = openBlocks + levelOf(visibleBrackets);
+        const line = " ".repeat(level * indentSize) + normalizePipelineSpacing(trimmed, code);
+
+        if (!isCommentOnly) {
+            let opened;
+            let openedAt = -1;
+            for (let index = 0; index < code.length; index += 1) {
+                const ch = code[index];
+                if (ch === "(" || ch === "[" || ch === "{") brackets.push({ ch, line: lineIndex });
+                else if (ch === ")" || ch === "]" || ch === "}") {
+                    brackets.pop();
+                    while (blocks.length && blocks[blocks.length - 1].depth > brackets.length) blocks.pop();
+                    if (opened && opened.depth > brackets.length) opened = undefined;
+                } else if (ch === ":" && !opened && isBlockColon(code, index, brackets[brackets.length - 1]?.ch)) {
+                    opened = { indent: rawIndent, depth: brackets.length };
+                    openedAt = index;
+                }
+            }
+            if (opened) {
+                // `:` のあとがコメントだけなら、本体は次の行から（文字列は隠してあるので、元の行で調べる）
+                opened.awaitingBody = /^\s*(?:\/\/.*)?$/.test(trimmed.slice(openedAt + 1));
+                blocks.push(opened);
+            }
+        }
         return line;
     });
     return formatted.join(eol);
 }
 
+// ---- ここから下の関数は、元のテキスト（`:` のブロックのまま）を読みます ----
+
+const STREAM_NAMES = ["Map", "Filter", "Count", "Reduce", "Loop", "Sort", "SortDesc", "Group", "Fork", "Update", "Check", "Try", "Catch"];
+// `:` の同じ行に本体を書けないブロック（書けるのは when / else と pop だけ）
+const NEXT_LINE_BODY = new RegExp(
+    String.raw`(?:>>\s*(Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)|^\s*(Catch))`
+    + String.raw`(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?\s*:(?!:)\s*(\S)`
+);
+// 以前の `{ … }` のブロック
+const LEGACY_BRACE_BLOCK = new RegExp(
+    String.raw`(?:>>\s*(Map|Filter|Count|Reduce(?:\s*\([^)]*\))?|Loop|Sort|SortDesc|Group|Fork|Update|Check|Try)`
+    + String.raw`(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?`
+    + String.raw`|\bpop\s+([A-Z][a-zA-Z0-9_]*)|(?:^|\}\s*)(Catch)(?:\s+as\s+(?:[a-z_][a-zA-Z0-9_]*|\([^)]*\)))?`
+    + String.raw`|^\s*(?:\}\s*)?(when\b[^{]*?|else))\s*\{`
+);
+
+function maskedLines(text) {
+    const lines = [];
+    scanLines(text, info => lines.push(info));
+    return lines;
+}
+
+/** `(a, Keep) >> pop Name:` の関数定義。大文字で始まる 2 番目以降の引数は処理引数 */
+function findFunctionDefinitions(text) {
+    const definitions = [];
+    for (const { code, lineNumber, lineStart } of maskedLines(text)) {
+        const match = /^\s*(?:(\([^)]*\)|[a-z_][a-zA-Z0-9_]*)\s*>>\s*)?pop\s+([A-Z][a-zA-Z0-9_]*)/.exec(code);
+        if (!match) continue;
+        const parameterText = (match[1] || "").replace(/^\(|\)$/g, "");
+        const params = parameterText.split(",").map(part => part.trim()).filter(Boolean).map((name, index) => ({
+            name,
+            process: index > 0 && /^[A-Z]/.test(name)
+        }));
+        definitions.push({
+            name: match[2],
+            params,
+            line: lineNumber,
+            start: lineStart + match.index + match[0].length - match[2].length,
+            length: match[2].length
+        });
+    }
+    return definitions;
+}
+
+function editDistance(left, right) {
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i += 1) {
+        let diagonal = previous[0];
+        previous[0] = i;
+        for (let j = 1; j <= right.length; j += 1) {
+            const above = previous[j];
+            previous[j] = Math.min(
+                previous[j] + 1,
+                previous[j - 1] + 1,
+                diagonal + (left[i - 1].toLowerCase() === right[j - 1].toLowerCase() ? 0 : 1)
+            );
+            diagonal = above;
+        }
+    }
+    return previous[right.length];
+}
+
+/** 知っている処理名のうち、name に近いもの（書き間違いの候補） */
+function similarProcessName(name, knownNames) {
+    const limit = name.length <= 4 ? 1 : 2;
+    let best;
+    for (const known of knownNames) {
+        const distance = editDistance(name, known);
+        if (distance <= limit && (!best || distance < best.distance)) best = { name: known, distance };
+    }
+    return best?.name;
+}
+
+function sourceDiagnostics(text) {
+    const diagnostics = [];
+    const lines = maskedLines(text);
+    const functions = findFunctionDefinitions(text);
+    const knownProcesses = new Set([
+        ...Object.keys(STANDARD_FUNCTIONS),
+        ...functions.map(definition => definition.name),
+        ...functions.flatMap(definition => definition.params.filter(param => param.process).map(param => param.name)),
+        "Use",
+        // `"lib/x.pop" >> Use(Square, Shout).` で名前を書いて読み込んだ関数
+        ...[...text.matchAll(/>>\s*Use\s*\(([^)]*)\)/g)].flatMap(match => match[1].split(",").map(name => name.trim()).filter(Boolean))
+    ]);
+    // `"lib/x.pop" >> Use.` は別のファイルの関数をすべて読み込むので、名前の書き間違いは判断できない
+    const importsEverything = /"[^"\n]*"\s*>>\s*Use\s*\./.test(text);
+    const reportedUnknown = new Set();
+
+    for (const { code, lineStart } of lines) {
+        const legacy = LEGACY_BRACE_BLOCK.exec(code);
+        if (legacy) {
+            const brace = legacy.index + legacy[0].length - 1;
+            const name = (legacy[1] || "").replace(/\(.*$/, "").trim() || (legacy[2] ? `pop ${legacy[2]}` : legacy[3] || legacy[4].trim().split(/\s/)[0]);
+            diagnostics.push({
+                kind: "legacy-brace-block",
+                severity: "error",
+                start: lineStart + brace,
+                length: 1,
+                message: `ブロックは { } ではなく、':' と字下げで書きます（'${name}:' のあと、本体を 1 段下げます）。'popcorn ファイル名 --migrate' で、まとめて書き換えられます。`
+            });
+        }
+
+        const sameLine = NEXT_LINE_BODY.exec(code);
+        if (sameLine) {
+            const name = (sameLine[1] || sameLine[2]).replace(/\(.*$/, "").trim();
+            const bodyStart = sameLine.index + sameLine[0].length - 1;
+            const hint = ["Map", "Filter", "Count", "Sort", "SortDesc", "Group"].includes(name)
+                ? `1 行で書くときは、式渡し '${name} (…)' を使います。`
+                : "";
+            diagnostics.push({
+                kind: "same-line-block-body",
+                severity: "error",
+                start: lineStart + bodyStart,
+                length: Math.max(1, lastNonWhitespaceIndex(code) - bodyStart + 1),
+                message: `${name} の本体は、次の行から字下げして書きます。${hint}`
+            });
+        }
+
+        // 標準関数にも、このファイルの関数にもない大文字の名前で、知っている名前に近いもの（書き間違い）
+        for (const match of code.matchAll(/(?<![A-Za-z0-9_:@])[A-Z][A-Za-z0-9_]*\b/g)) {
+            const name = match[0];
+            if (importsEverything || knownProcesses.has(name)) continue;
+            const similar = similarProcessName(name, knownProcesses);
+            if (!similar) continue;
+            const key = `${name}:${lineStart + match.index}`;
+            if (reportedUnknown.has(key)) continue;
+            reportedUnknown.add(key);
+            diagnostics.push({
+                kind: "unknown-process",
+                severity: "warning",
+                start: lineStart + match.index,
+                length: name.length,
+                message: `'${name}' という処理は見つかりません。'${similar}' の書き間違いではありませんか？`,
+                suggestion: similar
+            });
+        }
+    }
+
+    for (const plain of findPlainStringInterpolations(text)) {
+        diagnostics.push({
+            kind: "plain-string-interpolation",
+            severity: "warning",
+            start: plain.start,
+            length: plain.length,
+            message: `'…' の中の ${plain.text} は補間されません。値を入れたいときは "…" を使います。`
+        });
+    }
+    return diagnostics;
+}
+
+// `:` のブロックを読める（layout-view.js で包んだ）関数。モジュールを読み終えたあとで使う
+const layoutAware = () => module.exports;
+
+/** 関数の本体の中なら、その関数の定義 */
+function enclosingFunction(text, lineNumber, functions = findFunctionDefinitions(text)) {
+    return layoutAware().findBlockRanges(text)
+        .filter(block => block.kind === "function" && block.startLine <= lineNumber && lineNumber <= block.endLine)
+        .map(block => functions.find(definition => definition.line === block.startLine))
+        .find(Boolean);
+}
+
+/** 折りたたみの範囲（行）。`:` のブロックと、複数行にまたがる括弧 */
+function findFoldingRanges(text) {
+    const lines = maskedLines(text);
+    const lastLine = lines.length - 1;
+    const indentOf = info => info.line.length - info.line.trimStart().length;
+    const isBlank = lineNumber => !lines[lineNumber].code.trim();
+    const ranges = [];
+    for (const block of layoutAware().findBlockRanges(text)) {
+        let end;
+        if (block.endLine > lastLine) {
+            end = lastLine;                       // ファイルの終わりで閉じたブロック
+        } else {
+            const closing = lines[block.endLine];
+            const header = lines[block.startLine];
+            // 字下げで閉じたブロックの終わりの行（と `}` の行）は、外側の行
+            end = /^\s*\}/.test(closing.code) || indentOf(closing) <= indentOf(header) ? block.endLine - 1 : block.endLine;
+        }
+        while (end > block.startLine && isBlank(end)) end -= 1;
+        if (end > block.startLine) ranges.push({ start: block.startLine, end, kind: block.kind });
+    }
+    const stack = [];
+    for (const { code, lineNumber } of lines) {
+        for (const ch of code) {
+            if (ch === "(" || ch === "[" || ch === "{") stack.push(lineNumber);
+            else if ((ch === ")" || ch === "]" || ch === "}") && stack.length) {
+                const start = stack.pop();
+                if (lineNumber - 1 > start) ranges.push({ start, end: lineNumber - 1, kind: "bracket" });
+            }
+        }
+    }
+    const seen = new Set();
+    return ranges
+        .filter(range => {
+            const key = `${range.start}:${range.end}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .sort((left, right) => left.start - right.start || right.end - left.end);
+}
+
+/** offset の位置の、このファイルの関数か処理引数（ホバー用） */
+function processInfoAtOffset(text, offset) {
+    const token = tokenAtOffset(text, offset);
+    if (!token || !/^[A-Z]/.test(token.word)) return undefined;
+    const functions = findFunctionDefinitions(text);
+    const owner = enclosingFunction(text, lineNumberOf(text, offset), functions);
+    const parameter = owner?.params.find(param => param.process && param.name === token.word);
+    if (parameter) return { kind: "process-parameter", token, definition: owner };
+    const definition = functions.find(candidate => candidate.name === token.word);
+    if (definition) return { kind: "function", token, definition };
+    return undefined;
+}
+
+function lineNumberOf(text, offset) {
+    return text.slice(0, offset).split("\n").length - 1;
+}
+
+const BLOCK_SNIPPETS = Object.freeze({
+    Map: "Map:\n\t${0:@}",
+    Filter: "Filter:\n\t${0:@ > 0}",
+    Count: "Count:\n\t${0:@ > 0}",
+    Reduce: "Reduce(${1:0}) as (${2:acc}, ${3:item}):\n\t${0:acc + item}",
+    Sort: "Sort:\n\t${0:@}",
+    SortDesc: "SortDesc:\n\t${0:@}",
+    Group: "Group:\n\t${0:@}",
+    Loop: "Loop:\n\t${0:@}",
+    Fork: "Fork:\n\t${0:@}",
+    Update: "Update:\n\t${0:@::key} >> @::${1:key}",
+    Check: "Check:\n\twhen ${1:@ > 0}: ${2:\"yes\"}\n\telse: ${0:\"no\"}",
+    Try: "Try:\n\t${1:@}\nCatch as ${2:err}:\n\t${0:null}"
+});
+
+/**
+ * 補完の候補。kind は "function"（標準の処理）、"user-function"、"process-parameter"、
+ * "keyword"、"variable"、"property"、"snippet"（ブロックのひな形。snippet を VS Code のスニペットとして挿入する）のどれか
+ */
+function completionItems(text, offset) {
+    const before = text.slice(0, offset);
+    const items = [];
+    const seen = new Set();
+    const add = item => {
+        if (seen.has(item.label)) return;
+        seen.add(item.label);
+        items.push(item);
+    };
+
+    // `::` のあとは、辞書のキー
+    if (/::[a-z_]*$/.test(before)) {
+        const keys = new Set([...objectLiteralKeys(text)]);
+        for (const match of text.matchAll(/::([a-z_][a-zA-Z0-9_]*)/g)) keys.add(match[1]);
+        for (const key of keys) add({ label: key, kind: "property", detail: "辞書のキー" });
+        return items;
+    }
+
+    const functions = findFunctionDefinitions(text);
+    const enclosing = enclosingFunction(text, lineNumberOf(text, offset), functions);
+    for (const param of enclosing?.params || []) {
+        add(param.process
+            ? { label: param.name, kind: "process-parameter", detail: `処理引数（${enclosing.name} の引数）`, documentation: "呼ぶ側が丸括弧に書いた式を、いまの入力を @ にして計算します。" }
+            : { label: param.name, kind: "variable", detail: `${enclosing.name} の引数` });
+    }
+    for (const definition of functions) {
+        const params = definition.params.map(param => param.name).join(", ");
+        add({ label: definition.name, kind: "user-function", detail: `(${params}) >> pop ${definition.name}`, documentation: "このファイルで定義した関数です。" });
+    }
+    for (const [name, standard] of Object.entries(STANDARD_FUNCTIONS)) {
+        add({
+            label: name,
+            kind: "function",
+            detail: standard.output === "same" ? "入力と同じ型" : `→ ${standard.output}`,
+            documentation: standard.description
+        });
+    }
+    // ブロックのひな形（`Map:` と、字下げした本体）
+    for (const [name, snippet] of Object.entries(BLOCK_SNIPPETS)) {
+        add({ label: `${name}:`, kind: "snippet", detail: `${name} のブロック`, documentation: STANDARD_FUNCTIONS[name].description, snippet });
+    }
+    for (const [word, description] of Object.entries(SYSTEM_KEYWORDS)) {
+        add({ label: word, kind: "keyword", documentation: description });
+    }
+    add({ label: "not in", kind: "keyword", documentation: "要素・キー・部分文字列を含まないかどうか（Bool）を調べます。" });
+    for (const occurrence of allVariableOccurrences(text)) {
+        add({ label: occurrence.name, kind: "variable", detail: "変数" });
+    }
+    return items;
+}
+
 const exported = {
     analyzeDocument,
+    completionItems,
+    findFoldingRanges,
+    findFunctionDefinitions,
+    processInfoAtOffset,
     findUpdatePropertyOffsets,
     findUpdateScopeRanges,
     findBindings,
@@ -1072,8 +1399,20 @@ const exported = {
     typeFlowSummary
 };
 // `:` のブロックで書いたテキストも、解析できるようにする（layout-view.js）。整形は、元のテキストのまま
-const LAYOUT_NEUTRAL = new Set(["formatDocument", "isVariableName", "typeFlowSummary"]);
-module.exports = require("./layout-view").wrapExports(
+// 下の関数は、元のテキストをそのまま読む（中で、包んだ関数を使う）
+const LAYOUT_NEUTRAL = new Set([
+    "completionItems", "findFoldingRanges", "findFunctionDefinitions", "formatDocument",
+    "isVariableName", "processInfoAtOffset", "typeFlowSummary"
+]);
+const wrapped = require("./layout-view").wrapExports(
     exported,
     Object.keys(exported).filter(name => typeof exported[name] === "function" && !LAYOUT_NEUTRAL.has(name))
 );
+// 診断は、ブレース・ビューで調べるもの（変数・@・Update）と、元のテキストで調べるもの（書き方）を合わせる
+const analyzeLayout = wrapped.analyzeDocument;
+wrapped.analyzeDocument = function analyzeDocumentWithSource(text) {
+    const fromSource = sourceDiagnostics(text)
+        .filter(diagnostic => !isDiagnosticIgnoredAtOffset(text, diagnostic, diagnostic.start));
+    return [...analyzeLayout(text), ...fromSource].sort((left, right) => left.start - right.start);
+};
+module.exports = wrapped;

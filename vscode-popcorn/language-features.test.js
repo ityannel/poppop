@@ -22,9 +22,9 @@ const {
 const source = [
     "1 >> value.",
     "value >> Display.",
-    "[1, 2] >> Map as item {",
+    "[1, 2] >> Map as item:",
     "  item >> Display.",
-    "}",
+    "",
     "unknown >> Display",
     "@ >> Display."
 ].join("\n");
@@ -32,7 +32,7 @@ const source = [
 assert.strictEqual(findVariableDefinitions(source, "value").length, 1);
 assert.strictEqual(findVariableReferences(source, "value").length, 2);
 assert.deepStrictEqual(findBlockRanges(source).map(block => [block.kind, block.name, block.startLine, block.endLine]), [
-    ["stream", "Map", 2, 4]
+    ["stream", "Map", 2, 5]
 ]);
 
 const pipeline = findPipelineAtOffset(source, source.indexOf(">>") + 1);
@@ -47,10 +47,10 @@ assert.strictEqual(multiLineInput.slice(multiLinePipeline.start, multiLinePipeli
 assert.strictEqual(multiLinePipeline.inputType, "配列");
 
 const streamPipelineSource = [
-    "users >> Map as user {",
-    "    user >> Update {",
-    "    }",
-    "} >> Display >> instant."
+    "users >> Map as user:",
+    "    user >> Update:",
+    "        @",
+    ">> Display >> instant."
 ].join("\n");
 const streamPipeline = findPipelineAtOffset(streamPipelineSource, streamPipelineSource.indexOf(">>") + 1);
 assert.strictEqual(streamPipelineSource.slice(streamPipeline.start, streamPipeline.end), streamPipelineSource);
@@ -71,11 +71,10 @@ assert.ok(caseCollisionDiagnostics.some(diagnostic =>
 ));
 
 const updateSource = [
-    "users >> Map as user {",
-    "    user >> Update {",
+    "users >> Map as user:",
+    "    user >> Update:",
     '        "hidden" >> @::password.',
-    "    }",
-    "} >> instant."
+    ">> instant."
 ].join("\n");
 const updateDiagnostics = analyzeDocument(updateSource);
 assert.ok(!updateDiagnostics.some(diagnostic =>
@@ -84,13 +83,12 @@ assert.ok(!updateDiagnostics.some(diagnostic =>
 
 const updateKeysSource = [
     '[{"name": "alice", "password": "hash"}] >> users.',
-    "users >> Map as user {",
-    "    user >> Update {",
+    "users >> Map as user:",
+    "    user >> Update:",
     "        @::name >> Uppercase >> @::name.",
     "        false >> @::is_admin.",
     '        "hidden" >> @::password.',
-    "    }",
-    "} >> Display."
+    ">> Display."
 ].join("\n");
 const updateProperties = findUpdatePropertyOffsets(updateKeysSource);
 assert.strictEqual(updateProperties.find(property => property.name === "name").isNew, false);
@@ -107,23 +105,23 @@ assert.deepStrictEqual(
 
 // Destructuring alias in Reduce, pop function params, and labeled Fork should not flag undefined variables
 const reduceForkAndPop = [
-    "(a, b) >> pop AddTwo {",
+    "(a, b) >> pop AddTwo:",
     "    a + b.",
-    "}",
-    "[1, 2, 3] >> Reduce(0) as (acc, item) {",
+    "",
+    "[1, 2, 3] >> Reduce(0) as (acc, item):",
     "    acc + item.",
-    "} >> total.",
-    "[1, 2, 3] >> Fork as values {",
+    ">> total.",
+    "[1, 2, 3] >> Fork as values:",
     "    sum: values >> Sum.",
     "    max: values >> Max.",
-    "} >> stats.",
+    ">> stats.",
     "total >> Display.",
     "stats >> Display."
 ].join("\n");
 const reduceForkUndefined = analyzeDocument(reduceForkAndPop).filter(d => d.kind === "undefined-variable");
 assert.deepStrictEqual(reduceForkUndefined, []);
 
-const explicitImplicitSource = ["users >> Map as user {", "    @::name >> Display.", "}"].join("\n");
+const explicitImplicitSource = ["users >> Map as user:", "    @::name >> Display."].join("\n");
 assert.ok(isImplicitMarkerAtOffset(explicitImplicitSource, explicitImplicitSource.indexOf("@")));
 const valueImplicitSource = "false >> @::is_admin.";
 assert.deepStrictEqual(
@@ -141,12 +139,11 @@ assert.ok(pipelineProblemKinds.includes("empty-pipeline-stage"));
 
 const updateTypoDiagnostics = analyzeDocument([
     '[{"name": "alice", "score1": 10, "score2": 20}] >> users.',
-    "users >> Map as user {",
-    "    user >> Update {",
+    "users >> Map as user:",
+    "    user >> Update:",
     '        "ALICE" >> @::neme.',
     "        30 >> @::score3.",
-    "    }",
-    "} >> Display."
+    ">> Display."
 ].join("\n"));
 const keyTypoWarnings = updateTypoDiagnostics.filter(item => item.kind === "likely-update-key-typo");
 assert.strictEqual(keyTypoWarnings.length, 1);
@@ -154,11 +151,10 @@ assert.ok(keyTypoWarnings[0].message.includes("neme"));
 assert.ok(keyTypoWarnings[0].message.includes("name"));
 const ignoredUpdateTypoDiagnostics = analyzeDocument([
     '[{"name": "alice"}] >> users.',
-    "users >> Map as user {",
-    "    user >> Update {",
+    "users >> Map as user:",
+    "    user >> Update:",
     '        "ALICE" >> @::neme. // popcorn-ignore: likely-update-key-typo',
-    "    }",
-    "} >> Display."
+    ">> Display."
 ].join("\n"));
 assert.ok(!ignoredUpdateTypoDiagnostics.some(item => item.kind === "likely-update-key-typo"));
 
@@ -172,18 +168,18 @@ assert.strictEqual(
 
 // Last statement inside a block may omit the trailing '.'
 const omittedDotInBlock = [
-    "[1, 2] >> Map as item {",
+    "[1, 2] >> Map as item:",
     "    item >> Str",
-    "} >> labels.",
+    ">> labels.",
     "labels >> Display."
 ].join("\n");
 assert.ok(!analyzeDocument(omittedDotInBlock).some(d => d.kind === "missing-terminator"));
 
-assert.strictEqual(formatDocument("1>>value.\n[1]>>Map as item {\nitem>>Display.\n}"), [
+assert.strictEqual(formatDocument("1>>value.\n[1]>>Map as item:\n  item>>Display.\n>>items."), [
     "1 >> value.",
-    "[1] >> Map as item {",
+    "[1] >> Map as item:",
     "    item >> Display.",
-    "}"
+    ">> items."
 ].join("\n"));
 
 console.log("Language feature tests passed.");
