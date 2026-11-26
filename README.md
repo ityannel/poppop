@@ -87,6 +87,9 @@ The site has two pages:
 - `/` is the introduction site (`index.html` and `lp/`). Every demo on it uses
   output checked against the real interpreter. The examples and the optional
   background music credit live in `lp/data.js`.
+- `/en/` is the English introduction site. `en/index.html` is built from
+  `index.html` by `python tools/build_en_page.py`; run it after editing the
+  Japanese page. Its words for the demos live in `lp/data.en.js`.
 - `/playground/` is the Playground (`playground/index.html`).
 
 Start it locally from the repository root:

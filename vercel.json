@@ -8,6 +8,11 @@
       "source": "/playground",
       "destination": "/playground/",
       "permanent": true
+    },
+    {
+      "source": "/en",
+      "destination": "/en/",
+      "permanent": true
     }
   ]
 }

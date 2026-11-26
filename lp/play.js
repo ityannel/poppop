@@ -11,7 +11,8 @@
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------- ポップコーンの写真（15 粒から、毎回ランダムに選ぶ） ---------- */
-  const POP_URLS = Array.from({ length: 15 }, (_, i) => `lp/img/pop/pop-${String(i + 1).padStart(2, "0")}.webp`);
+  const ROOT = new URL("..", (document.currentScript && document.currentScript.src) || location.href).href;
+  const POP_URLS = Array.from({ length: 15 }, (_, i) => `${ROOT}lp/img/pop/pop-${String(i + 1).padStart(2, "0")}.webp`);
   const popImages = [];
   POP_URLS.forEach((url) => {
     const img = new Image();

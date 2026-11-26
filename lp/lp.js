@@ -2,6 +2,10 @@
   "use strict";
 
   const DATA = window.POPCORN_LP;
+  const EN = document.documentElement.lang === "en";
+  const L = (ja, en) => (EN ? en : ja);
+  const ROOT = new URL("..", (document.currentScript && document.currentScript.src) || location.href).href;
+  const rootUrl = (path) => new URL(path, ROOT).href;
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -21,7 +25,7 @@
   }
 
   function localize(raw) {
-    return window.PopCornLocalization ? window.PopCornLocalization.localizeError(raw) : raw;
+    return !EN && window.PopCornLocalization ? window.PopCornLocalization.localizeError(raw) : raw;
   }
 
   function encodeSource(source) {
@@ -32,7 +36,7 @@
   }
 
   function playgroundUrl(source) {
-    return `playground/#code=${encodeSource(source)}`;
+    return `${ROOT}playground/#code=${encodeSource(source)}`;
   }
 
   const TOKEN = /(\/\/[^\n]*)|("(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?|`[^`\n]*`?)|(>[?!]?>)|\b(pop|when|else|as|and|or|not|in)\b|\b(true|false|null)\b|\b([A-Z][A-Za-z0-9_]*)\b|\b([a-z_][A-Za-z0-9_]*)\b|(@)|(\d+(?:\.\d+)?)|(::|==|!=|>=|<=|[+\-*/%<>])|([.():,[\]{}])/g;
@@ -173,10 +177,10 @@
       popFetch();
       playSound(1);
       if (BGM) bgmPlay(true);
-      else toast("ポップの音：オン", "sound", 1600);
+      else toast(L("ポップの音：オン", "Pop sound: on"), "sound", 1600);
     } else {
       bgmStop();
-      toast(BGM ? "音：オフ" : "ポップの音：オフ", "sound", 1600);
+      toast(BGM ? L("音：オフ", "Sound: off") : L("ポップの音：オフ", "Pop sound: off"), "sound", 1600);
     }
   });
 
@@ -193,11 +197,13 @@
     const link = (text, url) => (url ? `<a href="${esc(url)}" rel="noopener">${esc(text)}</a>` : esc(text));
     const parts = [];
     if (BGM) {
-      soundToggle.title = "音（BGM とポップ）";
-      $(".sr-only", soundToggle).textContent = "音（BGM とポップ）";
-      parts.push(`BGM：「${esc(BGM.title)}」${link(BGM.author, BGM.authorUrl)}${BGM.license ? `（${link(BGM.license, BGM.licenseUrl)}）` : ""}`);
+      soundToggle.title = L("音（BGM とポップ）", "Sound (music and pops)");
+      $(".sr-only", soundToggle).textContent = soundToggle.title;
+      parts.push(EN
+        ? `Music: “${esc(BGM.title)}” by ${link(BGM.author, BGM.authorUrl)}${BGM.license ? ` (${link(BGM.license, BGM.licenseUrl)})` : ""}`
+        : `BGM：「${esc(BGM.title)}」${link(BGM.author, BGM.authorUrl)}${BGM.license ? `（${link(BGM.license, BGM.licenseUrl)}）` : ""}`);
     }
-    if (POP && POP.credit) parts.push(`ポップの音：${link(POP.credit, POP.creditUrl)}`);
+    if (POP && POP.credit) parts.push(`${L("ポップの音：", "Pop sound: ")}${link(POP.credit, POP.creditUrl)}`);
     credit.innerHTML = parts.join("<span class=\"credit-sep\"> ／ </span>");
     credit.hidden = false;
   }
@@ -210,7 +216,7 @@
 
   function popFetch() {
     if (!POP || popBytes) return;
-    popBytes = fetch(POP.src)
+    popBytes = fetch(rootUrl(POP.src))
       .then((r) => (r.ok ? r.arrayBuffer() : null))
       .catch(() => null);
   }
@@ -249,7 +255,7 @@
     bgmEl.crossOrigin = "anonymous";
     bgmEl.loop = true;
     bgmEl.preload = "auto";
-    bgmEl.src = BGM.src;
+    bgmEl.src = rootUrl(BGM.src);
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       const source = audio.createMediaElementSource(bgmEl);
@@ -361,10 +367,10 @@
   const countBox = countEl.closest(".pop-count");
   let pops = 0;
   const MILESTONES = new Map([
-    [10, "10 ポップ！ いい調子。"],
-    [50, "50 ポップ！ PopCorn 職人ですね。"],
-    [100, "100 ポップ！ もう止まらない…！"],
-    [300, "300 ポップ！ ここまで来た人は、なかなかいません。"],
+    [10, L("10 ポップ！ いい調子。", "10 pops! Nice.")],
+    [50, L("50 ポップ！ PopCorn 職人ですね。", "50 pops! A true PopCorn pro.")],
+    [100, L("100 ポップ！ もう止まらない…！", "100 pops! You can't stop now…!")],
+    [300, L("300 ポップ！ ここまで来た人は、なかなかいません。", "300 pops! Very few people make it this far.")],
   ]);
 
   function burst(x, y, power = 1) {
@@ -504,7 +510,7 @@
   function seedKernels(fresh = false) {
     popped = 0;
     tray.innerHTML = Array.from({ length: KERNELS }, (_, i) => (
-      `<button class="kernel${fresh ? " fresh" : ""}" type="button" style="--d:${(i * 0.37) % 2.2}s" aria-label="粒 ${i + 1} をポップさせる"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-kernel"/></svg></button>`
+      `<button class="kernel${fresh ? " fresh" : ""}" type="button" style="--d:${(i * 0.37) % 2.2}s" aria-label="${L(`粒 ${i + 1} をポップさせる`, `Pop kernel ${i + 1}`)}"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-kernel"/></svg></button>`
     )).join("");
   }
   seedKernels();
@@ -513,13 +519,13 @@
     if (!kernel || kernel.classList.contains("popped")) return;
     kernel.classList.remove("fresh");
     kernel.classList.add("popped");
-    kernel.setAttribute("aria-label", "ポップした！");
+    kernel.setAttribute("aria-label", L("ポップした！", "Popped!"));
     kernel.disabled = true;
     kernel.innerHTML = FX.popImg();
     burstAt(kernel, 1.1);
     popped += 1;
     if (popped === KERNELS) {
-      toast("ぜんぶポップ！ 🎉");
+      toast(L("ぜんぶポップ！ 🎉", "All popped! 🎉"));
       track("pc_lp_all_popped");
       setTimeout(() => {
         const r = tray.getBoundingClientRect();
@@ -536,14 +542,14 @@
     `<li class="hero-line"><span class="rider" aria-hidden="true">${FX.popImg()}</span><code>${highlight(line)}</code><span class="val">${esc(DATA.hero.values[i])}</span></li>`
   )).join("");
   const heroItems = $$(".hero-line", heroLines);
-  heroLines.insertAdjacentHTML("afterend", '<p class="hero-readout" id="heroReadout" aria-hidden="true"><span>はじめの値</span><b></b></p>');
+  heroLines.insertAdjacentHTML("afterend", `<p class="hero-readout" id="heroReadout" aria-hidden="true"><span>${L("はじめの値", "Start")}</span><b></b></p>`);
   const heroReadout = $("#heroReadout");
   function showReadout(i) {
     heroReadout.classList.toggle("last", i === heroItems.length - 1);
     heroReadout.classList.toggle("bump", false);
     void heroReadout.offsetWidth;
     heroReadout.classList.toggle("bump", true);
-    $("span", heroReadout).textContent = i === 0 ? "はじめの値" : `${i + 1} 行目を通ったあと`;
+    $("span", heroReadout).textContent = i === 0 ? L("はじめの値", "Start") : L(`${i + 1} 行目を通ったあと`, `After line ${i + 1}`);
     if (i === heroItems.length - 1) FX.flap($("b", heroReadout), DATA.hero.values[i]);
     else $("b", heroReadout).textContent = DATA.hero.values[i];
   }
@@ -580,7 +586,11 @@
   $("#ribbon").innerHTML = [...WORDS, ...WORDS].map((w) => `<span>${esc(w)}</span>`).join("");
 
   /* ---------- 01 rules ---------- */
-  const RULES = [
+  const RULES = EN ? [
+    { sym: ">>", title: "Pass the value right", text: "Values flow left to right through >> and change shape at every step." },
+    { sym: ".", title: "End with a period", text: "Every statement ends with a . and a new name goes on the far right." },
+    { sym: ":", title: "Longer work: colon and indent", text: "Work done for each item goes after : on indented lines." },
+  ] : [
     { sym: ">>", title: "値を、右へ渡す", text: "値は >> で、左から右へ流れていきます。通るたびに、形を変えていきます。" },
     { sym: ".", title: "文は、ピリオドで終わる", text: "文の終わりは . です。名前を付けるときも、いちばん右に書きます。" },
     { sym: ":", title: "長い処理は、: と字下げ", text: "ひとつずつ処理したい中身は、: のあと、字下げして書きます。" },
@@ -592,7 +602,7 @@
       <p>${esc(rule.text).replace(/(&gt;&gt;|\s\.\s|:)/, (m) => `<code>${m.trim()}</code>`)}</p>
       <pre class="code">${highlight(DATA.rules[i].code)}</pre>
       <div class="rule-run">
-        <button class="btn btn-small btn-paper" type="button" data-rule="${i}"><svg aria-hidden="true"><use href="#i-play"/></svg>実行</button>
+        <button class="btn btn-small btn-paper" type="button" data-rule="${i}"><svg aria-hidden="true"><use href="#i-play"/></svg>${L("実行", "Run")}</button>
         <output class="rule-out" id="ruleOut${i}"></output>
       </div>
     </article>`).join("");
@@ -680,12 +690,12 @@
       await wait(reduced ? 0 : 750);
       if (run !== orderRun) return;
     }
-    $("#orderResult").textContent = `どちらも答えは ${DATA.order.output}。でも、目の動きはこんなにちがいます。`;
+    $("#orderResult").textContent = L(`どちらも答えは ${DATA.order.output}。でも、目の動きはこんなにちがいます。`, `Both answer ${DATA.order.output}. But look how differently your eyes move.`);
   });
 
   /* ---------- 03 lab ---------- */
   const STAGES = new Map(DATA.lab.stages.map((stage) => [stage.id, stage]));
-  const GROUPS = [["pick", "えらぶ"], ["change", "かえる"], ["order", "ならべる"], ["fold", "まとめる"]];
+  const GROUPS = [["pick", L("えらぶ", "Pick")], ["change", L("かえる", "Change")], ["order", L("ならべる", "Arrange")], ["fold", L("まとめる", "Combine")]];
   const MAX_STAGES = 6;
   const BALL_COLORS = ["#ffffff", "#fff1b8", "#ffd9e7", "#c9f3e4", "#d7e5ff", "#ffe2c2", "#ecf9b8", "#e6ddff", "#cdf3fb", "#ffe9b0"];
   const lab = { source: DATA.lab.source.slice(), stages: ["even", "double", "sum"] };
@@ -729,7 +739,7 @@
 
   function balls(value, index) {
     if (Array.isArray(value)) {
-      if (!value.length) return `<span class="ball-empty" style="--i:${index}">[]（空っぽ）</span>`;
+      if (!value.length) return `<span class="ball-empty" style="--i:${index}">[]${L("（空っぽ）", " (empty)")}</span>`;
       return value.map((x, j) => `<span class="ball" style="--i:${index};--j:${j};--b:${BALL_COLORS[Math.abs(Math.round(x)) % BALL_COLORS.length]}">${esc(fmt(x))}</span>`).join("");
     }
     return `<span class="ball big" style="--i:${index}">${esc(fmt(value))}</span>`;
@@ -741,7 +751,7 @@
       <div class="pal-group">
         <h4>${name}</h4>
         ${DATA.lab.stages.filter((s) => s.group === group).map((s) => `
-          <button class="blk g-${group}" type="button" data-add="${s.id}" ${full ? "disabled" : ""} title="${esc(s.code)} を足す"><code>${esc(s.code)}</code>${esc(s.label)}</button>`).join("")}
+          <button class="blk g-${group}" type="button" data-add="${s.id}" ${full ? "disabled" : ""} title="${esc(L(`${s.code} を足す`, `Add ${s.code}`))}"><code>${esc(s.code)}</code>${esc(s.label)}</button>`).join("")}
       </div>`).join("");
   }
 
@@ -752,26 +762,26 @@
     const items = [];
     items.push(`
       <li class="st st-source" style="--i:0">
-        <div class="st-head"><span class="st-name">はじめの値</span><div class="st-tools"><button type="button" id="labShuffle" class="die" title="サイコロをふる" aria-label="サイコロをふって、数を作り直す">${FX.dieHtml(Math.min(6, Math.max(1, value.length)))}</button></div></div>
+        <div class="st-head"><span class="st-name">${L("はじめの値", "Start")}</span><div class="st-tools"><button type="button" id="labShuffle" class="die" title="${L("サイコロをふる", "Roll the die")}" aria-label="${L("サイコロをふって、数を作り直す", "Roll the die for new numbers")}">${FX.dieHtml(Math.min(6, Math.max(1, value.length)))}</button></div></div>
         <div class="st-out">${balls(value, 0)}</div>
       </li>`);
     if (!lab.stages.length) {
-      items.push(`<li class="pipe-link" aria-hidden="true"><span>&gt;&gt;</span></li><li class="st-empty">上のブロックをタップして、ここにつなごう</li>`);
+      items.push(`<li class="pipe-link" aria-hidden="true"><span>&gt;&gt;</span></li><li class="st-empty">${L("上のブロックをタップして、ここにつなごう", "Tap a block above to connect it here")}</li>`);
     }
     lab.stages.forEach((id, k) => {
       const stage = STAGES.get(id);
       const i = k + 1;
       items.push(`<li class="pipe-link" aria-hidden="true"><span>&gt;&gt;</span></li>`);
       const tools = `<div class="st-tools">
-          <button type="button" data-move="${k}" data-dir="-1" aria-label="左へ" ${k === 0 ? "disabled" : ""}>←</button>
-          <button type="button" data-move="${k}" data-dir="1" aria-label="右へ" ${k === lab.stages.length - 1 ? "disabled" : ""}>→</button>
-          <button type="button" class="rm" data-remove="${k}" aria-label="外す">×</button>
+          <button type="button" data-move="${k}" data-dir="-1" aria-label="${L("左へ", "Move left")}" ${k === 0 ? "disabled" : ""}>←</button>
+          <button type="button" data-move="${k}" data-dir="1" aria-label="${L("右へ", "Move right")}" ${k === lab.stages.length - 1 ? "disabled" : ""}>→</button>
+          <button type="button" class="rm" data-remove="${k}" aria-label="${L("外す", "Remove")}">×</button>
         </div>`;
       if (failed) {
         items.push(`<li class="st g-${stage.group} off" style="--i:${i}" data-index="${k}" draggable="true">
           <div class="st-head"><code>${esc(stage.code)}</code>${tools}</div>
           <span class="st-name">${esc(stage.label)}</span>
-          <span class="st-off">エラーで止まったので、ここは動きません</span>
+          <span class="st-off">${L("エラーで止まったので、ここは動きません", "The error stopped the flow, so this step doesn't run")}</span>
         </li>`);
         return;
       }
@@ -779,8 +789,8 @@
       if (result.error) {
         failed = true;
         const hint = Array.isArray(value)
-          ? "空っぽのリストからは、選べません。"
-          : "数になったあとは、リスト用のブロックをつなげません。";
+          ? L("空っぽのリストからは、選べません。", "There's nothing to pick from an empty list.")
+          : L("数になったあとは、リスト用のブロックをつなげません。", "Once it's a single number, list blocks can't follow.");
         items.push(`<li class="st g-${stage.group} err" style="--i:${i}" data-index="${k}" draggable="true">
           <div class="st-head"><code>${esc(stage.code)}</code>${tools}</div>
           <p class="st-err">${esc(localize(result.error))}</p>
@@ -790,7 +800,7 @@
       }
       value = result.value;
       const drop = result.dropped && result.dropped.length
-        ? `<div class="st-drop">${stage.id === "unique" ? "消えた" : stage.id === "top3" ? "入らなかった" : "えらばれなかった"} ${result.dropped.map((x, j) => `<span class="ball" style="--i:${i};--j:${j};--b:${BALL_COLORS[Math.abs(x) % BALL_COLORS.length]}">${esc(fmt(x))}</span>`).join("")}</div>`
+        ? `<div class="st-drop">${stage.id === "unique" ? L("消えた", "Removed") : stage.id === "top3" ? L("入らなかった", "Left out") : L("えらばれなかった", "Not picked")} ${result.dropped.map((x, j) => `<span class="ball" style="--i:${i};--j:${j};--b:${BALL_COLORS[Math.abs(x) % BALL_COLORS.length]}">${esc(fmt(x))}</span>`).join("")}</div>`
         : "";
       items.push(`<li class="st g-${stage.group}" style="--i:${i}" data-index="${k}" draggable="true">
         <div class="st-head"><code>${esc(stage.code)}</code>${tools}</div>
@@ -803,7 +813,7 @@
     items.push(`<li class="pipe-link" aria-hidden="true"><span>&gt;&gt;</span></li>`);
     items.push(`<li class="st st-result" style="--i:${last}">
       <div class="st-head"><code>result.</code></div>
-      <span class="st-name">${failed ? "エラーで止まりました" : "名前を付けて、できあがり"}</span>
+      <span class="st-name">${failed ? L("エラーで止まりました", "Stopped by an error") : L("名前を付けて、できあがり", "Named. Done!")}</span>
       <div class="st-out">${failed ? '<span class="ball big">—</span>' : Array.isArray(value) ? balls(value, last) : '<span class="flap" id="labFlap"></span>'}</div>
     </li>`);
     track.innerHTML = items.join("");
@@ -845,7 +855,7 @@
     track("pc_lp_lab_add", button.dataset.add);
     renderLab(lab.stages.length);
     burstAt(button, 0.6);
-    if (lab.stages.length >= MAX_STAGES) toast(`ブロックは ${MAX_STAGES} こまでです`);
+    if (lab.stages.length >= MAX_STAGES) toast(L(`ブロックは ${MAX_STAGES} こまでです`, `Up to ${MAX_STAGES} blocks`));
   });
   let labBusy = false;
   $("#labTrack").addEventListener("click", async (event) => {
@@ -914,7 +924,7 @@
   let holdTimer = 0;
   async function clearAll() {
     if (labBusy) return;
-    if (!lab.stages.length) { toast("外すブロックがありません", "info", 1600); return; }
+    if (!lab.stages.length) { toast(L("外すブロックがありません", "No blocks to remove"), "info", 1600); return; }
     labBusy = true;
     track("pc_lp_lab_clear");
     const cards = $$("#labTrack .st[data-index]");
@@ -939,7 +949,7 @@
   ["pointerup", "pointerleave", "pointercancel"].forEach((type) => clearBtn.addEventListener(type, () => {
     if (!holdTimer) return;
     holdStop();
-    toast("長押しすると、ぜんぶ外せます", "info", 1800);
+    toast(L("長押しすると、ぜんぶ外せます", "Press and hold to remove them all"), "info", 1800);
   }));
   clearBtn.addEventListener("click", (event) => { if (event.detail === 0) clearAll(); });
   clearBtn.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -963,7 +973,7 @@
     const r = fizz(n);
     const shown = expectedFb[i];
     const label = typeof shown === "string" ? shown : "";
-    return `<button class="tile ${r.cls}" type="button" data-n="${n}" aria-pressed="false" aria-label="${n}：${typeof shown === "string" ? shown : "そのまま"}"><span>${n}${label ? `<small>${esc(label)}</small>` : ""}</span></button>`;
+    return `<button class="tile ${r.cls}" type="button" data-n="${n}" aria-pressed="false" aria-label="${n}${L("：", ": ")}${typeof shown === "string" ? shown : L("そのまま", "the number")}"><span>${n}${label ? `<small>${esc(label)}</small>` : ""}</span></button>`;
   }).join("");
   let fbRun = 0;
   let fbAuto = false;
@@ -972,7 +982,7 @@
     $$("#fbTiles .tile").forEach((t) => t.setAttribute("aria-pressed", String(Number(t.dataset.n) === n)));
     $$("#fbCode .ln").forEach((l) => l.classList.remove("hit", "miss"));
     const trace = $("#fbTrace");
-    trace.innerHTML = `<div class="q">n = ${n} のとき、上から調べます</div>`;
+    trace.innerHTML = `<div class="q">${L(`n = ${n} のとき、上から調べます`, `n = ${n}: checking from the top`)}</div>`;
     const step = quick || reduced ? 0 : 260;
     for (const b of BRANCHES) {
       await wait(step);
@@ -989,7 +999,7 @@
     await wait(step);
     if (run !== fbRun) return;
     $(`#fbCode .ln[data-ln="${ELSE_LINE}"]`).classList.add("hit");
-    trace.insertAdjacentHTML("beforeend", '<div class="q">どれにも合わないので else</div><span class="ans">→<span class="flap"></span></span>');
+    trace.insertAdjacentHTML("beforeend", `<div class="q">${L("どれにも合わないので else", "No match, so else")}</div><span class="ans">→<span class="flap"></span></span>`);
     FX.flap($(".ans .flap", trace), String(n), { quick });
   }
   $("#fbTiles").addEventListener("click", (event) => {
@@ -1001,12 +1011,12 @@
   });
   function stopFbAuto() {
     fbAuto = false;
-    $("#fbPlay").lastChild.textContent = "1 から順に";
+    $("#fbPlay").lastChild.textContent = L("1 から順に", "Count from 1");
   }
   $("#fbPlay").addEventListener("click", async () => {
     if (fbAuto) { stopFbAuto(); return; }
     fbAuto = true;
-    $("#fbPlay").lastChild.textContent = "止める";
+    $("#fbPlay").lastChild.textContent = L("止める", "Stop");
     for (let n = 1; n <= 30 && fbAuto; n += 1) {
       traceFizz(n, true);
       const tile = $(`#fbTiles .tile[data-n="${n}"]`);
@@ -1050,13 +1060,13 @@
   function renderPeek() {
     let html = `<span class="seg">${highlight(peek.parts[0])}</span>`;
     peek.parts.slice(1).forEach((part, i) => {
-      html += ` <button class="peek-op" type="button" data-op="${i}" aria-pressed="${peekOn[i]}" aria-label="${i + 1} 番目の >> を ${peekOn[i] ? ">>" : ">?>"} にする">${peekOn[i] ? "&gt;?&gt;" : "&gt;&gt;"}</button> <span class="seg">${highlight(part)}</span>`;
+      html += ` <button class="peek-op" type="button" data-op="${i}" aria-pressed="${peekOn[i]}" aria-label="${L(`${i + 1} 番目の >> を ${peekOn[i] ? ">>" : ">?>"} にする`, `Make operator ${i + 1} ${peekOn[i] ? ">>" : ">?>"}`)}">${peekOn[i] ? "&gt;?&gt;" : "&gt;&gt;"}</button> <span class="seg">${highlight(part)}</span>`;
     });
     $("#peekCode").innerHTML = html;
     const lines = peek.lines.filter((_, i) => peekOn[i]);
     $("#peekOut").innerHTML = lines.length
       ? lines.map((l) => `<span class="warn">${esc(l.slice(0, l.indexOf("]") + 1))}</span>${esc(l.slice(l.indexOf("]") + 1))}`).join("\n")
-      : '<span class="dim">（何も表示されません。&gt;&gt; をタップしてみよう）</span>';
+      : `<span class="dim">${L("（何も表示されません。&gt;&gt; をタップしてみよう）", "(Nothing is shown. Try tapping a &gt;&gt;)")}</span>`;
   }
   $("#peekCode").addEventListener("click", (event) => {
     const op = event.target.closest("[data-op]");
@@ -1097,8 +1107,8 @@
       <span class="ff-step ${num.error ? "swap" : "skip"}">0</span><span class="ff-arrow">&gt;&gt;</span>
       <span class="ff-step swap">age = ${esc(String(age))}</span>
       <p class="ff-note">${num.error
-        ? `<span class="err">${esc(localize(num.error))}</span><br>エラーが起きたので、<code>0</code> に差し替えて進みました。`
-        : "エラーは起きませんでした。<code>&gt;!&gt;</code> の右の <code>0</code> は使われません。"}</p>`;
+        ? `<span class="err">${esc(localize(num.error))}</span><br>${L("エラーが起きたので、<code>0</code> に差し替えて進みました。", "An error happened, so it switched to <code>0</code> and kept going.")}`
+        : L("エラーは起きませんでした。<code>&gt;!&gt;</code> の右の <code>0</code> は使われません。", "No error, so the <code>0</code> after <code>&gt;!&gt;</code> isn't used.")}</p>`;
   }
   $("#fallbackInput").maxLength = 24;
   $("#fallbackInput").addEventListener("input", renderFallback);
@@ -1113,7 +1123,7 @@
   // Fork
   const forkNums = [3, 8, 4];
   $("#forkInputs").innerHTML = forkNums.map((n, i) => `
-    <span class="num-step"><button type="button" data-fork="${i}" data-d="-1" aria-label="${i + 1} 番目を 1 へらす">−</button><output id="forkN${i}">${n}</output><button type="button" data-fork="${i}" data-d="1" aria-label="${i + 1} 番目を 1 ふやす">＋</button></span>`).join("");
+    <span class="num-step"><button type="button" data-fork="${i}" data-d="-1" aria-label="${L(`${i + 1} 番目を 1 へらす`, `Decrease number ${i + 1}`)}">−</button><output id="forkN${i}">${n}</output><button type="button" data-fork="${i}" data-d="1" aria-label="${L(`${i + 1} 番目を 1 ふやす`, `Increase number ${i + 1}`)}">＋</button></span>`).join("");
   function renderFork(changed = false) {
     const total = forkNums.reduce((a, b) => a + b, 0);
     const avg = total / forkNums.length;
@@ -1167,7 +1177,7 @@
 
   // Errors
   const errors = DATA.errors;
-  $("#errorChips").innerHTML = [`<button class="chip" type="button" data-err="" aria-pressed="true">正しいコード</button>`]
+  $("#errorChips").innerHTML = [`<button class="chip" type="button" data-err="" aria-pressed="true">${L("正しいコード", "Correct code")}</button>`]
     .concat(errors.cases.map((c) => `<button class="chip" type="button" data-err="${c.id}" aria-pressed="false">${esc(c.label)}</button>`)).join("");
   function renderError(id) {
     const c = errors.cases.find((x) => x.id === id);
@@ -1245,7 +1255,7 @@
 
   $("#tryExamples").innerHTML = DATA.examples.map((ex) => `
     <button class="ex-btn" type="button" data-ex="${ex.id}" aria-pressed="${ex.id === currentExample}">
-      <span class="em" aria-hidden="true">${ex.emoji}</span>${esc(ex.label)}${ex.interactive ? "<small>入力あり</small>" : ""}
+      <span class="em" aria-hidden="true">${ex.emoji}</span>${esc(ex.label)}${ex.interactive ? `<small>${L("入力あり", "asks you")}</small>` : ""}
     </button>`).join("");
   function loadExample(id) {
     const ex = DATA.examples.find((e) => e.id === id);
@@ -1261,7 +1271,7 @@
     const b = event.target.closest("[data-ex]");
     if (!b) return;
     loadExample(b.dataset.ex);
-    consoleEl.innerHTML = '<p class="console-hint">「実行」を押してみよう。</p>';
+    consoleEl.innerHTML = `<p class="console-hint">${L("「実行」を押してみよう。", "Press Run.")}</p>`;
   });
   loadExample(currentExample);
 
@@ -1277,21 +1287,21 @@
   function ensureWorker() {
     if (worker) return;
     ready = false;
-    setStatus("loading", "準備中…");
+    setStatus("loading", L("準備中…", "Loading…"));
     try {
-      worker = new Worker("playground-worker.js");
+      worker = new Worker(rootUrl("playground-worker.js"));
     } catch (error) {
-      setStatus("error", "準備できませんでした");
-      line(esc(`この画面では動かせませんでした（${error.message}）。Playground で試してください。`), "out-line out-err");
+      setStatus("error", L("準備できませんでした", "Couldn't load"));
+      line(esc(L(`この画面では動かせませんでした（${error.message}）。Playground で試してください。`, `Couldn't run it here (${error.message}). Please try the Playground.`)), "out-line out-err");
       worker = null;
       return;
     }
     worker.addEventListener("message", onWorkerMessage);
     worker.addEventListener("error", () => {
-      setStatus("error", "準備できませんでした");
-      toast("準備できませんでした", "err", 2600);
+      setStatus("error", L("準備できませんでした", "Couldn't load"));
+      toast(L("準備できませんでした", "Couldn't load"), "err", 2600);
       finishRun();
-      line("実行環境を読み込めませんでした。ネットワークを確かめて、もう一度押してください。", "out-line out-err");
+      line(L("実行環境を読み込めませんでした。ネットワークを確かめて、もう一度押してください。", "Couldn't load the runtime. Check your connection and press Run again."), "out-line out-err");
       worker?.terminate();
       worker = null;
     });
@@ -1301,17 +1311,17 @@
     const msg = event.data || {};
     if (msg.type === "ready") {
       ready = true;
-      setStatus("ready", "準備OK");
+      setStatus("ready", L("準備OK", "Ready"));
       if (pendingRun) {
         const src = pendingRun;
         pendingRun = null;
         startRun(src);
       }
     } else if (msg.type === "boot-error") {
-      setStatus("error", "準備できませんでした");
-      toast("準備できませんでした", "err", 2600);
+      setStatus("error", L("準備できませんでした", "Couldn't load"));
+      toast(L("準備できませんでした", "Couldn't load"), "err", 2600);
       finishRun();
-      line(esc(`実行環境を読み込めませんでした（${msg.message}）。ネットワークを確かめて、もう一度押してください。`), "out-line out-err");
+      line(esc(L(`実行環境を読み込めませんでした（${msg.message}）。ネットワークを確かめて、もう一度押してください。`, `Couldn't load the runtime (${msg.message}). Check your connection and press Run again.`)), "out-line out-err");
       worker?.terminate();
       worker = null;
     } else if (msg.type === "stream") {
@@ -1323,9 +1333,10 @@
     } else if (msg.type === "result") {
       $(".loading-line", consoleEl)?.remove();
       if (!msg.ok && msg.error) line(esc(localize(msg.error)), "out-line out-err");
-      line(esc(`${msg.ok ? "おわり" : "止まりました"}（${msg.elapsedMs ?? 0} ms）`), "out-line out-meta");
-      setStatus(msg.ok ? "done" : "error", msg.ok ? "できた！" : "エラー");
-      toast(msg.ok ? `できた！ ${msg.elapsedMs ?? 0} ms` : "エラーで止まりました", msg.ok ? "ok" : "err", 2600);
+      const ms = msg.elapsedMs ?? 0;
+      line(esc(EN ? `${msg.ok ? "Done" : "Stopped"} (${ms} ms)` : `${msg.ok ? "おわり" : "止まりました"}（${ms} ms）`), "out-line out-meta");
+      setStatus(msg.ok ? "done" : "error", msg.ok ? L("できた！", "Done!") : L("エラー", "Error"));
+      toast(msg.ok ? L(`できた！ ${ms} ms`, `Done! ${ms} ms`) : L("エラーで止まりました", "Stopped by an error"), msg.ok ? "ok" : "err", 2600);
       if (msg.ok) burstAt($("#tryRun"), 0.6);
       finishRun();
     }
@@ -1334,7 +1345,7 @@
   function askInput(id, prompt) {
     const row = document.createElement("form");
     row.className = "out-input";
-    row.innerHTML = `<span>${esc(prompt)}</span><input type="text" aria-label="${esc(prompt || "入力")}" autocomplete="off"><button class="btn btn-small btn-yellow" type="submit">送る</button>`;
+    row.innerHTML = `<span>${esc(prompt)}</span><input type="text" aria-label="${esc(prompt || L("入力", "Input"))}" autocomplete="off"><button class="btn btn-small btn-yellow" type="submit">${L("送る", "Send")}</button>`;
     consoleEl.appendChild(row);
     consoleEl.scrollTop = consoleEl.scrollHeight;
     const input = $("input", row);
@@ -1357,8 +1368,8 @@
     running = true;
     $("#tryRun").disabled = true;
     $("#tryStop").hidden = false;
-    setStatus("running", "実行中…");
-    toast("PopCorn を実行中…", "run", 0);
+    setStatus("running", L("実行中…", "Running…"));
+    toast(L("PopCorn を実行中…", "Running PopCorn…"), "run", 0);
     worker.postMessage({ type: "run", source });
   }
 
@@ -1375,9 +1386,9 @@
     } else {
       running = true;
       pendingRun = editor.value;
-      const lanes = [["Python を起こす", "#ffd23f", "1.9s", "0s"], ["PopCorn を読む", "#ff4f8b", "1.4s", ".3s"], ["ポップの準備", "#2ed3a0", "2.4s", ".15s"]];
-      line(`ポップコーンをあたためています…（はじめの 1 回だけ、少し時間がかかります）<span class="race" aria-hidden="true">${lanes.map(([name, color, dur, delay]) => `<span class="lane"><span>${name}</span><i style="--lc:${color};--ld:${dur};--lw:${delay}"></i></span>`).join("")}</span>`, "out-line out-meta loading-line");
-      toast("PopCorn を準備中…", "run", 0);
+      const lanes = [[L("Python を起こす", "Waking Python"), "#ffd23f", "1.9s", "0s"], [L("PopCorn を読む", "Reading PopCorn"), "#ff4f8b", "1.4s", ".3s"], [L("ポップの準備", "Heating the pan"), "#2ed3a0", "2.4s", ".15s"]];
+      line(`${L("ポップコーンをあたためています…（はじめの 1 回だけ、少し時間がかかります）", "Warming up the popcorn… (only the first run takes a moment)")}<span class="race" aria-hidden="true">${lanes.map(([name, color, dur, delay]) => `<span class="lane"><span>${name}</span><i style="--lc:${color};--ld:${dur};--lw:${delay}"></i></span>`).join("")}</span>`, "out-line out-meta loading-line");
+      toast(L("PopCorn を準備中…", "Getting PopCorn ready…"), "run", 0);
     }
   }
   $("#tryRun").addEventListener("click", runTry);
@@ -1388,16 +1399,22 @@
     pendingRun = null;
     finishRun();
     $(".loading-line", consoleEl)?.remove();
-    line("止めました。もう一度「実行」を押すと、準備からやり直します。", "out-line out-meta");
-    toast("止めました", "info", 1600);
-    setStatus("idle", "止めました");
+    line(L("止めました。もう一度「実行」を押すと、準備からやり直します。", "Stopped. Press Run again to start over."), "out-line out-meta");
+    toast(L("止めました", "Stopped"), "info", 1600);
+    setStatus("idle", L("止めました", "Stopped"));
   });
   $("#tryOpen").addEventListener("click", () => track("pc_lp_open", "try"));
 
   /* ---------- 07 learn ---------- */
   const robot = $("#robot");
   const bubble = $("#robotBubble");
-  const ROBOT_LINES = [
+  const ROBOT_LINES = EN ? [
+    "PopCorn reads left to right. That's it!",
+    "If you make a mistake, I'll give you a hint.",
+    "Learn Map and Filter, and you're a pro!",
+    "Errors aren't scary. I'll explain them.",
+    "How many kernels have you popped?",
+  ] : [
     "PopCorn は、左から右へ読むだけ！",
     "まちがえても、ぼくがヒントを出すよ。",
     "Map と Filter を覚えたら、もう一人前！",
@@ -1427,7 +1444,7 @@
     if (!b) return;
     const l = DATA.lessons[Number(b.dataset.lesson)];
     $$("#lessons .lesson").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    say(`レッスン ${l.badge}「${l.title}」。${l.intro.replace(/`/g, "")}`);
+    say(EN ? `Lesson ${l.badge}: “${l.title}”. ${l.intro.replace(/`/g, "")}` : `レッスン ${l.badge}「${l.title}」。${l.intro.replace(/`/g, "")}`);
     track("pc_lp_lesson", l.badge);
   });
   if (!reduced) {
@@ -1456,9 +1473,9 @@
     const text = $(`#${b.dataset.copy}`).textContent;
     try {
       await navigator.clipboard.writeText(text);
-      toast("コピーしました", "ok", 1800);
+      toast(L("コピーしました", "Copied"), "ok", 1800);
     } catch {
-      toast("コピーできませんでした。選んでコピーしてください", "err");
+      toast(L("コピーできませんでした。選んでコピーしてください", "Couldn't copy. Please select it and copy."), "err");
     }
   });
 
@@ -1481,5 +1498,5 @@
     if (document.fonts?.ready) document.fonts.ready.then(() => pitApi.measure());
   }
 
-  $$('a[href^="playground/"]').forEach((a) => a.addEventListener("click", () => track("pc_lp_cta", a.closest("section, header, footer")?.id || "nav")));
+  $$('a[href$="playground/"]').forEach((a) => a.addEventListener("click", () => track("pc_lp_cta", a.closest("section, header, footer")?.id || "nav")));
 })();

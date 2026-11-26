@@ -6,6 +6,7 @@ on:
     paths:
       - "index.html"
       - "lp/**"
+      - "en/**"
       - "playground/**"
       - "itya-theme.css"
       - "popcorn-icons.js"
@@ -46,7 +47,7 @@ jobs:
         run: |
           mkdir _site
           cp index.html playground.css popcorn-visual.css itya-theme.css playground.js playground-worker.js popcorn-formatter.js popcorn-localization.js popcorn-icons.js popcorn-logo.png favicon.png popcorn-ogp.png _site/
-          cp -r lp playground _site/
+          cp -r lp playground en _site/
           cp popcorn_specification.md _site/
           touch _site/.nojekyll
           python tools/build_playground_runtime.py _site/popcorn-runtime.zip

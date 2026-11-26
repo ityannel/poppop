@@ -1995,3 +1995,46 @@ b { font-weight: 800; }
 .footer-bgm { grid-column: 1 / -1; margin: 0; color: #aeb9e0; font-size: 12.5px; }
 .footer-bgm a { color: #fff; text-decoration-color: var(--yellow); text-underline-offset: 3px; }
 .footer-bgm .credit-sep { color: #6f7aa6; }
+
+/* 言語の切り替え（日本語 ⇄ English） */
+.lang-link {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border: var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+  font: 700 13px/1 var(--mono);
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.lang-link:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.lang-link:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+
+/* 遊び方の札は、番号の丸（.eyebrow span）の形を受け継がない */
+.section-head .eyebrow .hows {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+}
+.section-head .eyebrow .hows .how {
+  display: inline-flex;
+  width: auto;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 800 12px/1 var(--jp);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.section-head .eyebrow .hows .sr-only { width: 1px; height: 1px; border: 0; box-shadow: none; background: none; }
