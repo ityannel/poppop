@@ -348,6 +348,16 @@
     `<li class="hero-line"><span class="rider" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#i-pop"/></svg></span><code>${highlight(line)}</code><span class="val">${esc(DATA.hero.values[i])}</span></li>`
   )).join("");
   const heroItems = $$(".hero-line", heroLines);
+  heroLines.insertAdjacentHTML("afterend", '<p class="hero-readout" id="heroReadout" aria-hidden="true"><span>はじめの値</span><b></b></p>');
+  const heroReadout = $("#heroReadout");
+  function showReadout(i) {
+    heroReadout.classList.toggle("last", i === heroItems.length - 1);
+    heroReadout.classList.toggle("bump", false);
+    void heroReadout.offsetWidth;
+    heroReadout.classList.toggle("bump", true);
+    $("span", heroReadout).textContent = i === 0 ? "はじめの値" : `${i + 1} 行目を通ったあと`;
+    $("b", heroReadout).textContent = DATA.hero.values[i];
+  }
   let heroRun = 0;
   let heroVisible = false;
   async function playHero() {
@@ -355,6 +365,7 @@
     heroItems.forEach((li) => li.classList.remove("on", "shown"));
     if (reduced) {
       heroItems.forEach((li) => li.classList.add("shown"));
+      showReadout(heroItems.length - 1);
       return;
     }
     await wait(400);
@@ -362,10 +373,12 @@
       if (run !== heroRun) return;
       heroItems.forEach((li, j) => li.classList.toggle("on", j === i));
       heroItems[i].classList.add("shown");
+      showReadout(i);
       await wait(i === heroItems.length - 1 ? 300 : 950);
     }
     if (run !== heroRun) return;
-    burstAt($(".val", heroItems[heroItems.length - 1]), 0.5);
+    const lastVal = $(".val", heroItems[heroItems.length - 1]);
+    burstAt(lastVal.offsetParent ? lastVal : $("b", heroReadout), 0.5);
     await wait(3200);
     if (run === heroRun && heroVisible) playHero();
   }
