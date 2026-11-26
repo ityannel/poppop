@@ -1994,3 +1994,4 @@ b { font-weight: 800; }
 
 .footer-bgm { grid-column: 1 / -1; margin: 0; color: #aeb9e0; font-size: 12.5px; }
 .footer-bgm a { color: #fff; text-decoration-color: var(--yellow); text-underline-offset: 3px; }
+.footer-bgm .credit-sep { color: #6f7aa6; }

@@ -170,6 +170,7 @@
     store.set("popcorn.lp.sound", soundOn ? "1" : "0");
     soundToggle.setAttribute("aria-pressed", String(soundOn));
     if (soundOn) {
+      popFetch();
       playSound(1);
       if (BGM) bgmPlay(true);
       else toast("ポップの音：オン", "sound", 1600);
@@ -186,14 +187,61 @@
   let bgmGain = null;
   let bgmTimer = 0;
   let bgmRamp = 0;
-  if (BGM) {
-    soundToggle.title = "音（BGM とポップ）";
-    $(".sr-only", soundToggle).textContent = "音（BGM とポップ）";
+  const POP = DATA.popSound && DATA.popSound.src && DATA.popSound.count ? DATA.popSound : null;
+  if (BGM || (POP && POP.credit)) {
     const credit = $("#bgmCredit");
     const link = (text, url) => (url ? `<a href="${esc(url)}" rel="noopener">${esc(text)}</a>` : esc(text));
-    credit.innerHTML = `BGM：「${esc(BGM.title)}」${link(BGM.author, BGM.authorUrl)}${BGM.license ? `（${link(BGM.license, BGM.licenseUrl)}）` : ""}`;
+    const parts = [];
+    if (BGM) {
+      soundToggle.title = "音（BGM とポップ）";
+      $(".sr-only", soundToggle).textContent = "音（BGM とポップ）";
+      parts.push(`BGM：「${esc(BGM.title)}」${link(BGM.author, BGM.authorUrl)}${BGM.license ? `（${link(BGM.license, BGM.licenseUrl)}）` : ""}`);
+    }
+    if (POP && POP.credit) parts.push(`ポップの音：${link(POP.credit, POP.creditUrl)}`);
+    credit.innerHTML = parts.join("<span class=\"credit-sep\"> ／ </span>");
     credit.hidden = false;
   }
+
+  /* ---------- ポップの音：録音した粒を、はじけるたびにランダムに鳴らす ---------- */
+  let popBytes = null;
+  let popBuf = null;
+  let popDecoding = false;
+  let popLast = 0;
+
+  function popFetch() {
+    if (!POP || popBytes) return;
+    popBytes = fetch(POP.src)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+  }
+
+  function popDecode() {
+    if (!POP || popBuf || popDecoding || !audio) return;
+    popDecoding = true;
+    popFetch();
+    popBytes.then((bytes) => {
+      if (!bytes) return;
+      try {
+        audio.decodeAudioData(bytes, (buf) => { popBuf = buf; }, () => {});
+      } catch { /* 読めない形式なら、合成の音のまま */ }
+    });
+  }
+
+  function popSample(power) {
+    const now = audio.currentTime;
+    if (now - popLast < 0.028) return;
+    popLast = now;
+    const i = Math.floor(Math.random() * POP.count);
+    const src = audio.createBufferSource();
+    const g = audio.createGain();
+    src.buffer = popBuf;
+    src.playbackRate.value = 0.88 + Math.random() * 0.26 + 0.06 * power;
+    g.gain.value = Math.min(1, 0.5 + 0.35 * power);
+    src.connect(g).connect(audio.destination);
+    src.start(now, i * POP.step, POP.step * 0.92);
+  }
+
+  if (soundOn) popFetch();
 
   function bgmSetup() {
     if (bgmEl) return;
@@ -275,6 +323,11 @@
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === "suspended") audio.resume();
+      popDecode();
+      if (popBuf) {
+        popSample(power);
+        return;
+      }
       const t = audio.currentTime;
       const osc = audio.createOscillator();
       const gain = audio.createGain();

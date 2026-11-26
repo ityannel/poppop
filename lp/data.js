@@ -400,5 +400,12 @@ window.POPCORN_LP = {
     "authorUrl": "",
     "license": "",
     "licenseUrl": ""
+  },
+  "popSound": {
+    "src": "",
+    "step": 0.25,
+    "count": 0,
+    "credit": "",
+    "creditUrl": ""
   }
 };
