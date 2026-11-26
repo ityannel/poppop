@@ -166,7 +166,7 @@
   }
 
   let audio = null;
-  let soundOn = store.get("popcorn.lp.sound") === "1";
+  let soundOn = false;
 
   /* 音量は 0〜8 の 8 段。6 がふつう */
   const VOLUME_STEPS = 8;
@@ -192,7 +192,6 @@
   soundToggle.setAttribute("aria-pressed", String(soundOn));
   soundToggle.addEventListener("click", () => {
     soundOn = !soundOn;
-    store.set("popcorn.lp.sound", soundOn ? "1" : "0");
     soundToggle.setAttribute("aria-pressed", String(soundOn));
     if (soundOn) {
       popFetch();
@@ -384,7 +383,7 @@
     } catch { /* 音が出せなくても、動く */ }
   }
 
-  /* ---------- はじめに：音を出すかを聞く（答えは覚える。?sound-check で、もう一度出す） ---------- */
+  /* ---------- 開くたびに、音を出すかを聞く（音量だけは覚えておく） ---------- */
   const PIXELS = {
     corn: [
       "........kkkk........",
@@ -458,7 +457,7 @@
     return `<svg class="${className}" viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
   }
 
-  if (store.get("popcorn.lp.sound") === null || new URLSearchParams(location.search).has("sound-check")) openGate();
+  openGate();
 
   function openGate() {
     const title = L("音が出ますが、よろしいですか？", "This site has sound. Is that OK?");
@@ -532,7 +531,6 @@
 
     function finish(on) {
       soundOn = on;
-      store.set("popcorn.lp.sound", on ? "1" : "0");
       soundToggle.setAttribute("aria-pressed", String(on));
       track("pc_lp_sound_gate", on ? "yes" : "no");
       if (on) {

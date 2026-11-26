@@ -88,10 +88,9 @@ The site has two pages:
   output checked against the real interpreter. The examples and the optional
   background music credit live in `lp/data.js`. The 3D pipe at the top is
   `lp/hero3d.js`, built on three.js (`lp/vendor/`, MIT). It is skipped when
-  WebGL is missing or the visitor prefers reduced motion. The first visit asks
-  whether to play sound and remembers the answer; add `?sound-check` to the
-  URL to see that screen again. The symbol background of the last blue band
-  is `lp/field.js`.
+  WebGL is missing or the visitor prefers reduced motion. Every visit starts
+  by asking whether to play sound (only the volume is remembered). The symbol
+  background of the last blue band is `lp/field.js`.
   Sound files are in `lp/audio/`: the background music "Jazz Brunch" by Kevin
   MacLeod (incompetech.com, CC BY 4.0) and a sprite of 12 single pops (0.25 s
   each) cut from "Pop-Corn: Corn bursting" on BigSoundBank (CC0). Both credits
