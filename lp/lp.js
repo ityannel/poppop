@@ -11,6 +11,36 @@
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  /* 中身が変わって高さが変わる箱を、ぱっと変えずに、なめらかに伸び縮みさせる */
+  function smoothHeight(el, ms = 320) {
+    if (!el || reduced || !window.ResizeObserver || !window.MutationObserver) return;
+    let from = el.getBoundingClientRect().height;
+    let timer = 0;
+    new ResizeObserver(() => { from = el.getBoundingClientRect().height; }).observe(el);
+    new MutationObserver(() => {
+      const start = from;
+      el.style.transition = "none";
+      el.style.height = "auto";
+      const to = el.getBoundingClientRect().height;
+      if (!start || !to || Math.abs(to - start) < 2) {
+        el.style.transition = "";
+        el.style.height = "";
+        return;
+      }
+      el.style.height = `${start}px`;
+      el.getBoundingClientRect();
+      el.classList.add("is-growing");
+      el.style.transition = `height ${ms}ms cubic-bezier(.2, .8, .2, 1)`;
+      el.style.height = `${to}px`;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        el.style.transition = "";
+        el.style.height = "";
+        el.classList.remove("is-growing");
+      }, ms + 60);
+    }).observe(el, { childList: true, subtree: true, characterData: true });
+  }
+
   const track = (name, v) => {
     try { window.itya?.track(name, v === undefined ? undefined : { v: String(v).slice(0, 60) }); } catch { /* 計測で、動作を止めない */ }
   };
@@ -1371,6 +1401,7 @@
     $("#forkCode").innerHTML = highlight(`${fmt(forkNums)} >> Fork(Sum, Average, Max - Min) >> (total, avg, spread).`);
     $("#forkTree").innerHTML = [["Sum", "total", total], ["Average", "avg", avg], ["Max - Min", "spread", spread]]
       .map(([code, name, v]) => `<div class="fork-leaf${changed ? " bump" : ""}"><code>${code}</code><b>${esc(fmt(v))}</b><span>${name}</span></div>`).join("");
+    $$("#forkTree .fork-leaf").forEach((leaf) => leaf.style.setProperty("--n", String(Math.max(4, $("b", leaf).textContent.length))));
   }
   $("#forkInputs").addEventListener("click", (event) => {
     const b = event.target.closest("[data-fork]");
@@ -1737,6 +1768,8 @@
     $("#finaleHint").hidden = false;
     if (document.fonts?.ready) document.fonts.ready.then(() => pitApi.measure());
   }
+
+  ["#labTrack", "#labCode", ".tool-box"].forEach((selector) => smoothHeight($(selector)));
 
   $$('a[href$="playground/"]').forEach((a) => a.addEventListener("click", () => track("pc_lp_cta", a.closest("section, header, footer")?.id || "nav")));
 })();

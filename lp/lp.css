@@ -2576,3 +2576,27 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
 .try .lead b { padding: 0 .3em; background: var(--yellow); color: var(--ink); }
 .ide-main { box-shadow: 8px 8px 0 var(--pink), 0 34px 40px -10px rgb(70 40 10 / 60%); }
 .ex-btn { box-shadow: 3px 3px 0 rgb(19 32 74 / 55%); }
+
+/* ---------- 大きさが変わる所：先に場所を取るか、なめらかに伸ばす ---------- */
+.tool-box { display: grid; grid-template-columns: minmax(0, 1fr); }
+.tool-tabs { grid-row: 1; grid-column: 1; }
+.tool-panel, .tool-panel[hidden] { display: grid; grid-row: 2; grid-column: 1; align-content: start; }
+.tool-panel[hidden] { display: grid !important; visibility: hidden; pointer-events: none; }
+.tool-text h3, .section-head h2 { text-wrap: balance; }
+.is-growing { overflow: clip; overflow-clip-margin: 14px; }
+
+.num-step output { width: 44px; min-width: 0; }
+.fork-leaf { container-type: inline-size; }
+.fork-leaf b {
+  overflow: hidden;
+  font-size: clamp(11px, calc(100cqi / (var(--n, 6) * .66)), 20px);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.fb-trace { min-height: 200px; }
+#fbPlay { min-width: 132px; justify-content: center; }
+
+.robot-bubble { display: flex; align-items: center; justify-content: center; min-height: 140px; }
+@media (min-width: 700px) { .robot-bubble { min-height: 114px; } }
