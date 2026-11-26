@@ -53,16 +53,9 @@ function start() {
     return group;
   }
 
-  /* ---------- 粒（しずく形を回して作る） ---------- */
-  const kernelProfile = [];
-  for (let i = 0; i <= 24; i += 1) {
-    const t = i / 24;
-    const r = Math.pow(Math.sin(Math.PI * t), 0.62) * (1 - 0.58 * t * t) * 0.2 + 0.0001;
-    kernelProfile.push(new THREE.Vector2(r, (t - 0.5) * 0.5));
-  }
-  const kernelGeometry = new THREE.LatheGeometry(kernelProfile, 28);
-  const KERNEL_COLD = new THREE.Color(0xffd23f);
-  const KERNEL_HOT = new THREE.Color(0xff6a1c);
+  /* ---------- 粒（写真）。熱くなると赤みがかる ---------- */
+  const KERNEL_COLD = new THREE.Color(0xffffff);
+  const KERNEL_HOT = new THREE.Color(0xff8a5c);
 
   /* ---------- ガラスの管：ふちだけ濃く、中は透ける ---------- */
   const glass = new THREE.ShaderMaterial({
@@ -167,6 +160,22 @@ function start() {
     return tex;
   });
 
+  const KERNEL_ASPECT = [213, 199, 200, 174, 193, 182, 189, 206, 203, 197, 193, 220, 190, 202, 203].map((w) => w / 240);
+  const kernelTextures = KERNEL_ASPECT.map((_, i) => {
+    const tex = loader.load(new URL(`./img/kernel/kernel-${String(i + 1).padStart(2, "0")}.webp`, import.meta.url).href);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.userData.keep = true;
+    return tex;
+  });
+  const bucketBackTex = loader.load(new URL("./img/skeuo/bucket.webp", import.meta.url).href);
+  const bucketFrontTex = loader.load(new URL("./img/skeuo/bucket-front.webp", import.meta.url).href);
+  [bucketBackTex, bucketFrontTex].forEach((tex) => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.userData.keep = true;
+  });
+  const BUCKET_ASPECT = 520 / 705;
+  let bucket = null;
+
   /* ---------- 画面の大きさと、管の通り道 ---------- */
   const RINGS = [
     { at: 0.34, atNarrow: 0.2, color: 0xff4f8b, label: ">>", bg: "#ff4f8b", fg: "#ffffff" },
@@ -200,8 +209,8 @@ function start() {
     pipeGroup.children.slice().forEach((child) => {
       pipeGroup.remove(child);
       child.traverse((o) => {
-        if (o.geometry && o.geometry !== kernelGeometry) o.geometry.dispose();
-        if (o.material && o.material.map && o.material.map !== popTexture) o.material.map.dispose();
+        if (o.geometry && !o.isSprite) o.geometry.dispose();
+        if (o.material && o.material.map && o.material.map !== popTexture && !o.material.map.userData.keep) o.material.map.dispose();
       });
     });
     ringObjects = [];
@@ -218,9 +227,16 @@ function start() {
     narrow = W < 980;
     R = px(narrow ? 12 : 18);
     const side = Math.min(Rt + (narrow ? 4 : 30), W - (narrow ? 18 : 34));
-    const cap = $caption();
-    const capRight = cap ? cap.right - hr.left : L;
-    const capBottom = cap ? cap.bottom - hr.top : B + 40;
+    const tray = hero.querySelector(".tray");
+    const tr = tray ? tray.getBoundingClientRect() : null;
+    const trayRight = tr ? tr.right - hr.left : W * 0.6;
+    const trayBottom = tr ? tr.bottom - hr.top : H - 40;
+    const fy = narrow ? H - 10 : Math.min(H - 4, trayBottom + 6);
+    const Hbs = narrow ? THREE.MathUtils.clamp(112 + (W - 400) * 0.14, 112, 160) : THREE.MathUtils.clamp(190 + (W - 1024) * 0.134, 176, 236);
+    const bwS = Hbs * BUCKET_ASPECT;
+    const bxS = narrow ? W - 6 - bwS / 2 : Math.min(W - 12 - bwS / 2, side + 10);
+    const bTopS = fy - Hbs;
+    const endY = Math.max(B + 24, bTopS + 0.12 * Hbs);
     let pts;
     if (!narrow) {
       pts = [
@@ -229,15 +245,14 @@ function start() {
         toWorld(side, T + 60, 0.5),
         toWorld(side + 6, T + (B - T) * 0.62, 0.6),
         toWorld(side - 10, B + 16, 0.5),
-        toWorld(Math.max(capRight + 70, Rt - (Rt - L) * 0.42), capBottom + 6, 0.3),
+        toWorld(bxS, endY, 0.3),
       ];
     } else {
       pts = [
         toWorld(W + 50, T + (B - T) * 0.22, 0),
         toWorld(side, T + (B - T) * 0.48, 0.2),
         toWorld(side, B + 24, 0.3),
-        toWorld(side, H - 96, 0.3),
-        toWorld(W - 70, H - 36, 0.2),
+        toWorld(bxS, endY, 0.3),
       ];
     }
     curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
@@ -281,16 +296,19 @@ function start() {
 
     const [hw] = halfAt(0);
     wallR = hw - px(14);
-    const tray = hero.querySelector(".tray");
-    const tr = tray ? tray.getBoundingClientRect() : null;
-    const trayRight = tr ? tr.right - hr.left : W * 0.6;
-    const trayBottom = tr ? tr.bottom - hr.top : H - 40;
-    floorY = toWorld(0, narrow ? H - 10 : Math.min(H - 4, trayBottom + 6), 0).y;
+    floorY = toWorld(0, fy, 0).y;
     wallL = toWorld(narrow ? 6 : Math.max(trayRight + 24, L), 0, 0).x;
-  }
-  function $caption() {
-    const c = hero.querySelector(".hero-caption");
-    return c ? c.getBoundingClientRect() : null;
+
+    const Hb0 = px(Hbs);
+    const Wb0 = Hb0 * BUCKET_ASPECT;
+    bucket = { cx: toWorld(bxS, 0, 0).x, wI: Wb0 * 0.4, tW: Wb0 * 0.06, top: floorY + Hb0 * 0.78, base: floorY + Hb0 * 0.075 };
+    [[bucketBackTex, -px(125)], [bucketFrontTex, px(150)]].forEach(([tex, z]) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+      const h = Hb0 * ((CAM_Z - z) / CAM_Z);
+      sprite.scale.set(h * BUCKET_ASPECT, h, 1);
+      sprite.position.copy(toWorld(bxS, fy - Hbs / 2, z));
+      pipeGroup.add(sprite);
+    });
   }
 
   function resize() {
@@ -309,12 +327,13 @@ function start() {
   const kernels = [];
   let spawnIn = 0.2;
   function spawnKernel() {
-    const mat = toon(KERNEL_COLD.clone());
-    const obj = withOutline(kernelGeometry, mat, 1.14);
-    obj.scale.setScalar(px(narrow ? 22 : 30) / 0.5);
-    obj.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+    const i = Math.floor(Math.random() * kernelTextures.length);
+    const mat = new THREE.SpriteMaterial({ map: kernelTextures[i], alphaTest: 0.35, rotation: Math.random() * 6.28 });
+    const obj = new THREE.Sprite(mat);
+    const h = px(narrow ? 34 : 46);
+    obj.scale.set(h * KERNEL_ASPECT[i], h, 1);
     scene.add(obj);
-    kernels.push({ obj, mat, s: 0, speed: 0.15 + Math.random() * 0.03, spin: new THREE.Vector3(Math.random() * 3 - 1.5, Math.random() * 3 - 1.5, Math.random() * 2), passed: 0 });
+    kernels.push({ obj, mat, w: h * KERNEL_ASPECT[i], h, s: 0, speed: 0.15 + Math.random() * 0.03, spin: new THREE.Vector3(0, 0, Math.random() * 2 - 1), passed: 0 });
   }
   function removeKernel(k) {
     scene.remove(k.obj);
@@ -351,9 +370,7 @@ function start() {
   function popKernel(k, burst = true) {
     const p = k.obj.position.clone();
     const tangent = curve.getTangentAt(Math.min(1, k.s));
-    const vel = narrow
-      ? tangent.multiplyScalar(px(240)).add(new THREE.Vector3(px(-Math.random() * 160), px(140 + Math.random() * 120), px((Math.random() - 0.5) * 60)))
-      : tangent.multiplyScalar(px(260)).add(new THREE.Vector3(px((Math.random() - 0.3) * 140), px(330 + Math.random() * 170), px((Math.random() - 0.5) * 100)));
+    const vel = tangent.multiplyScalar(px(70)).add(new THREE.Vector3(px((Math.random() - 0.5) * 70), px(240 + Math.random() * 130), px((Math.random() - 0.5) * 70)));
     spawnPop(p, vel, 1.1);
     if (burst) spawnBurst(p);
     removeKernel(k);
@@ -374,9 +391,9 @@ function start() {
     const r = hero.getBoundingClientRect();
     ndc.set(((event.clientX - r.left) / r.width) * 2 - 1, -((event.clientY - r.top) / r.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const hit = raycaster.intersectObjects(kernels.map((k) => k.obj), true)[0];
+    const hit = raycaster.intersectObjects(kernels.map((k) => k.obj), false)[0];
     if (hit) {
-      const k = kernels.find((x) => x.obj === hit.object.parent);
+      const k = kernels.find((x) => x.obj === hit.object);
       if (k) popKernel(k);
     }
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -401,6 +418,33 @@ function start() {
   let visible = true;
   const tmp = new THREE.Vector3();
 
+  function collideBox(p, x0, x1, y0, y1) {
+    const pos = p.sprite.position;
+    const dx = pos.x - Math.max(x0, Math.min(x1, pos.x));
+    const dy = pos.y - Math.max(y0, Math.min(y1, pos.y));
+    const d = Math.hypot(dx, dy);
+    if (d >= p.r) return;
+    let nx = 0;
+    let ny = 0;
+    if (d > 1e-6) {
+      nx = dx / d;
+      ny = dy / d;
+      pos.x += nx * (p.r - d);
+      pos.y += ny * (p.r - d);
+    } else {
+      const edges = [[pos.x - x0, -1, 0], [x1 - pos.x, 1, 0], [pos.y - y0, 0, -1], [y1 - pos.y, 0, 1]].sort((a, b) => a[0] - b[0]);
+      [, nx, ny] = edges[0];
+      pos.x += nx * (edges[0][0] + p.r);
+      pos.y += ny * (edges[0][0] + p.r);
+    }
+    const vn = p.vel.x * nx + p.vel.y * ny;
+    if (vn < 0) {
+      p.vel.x -= 1.28 * vn * nx;
+      p.vel.y -= 1.28 * vn * ny;
+      p.vel.x *= 0.94;
+    }
+  }
+
   function step(dt) {
     spawnIn -= dt;
     if (spawnIn <= 0 && kernels.length < 7) {
@@ -415,9 +459,9 @@ function start() {
       const p = curve.getPointAt(k.s);
       const shake = heat * heat * px(6);
       k.obj.position.set(p.x + (Math.random() - 0.5) * shake, p.y + (Math.random() - 0.5) * shake, p.z);
-      k.obj.rotation.x += k.spin.x * dt * (1 + heat * 2);
-      k.obj.rotation.y += k.spin.y * dt * (1 + heat * 2);
-      k.obj.rotation.z += k.spin.z * dt;
+      k.mat.rotation += k.spin.z * dt * (1 + heat * 3);
+      const swell = 1 + heat * 0.2;
+      k.obj.scale.set(k.w * swell, k.h * swell, 1);
       ringObjects.forEach((ring, i) => {
         if (k.passed <= i && k.s >= ring.at) {
           k.passed = i + 1;
@@ -448,6 +492,11 @@ function start() {
         p.spin *= 0.8;
       }
       if (pos.x > wallR - p.r) { pos.x = wallR - p.r; p.vel.x *= -0.5; }
+      if (bucket) {
+        collideBox(p, bucket.cx - bucket.wI - bucket.tW, bucket.cx - bucket.wI, floorY, bucket.top);
+        collideBox(p, bucket.cx + bucket.wI, bucket.cx + bucket.wI + bucket.tW, floorY, bucket.top);
+        collideBox(p, bucket.cx - bucket.wI, bucket.cx + bucket.wI, floorY, bucket.base);
+      }
       if (pos.y < floorY + px(180) && pos.x < wallL + p.r) { pos.x = wallL + p.r; p.vel.x = Math.abs(p.vel.x) * 0.5; }
       if (pos.z > zMax) { pos.z = zMax; p.vel.z *= -0.4; }
       if (pos.z < zMin) { pos.z = zMin; p.vel.z *= -0.4; }
@@ -545,9 +594,9 @@ function start() {
   }).observe(hero);
   document.addEventListener("visibilitychange", () => (document.hidden ? pause() : play()));
   // 最初から少し積もっているように
-  for (let i = 0; i < (narrow ? 4 : 5); i += 1) {
-    const x = wallL + (wallR - wallL) * (narrow ? 0.1 + Math.random() * 0.7 : 0.25 + Math.random() * 0.6);
-    spawnPop(new THREE.Vector3(x, floorY + px(narrow ? 40 + i * 30 : 120 + i * 50), px((Math.random() - 0.5) * 120)), new THREE.Vector3(0, 0, 0), 1);
+  for (let i = 0; i < (narrow ? 3 : 5); i += 1) {
+    const x = bucket.cx + (Math.random() - 0.5) * bucket.wI * 0.8;
+    spawnPop(new THREE.Vector3(x, bucket.base + px((narrow ? 24 : 36) + i * (narrow ? 34 : 52)), px((Math.random() - 0.5) * 80)), new THREE.Vector3(0, 0, 0), 1);
   }
   play();
 }

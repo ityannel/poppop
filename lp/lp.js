@@ -750,8 +750,9 @@
   let popped = 0;
   function seedKernels(fresh = false) {
     popped = 0;
+    const order = Array.from({ length: 15 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
     tray.innerHTML = Array.from({ length: KERNELS }, (_, i) => (
-      `<button class="kernel${fresh ? " fresh" : ""}" type="button" style="--d:${(i * 0.37) % 2.2}s" aria-label="${L(`粒 ${i + 1} をポップさせる`, `Pop kernel ${i + 1}`)}"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-kernel"/></svg></button>`
+      `<button class="kernel${fresh ? " fresh" : ""}" type="button" style="--d:${(i * 0.37) % 2.2}s" aria-label="${L(`粒 ${i + 1} をポップさせる`, `Pop kernel ${i + 1}`)}"><img class="kernel-photo" src="${rootUrl(`lp/img/kernel/kernel-${String(order[i]).padStart(2, "0")}.webp`)}" alt="" width="46" height="54" draggable="false" decoding="async"></button>`
     )).join("");
   }
   seedKernels();

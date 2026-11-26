@@ -2519,3 +2519,60 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
 /* 最後の帯の背景：PopCorn の記号のドット（lp/field.js） */
 .finale-field { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .finale.has-field { background: var(--blue); }
+
+/* ---------- 写真の素材（コルク・有孔ボード・木の机・トウモロコシの粒） ---------- */
+.kernel { width: 46px; height: 56px; }
+.kernel .kernel-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 4px rgb(19 32 74 / 30%));
+  animation: float 4s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.kernel:hover .kernel-photo, .kernel:focus-visible .kernel-photo { animation: wobble .45s ease-in-out infinite; }
+.kernel.fresh .kernel-photo { animation: regrow .5s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: var(--d, 0s); }
+
+.rules {
+  background: url("img/skeuo/cork-tile.webp") 0 0 / 1000px auto, #d9a26f;
+}
+.rules .section-head, .lab .section-head {
+  position: relative;
+  display: inline-block;
+  max-width: min(760px, 100%);
+  margin-bottom: 52px;
+  padding: 24px 28px 22px;
+  background: var(--paper-grain), #fffdf4;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 20%), 0 16px 22px -8px rgb(80 40 10 / 45%);
+  rotate: -.5deg;
+}
+.rules .section-head::before, .lab .section-head::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border-radius: 50% !important;
+  background: radial-gradient(circle at 35% 30%, #ffe0e8 0 10%, #ff4f8b 32%, #b3174e 78%);
+  box-shadow: 0 7px 6px -2px rgb(0 0 0 / 45%), 0 1px 0 rgb(0 0 0 / 30%);
+}
+.rule-card { box-shadow: 0 2px 2px rgb(19 32 74 / 10%), 0 22px 26px -10px rgb(70 35 10 / 55%), 6px 6px 0 var(--ink); }
+
+.lab {
+  background: url("img/skeuo/peg-tile.webp") 0 0 / 538px auto, #e9b98f;
+}
+@media (max-width: 600px) { .lab { background-size: 400px auto; } }
+.lab-board { box-shadow: 8px 8px 0 var(--ink), 0 28px 34px -10px rgb(90 50 20 / 50%); }
+
+.try {
+  background: url("img/skeuo/wood-tile.webp") 0 0 / 1100px auto, #e9c9a0;
+  color: var(--ink);
+}
+.try .lead { color: var(--ink-2); }
+.try .lead b { padding: 0 .3em; background: var(--yellow); color: var(--ink); }
+.ide-main { box-shadow: 8px 8px 0 var(--pink), 0 34px 40px -10px rgb(70 40 10 / 60%); }
+.ex-btn { box-shadow: 3px 3px 0 rgb(19 32 74 / 55%); }
