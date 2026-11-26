@@ -73,14 +73,10 @@
     return String(value);
   }
 
-  /* ---------- toast ---------- */
-  const toastEl = $("#toast");
-  let toastTimer = 0;
-  function toast(text) {
-    toastEl.textContent = text;
-    toastEl.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200);
+  /* ---------- お知らせ：上のバーのポップ数が伸びて、知らせる ---------- */
+  const FX = window.PopFX;
+  function toast(text, kind = "info", ms = 2400) {
+    FX.island(text, { kind, ms });
   }
 
   /* ---------- pop! (canvas + sound + counter) ---------- */
@@ -125,6 +121,7 @@
     const now = performance.now();
     particles = particles.filter((p) => now - p.born < p.life);
     for (const p of particles) {
+      if (now < p.born) continue;
       const t = (now - p.born) / 1000;
       const x = p.x + p.vx * t;
       const y = p.y + p.vy * t + 0.5 * p.g * t * t;
@@ -134,8 +131,16 @@
       ctx.globalAlpha = k > 0.7 ? Math.max(0, 1 - (k - 0.7) / 0.3) : 1;
       const grow = Math.min(1, (now - p.born) / 120);
       ctx.scale(grow, grow);
-      if (p.kind === "pop") {
+      if (p.kind === "pop" && p.img) {
+        const w = p.size * 2.2;
+        const h = (w * p.img.naturalHeight) / p.img.naturalWidth;
+        ctx.drawImage(p.img, -w / 2, -h / 2, w, h);
+      } else if (p.kind === "pop") {
         drawPopcorn(p.size);
+      } else if (p.kind === "dust") {
+        ctx.globalAlpha = Math.max(0, 1 - k);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
       } else {
         ctx.fillStyle = p.color;
         ctx.strokeStyle = "#13204a";
@@ -164,7 +169,7 @@
     soundOn = !soundOn;
     store.set("popcorn.lp.sound", soundOn ? "1" : "0");
     soundToggle.setAttribute("aria-pressed", String(soundOn));
-    toast(soundOn ? "ポップの音：オン 🔊" : "ポップの音：オフ");
+    toast(soundOn ? "ポップの音：オン" : "ポップの音：オフ", "sound", 1600);
     if (soundOn) playSound(1);
   });
 
@@ -238,6 +243,7 @@
         life: reduced ? 500 : 900 + Math.random() * 500,
         size: roll < 0.5 ? 16 + Math.random() * 10 : 9 + Math.random() * 6,
         kind: roll < 0.5 ? "pop" : roll < 0.78 ? "dot" : "bar",
+        img: roll < 0.5 ? FX.popImage() : null,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
       });
     }
@@ -245,6 +251,38 @@
       looping = true;
       requestAnimationFrame(frame);
     }
+  }
+
+  function dust(el) {
+    if (!el) return Promise.resolve();
+    const r = el.getBoundingClientRect();
+    const chip = el.querySelector(".st-head code");
+    const tint = chip ? getComputedStyle(chip).backgroundColor : "#ffd23f";
+    const now = performance.now();
+    const n = reduced ? 0 : Math.min(110, Math.round((r.width * r.height) / 240));
+    for (let i = 0; i < n; i += 1) {
+      const fx = Math.random();
+      particles.push({
+        x: r.left + fx * r.width,
+        y: r.top + Math.random() * r.height,
+        vx: 50 + Math.random() * 140,
+        vy: -40 - Math.random() * 110,
+        g: -60,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 6,
+        born: now + fx * 420,
+        life: 600 + Math.random() * 500,
+        size: 2 + Math.random() * 4,
+        kind: "dust",
+        color: i % 3 === 0 ? tint : i % 3 === 1 ? "#13204a" : "#ffffff",
+      });
+    }
+    el.classList.add("dusting");
+    if (n && !looping) {
+      looping = true;
+      requestAnimationFrame(frame);
+    }
+    return wait(reduced ? 0 : 500);
   }
 
   function burstAt(element, power = 1) {
@@ -294,7 +332,7 @@
     [2, 62, 40, 24, 0.8, 18], [72, 88, 50, -20, 1.6, 16], [40, 2, 34, 30, 2.6, 10],
   ];
   decor.innerHTML = DECOR.map(([x, y, s, r, d, depth]) => (
-    `<svg style="left:${x}%;top:${y}%;--s:${s}px;--r:${r}deg;--d:${d}s;--depth:${depth}" viewBox="0 0 64 64"><use href="#i-pop"/></svg>`
+    `<span class="decor-pop" style="left:${x}%;top:${y}%;--s:${s}px;--r:${r}deg;--d:${d}s;--depth:${depth}">${FX.popImg()}</span>`
   )).join("");
   if (!reduced && window.matchMedia("(pointer: fine)").matches) {
     const hero = $(".hero");
@@ -327,7 +365,7 @@
     kernel.classList.add("popped");
     kernel.setAttribute("aria-label", "ポップした！");
     kernel.disabled = true;
-    $("use", kernel).setAttribute("href", "#i-pop");
+    kernel.innerHTML = FX.popImg();
     burstAt(kernel, 1.1);
     popped += 1;
     if (popped === KERNELS) {
@@ -345,7 +383,7 @@
   const heroLines = $("#heroLines");
   const heroCode = DATA.hero.code.split("\n");
   heroLines.innerHTML = heroCode.map((line, i) => (
-    `<li class="hero-line"><span class="rider" aria-hidden="true"><svg viewBox="0 0 64 64"><use href="#i-pop"/></svg></span><code>${highlight(line)}</code><span class="val">${esc(DATA.hero.values[i])}</span></li>`
+    `<li class="hero-line"><span class="rider" aria-hidden="true">${FX.popImg()}</span><code>${highlight(line)}</code><span class="val">${esc(DATA.hero.values[i])}</span></li>`
   )).join("");
   const heroItems = $$(".hero-line", heroLines);
   heroLines.insertAdjacentHTML("afterend", '<p class="hero-readout" id="heroReadout" aria-hidden="true"><span>はじめの値</span><b></b></p>');
@@ -356,7 +394,8 @@
     void heroReadout.offsetWidth;
     heroReadout.classList.toggle("bump", true);
     $("span", heroReadout).textContent = i === 0 ? "はじめの値" : `${i + 1} 行目を通ったあと`;
-    $("b", heroReadout).textContent = DATA.hero.values[i];
+    if (i === heroItems.length - 1) FX.flap($("b", heroReadout), DATA.hero.values[i]);
+    else $("b", heroReadout).textContent = DATA.hero.values[i];
   }
   let heroRun = 0;
   let heroVisible = false;
@@ -373,6 +412,7 @@
       if (run !== heroRun) return;
       heroItems.forEach((li, j) => li.classList.toggle("on", j === i));
       heroItems[i].classList.add("shown");
+      if (i === heroItems.length - 1) FX.flap($(".val", heroItems[i]), DATA.hero.values[i]);
       showReadout(i);
       await wait(i === heroItems.length - 1 ? 300 : 950);
     }
@@ -562,7 +602,7 @@
     const items = [];
     items.push(`
       <li class="st st-source" style="--i:0">
-        <div class="st-head"><span class="st-name">はじめの値</span><div class="st-tools"><button type="button" id="labShuffle" title="数をまぜる" aria-label="数をまぜる">🎲</button></div></div>
+        <div class="st-head"><span class="st-name">はじめの値</span><div class="st-tools"><button type="button" id="labShuffle" class="die" title="サイコロをふる" aria-label="サイコロをふって、数を作り直す">${FX.dieHtml(Math.min(6, Math.max(1, value.length)))}</button></div></div>
         <div class="st-out">${balls(value, 0)}</div>
       </li>`);
     if (!lab.stages.length) {
@@ -614,7 +654,7 @@
     items.push(`<li class="st st-result" style="--i:${last}">
       <div class="st-head"><code>result.</code></div>
       <span class="st-name">${failed ? "エラーで止まりました" : "名前を付けて、できあがり"}</span>
-      <div class="st-out">${failed ? '<span class="ball big">—</span>' : balls(value, last)}</div>
+      <div class="st-out">${failed ? '<span class="ball big">—</span>' : Array.isArray(value) ? balls(value, last) : '<span class="flap" id="labFlap"></span>'}</div>
     </li>`);
     track.innerHTML = items.join("");
     track.querySelectorAll(".st").forEach((el) => {
@@ -631,6 +671,8 @@
       void track.offsetWidth;
       track.classList.add("flow");
     }
+    const flapEl = $("#labFlap");
+    if (flapEl) FX.flap(flapEl, fmt(value), { delay: reduced ? 0 : Math.max(0, last - animateFrom) * 420 });
     const code = labCode();
     $("#labCode").innerHTML = highlight(code);
     $("#labOpen").href = playgroundUrl(code);
@@ -655,12 +697,17 @@
     burstAt(button, 0.6);
     if (lab.stages.length >= MAX_STAGES) toast(`ブロックは ${MAX_STAGES} こまでです`);
   });
-  $("#labTrack").addEventListener("click", (event) => {
+  let labBusy = false;
+  $("#labTrack").addEventListener("click", async (event) => {
     const remove = event.target.closest("[data-remove]");
     const move = event.target.closest("[data-move]");
     const shuffle = event.target.closest("#labShuffle");
+    if (labBusy && (remove || shuffle)) return;
     if (remove) {
       const k = Number(remove.dataset.remove);
+      labBusy = true;
+      await dust(remove.closest(".st"));
+      labBusy = false;
       lab.stages.splice(k, 1);
       renderLab(k + 1);
     } else if (move) {
@@ -670,10 +717,14 @@
       [lab.stages[k], lab.stages[to]] = [lab.stages[to], lab.stages[k]];
       renderLab(Math.min(k, to) + 1);
     } else if (shuffle) {
-      const n = 5 + Math.floor(Math.random() * 3);
+      const n = 3 + Math.floor(Math.random() * 4);
+      labBusy = true;
+      track("pc_lp_lab_dice", n);
+      await FX.rollDie(shuffle, n);
+      labBusy = false;
+      burstAt(shuffle, 0.5);
       lab.source = Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 9));
       renderLab(0);
-      burstAt(shuffle, 0.5);
     }
   });
   let dragFrom = -1;
@@ -708,7 +759,40 @@
     $$(".dragging, .drop-target").forEach((el) => el.classList.remove("dragging", "drop-target"));
   });
   $("#labReplay").addEventListener("click", (event) => { renderLab(0); burstAt(event.currentTarget, 0.5); });
-  $("#labClear").addEventListener("click", () => { lab.stages = []; renderLab(0); });
+  const clearBtn = $("#labClear");
+  const HOLD_MS = 750;
+  let holdTimer = 0;
+  async function clearAll() {
+    if (labBusy) return;
+    if (!lab.stages.length) { toast("外すブロックがありません", "info", 1600); return; }
+    labBusy = true;
+    track("pc_lp_lab_clear");
+    const cards = $$("#labTrack .st[data-index]");
+    await Promise.all(cards.map((card, i) => wait(i * 80).then(() => dust(card))));
+    labBusy = false;
+    lab.stages = [];
+    renderLab(0);
+  }
+  function holdStop() {
+    clearTimeout(holdTimer);
+    holdTimer = 0;
+    clearBtn.classList.remove("holding");
+    clearBtn.style.setProperty("--hold", "0");
+  }
+  clearBtn.style.setProperty("--hold-ms", `${HOLD_MS}ms`);
+  clearBtn.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    clearBtn.classList.add("holding");
+    clearBtn.style.setProperty("--hold", "1");
+    holdTimer = setTimeout(() => { holdStop(); clearAll(); }, HOLD_MS);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((type) => clearBtn.addEventListener(type, () => {
+    if (!holdTimer) return;
+    holdStop();
+    toast("長押しすると、ぜんぶ外せます", "info", 1800);
+  }));
+  clearBtn.addEventListener("click", (event) => { if (event.detail === 0) clearAll(); });
+  clearBtn.addEventListener("contextmenu", (event) => event.preventDefault());
   $("#labOpen").addEventListener("click", () => track("pc_lp_open", "lab"));
   renderLab(0);
   let labSeen = false;
@@ -747,14 +831,16 @@
       $(`#fbCode .ln[data-ln="${b.line}"]`).classList.add(ok ? "hit" : "miss");
       trace.insertAdjacentHTML("beforeend", `<div>${n} % ${b.k} == 0 → <span class="${ok ? "t" : "f"}">${ok}</span></div>`);
       if (ok) {
-        trace.insertAdjacentHTML("beforeend", `<span class="ans">→ "${b.word}"</span>`);
+        trace.insertAdjacentHTML("beforeend", '<span class="ans">→<span class="flap"></span></span>');
+        FX.flap($(".ans .flap", trace), `"${b.word}"`, { quick });
         return;
       }
     }
     await wait(step);
     if (run !== fbRun) return;
     $(`#fbCode .ln[data-ln="${ELSE_LINE}"]`).classList.add("hit");
-    trace.insertAdjacentHTML("beforeend", `<div class="q">どれにも合わないので else</div><span class="ans">→ ${n}</span>`);
+    trace.insertAdjacentHTML("beforeend", '<div class="q">どれにも合わないので else</div><span class="ans">→<span class="flap"></span></span>');
+    FX.flap($(".ans .flap", trace), String(n), { quick });
   }
   $("#fbTiles").addEventListener("click", (event) => {
     const tile = event.target.closest(".tile");
@@ -1053,6 +1139,7 @@
     worker.addEventListener("message", onWorkerMessage);
     worker.addEventListener("error", () => {
       setStatus("error", "準備できませんでした");
+      toast("準備できませんでした", "err", 2600);
       finishRun();
       line("実行環境を読み込めませんでした。ネットワークを確かめて、もう一度押してください。", "out-line out-err");
       worker?.terminate();
@@ -1072,6 +1159,7 @@
       }
     } else if (msg.type === "boot-error") {
       setStatus("error", "準備できませんでした");
+      toast("準備できませんでした", "err", 2600);
       finishRun();
       line(esc(`実行環境を読み込めませんでした（${msg.message}）。ネットワークを確かめて、もう一度押してください。`), "out-line out-err");
       worker?.terminate();
@@ -1087,6 +1175,7 @@
       if (!msg.ok && msg.error) line(esc(localize(msg.error)), "out-line out-err");
       line(esc(`${msg.ok ? "おわり" : "止まりました"}（${msg.elapsedMs ?? 0} ms）`), "out-line out-meta");
       setStatus(msg.ok ? "done" : "error", msg.ok ? "できた！" : "エラー");
+      toast(msg.ok ? `できた！ ${msg.elapsedMs ?? 0} ms` : "エラーで止まりました", msg.ok ? "ok" : "err", 2600);
       if (msg.ok) burstAt($("#tryRun"), 0.6);
       finishRun();
     }
@@ -1119,6 +1208,7 @@
     $("#tryRun").disabled = true;
     $("#tryStop").hidden = false;
     setStatus("running", "実行中…");
+    toast("PopCorn を実行中…", "run", 0);
     worker.postMessage({ type: "run", source });
   }
 
@@ -1135,7 +1225,9 @@
     } else {
       running = true;
       pendingRun = editor.value;
-      line('<span class="loading-pop" aria-hidden="true"><i></i><i></i><i></i></span>ポップコーンをあたためています…（はじめの 1 回だけ、少し時間がかかります）', "out-line out-meta loading-line");
+      const lanes = [["Python を起こす", "#ffd23f", "1.9s", "0s"], ["PopCorn を読む", "#ff4f8b", "1.4s", ".3s"], ["ポップの準備", "#2ed3a0", "2.4s", ".15s"]];
+      line(`ポップコーンをあたためています…（はじめの 1 回だけ、少し時間がかかります）<span class="race" aria-hidden="true">${lanes.map(([name, color, dur, delay]) => `<span class="lane"><span>${name}</span><i style="--lc:${color};--ld:${dur};--lw:${delay}"></i></span>`).join("")}</span>`, "out-line out-meta loading-line");
+      toast("PopCorn を準備中…", "run", 0);
     }
   }
   $("#tryRun").addEventListener("click", runTry);
@@ -1147,6 +1239,7 @@
     finishRun();
     $(".loading-line", consoleEl)?.remove();
     line("止めました。もう一度「実行」を押すと、準備からやり直します。", "out-line out-meta");
+    toast("止めました", "info", 1600);
     setStatus("idle", "止めました");
   });
   $("#tryOpen").addEventListener("click", () => track("pc_lp_open", "try"));
@@ -1213,11 +1306,30 @@
     const text = $(`#${b.dataset.copy}`).textContent;
     try {
       await navigator.clipboard.writeText(text);
-      toast("コピーしました");
+      toast("コピーしました", "ok", 1800);
     } catch {
-      toast("コピーできませんでした。選んでコピーしてください");
+      toast("コピーできませんでした。選んでコピーしてください", "err");
     }
   });
+
+  /* ---------- finale：札とポップコーンが弾ける ---------- */
+  const PIT_WORDS = [">>", "Map", "Filter", "Sum", "Sort", "Fork", "Check", "pop", "@", ">?>", ">!>", "Test", "Loop", "when", "Display", ".", "Reduce", "Expect"];
+  const PIT_COLORS = ["#ffd23f", "#ff4f8b", "#2ed3a0", "#ffffff", "#9ec2ff", "#ffb35c"];
+  const pitItems = [
+    ...PIT_WORDS.map((text, i) => ({ kind: "tag", text, color: PIT_COLORS[i % PIT_COLORS.length] })),
+    ...Array.from({ length: 18 }, () => ({ kind: "pop" })),
+  ];
+  const finale = $("#finale");
+  finale.setAttribute("data-nopop", "");
+  const pitApi = FX.pit(finale, {
+    items: pitItems,
+    obstacles: () => [$(".finale-kicker"), $(".finale h2"), $("#finaleBtn"), $("#finaleHint")],
+    onPop: (x, y) => burst(x, y, 0.25),
+  });
+  if (pitApi) {
+    $("#finaleHint").hidden = false;
+    if (document.fonts?.ready) document.fonts.ready.then(() => pitApi.measure());
+  }
 
   $$('a[href^="playground/"]').forEach((a) => a.addEventListener("click", () => track("pc_lp_cta", a.closest("section, header, footer")?.id || "nav")));
 })();

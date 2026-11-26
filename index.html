@@ -33,7 +33,6 @@
 <body>
   <a class="skip" href="#main">本文へ</a>
   <canvas id="popLayer" class="pop-layer" aria-hidden="true"></canvas>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <svg width="0" height="0" class="sprite" aria-hidden="true" focusable="false">
     <defs>
@@ -68,6 +67,24 @@
       </symbol>
       <symbol id="i-play" viewBox="0 0 24 24">
         <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-tap" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" fill="currentColor"/>
+        <circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.2" opacity=".45"/>
+      </symbol>
+      <symbol id="i-drag" viewBox="0 0 24 24">
+        <path d="M12 3v18M3 12h18M12 3 9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-hold" viewBox="0 0 24 24">
+        <circle cx="12" cy="13.5" r="7.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M12 13.5v-4M10 2.5h4M12 2.5V6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type" viewBox="0 0 24 24">
+        <rect x="2.5" y="6" width="19" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M6.5 10h1M10.5 10h1M14.5 10h1M8 14h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-throw" viewBox="0 0 24 24">
+        <path d="M4 19c2-8 8-12.5 15-12.5M19 6.5l-4-2.4M19 6.5l-2.2 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       </symbol>
     </defs>
   </svg>
@@ -137,7 +154,7 @@
     <section class="section rules" id="rules">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>01</span>きまり</p>
+          <p class="eyebrow"><span>01</span>きまり<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
           <h2>覚えることは、<br class="sp">3つだけ。</h2>
           <p class="lead">PopCorn の文は、まるで文章のよう。左から読んで、<b>.</b> で終わります。</p>
         </header>
@@ -148,7 +165,7 @@
     <section class="section order" id="order">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>02</span>読みやすさ</p>
+          <p class="eyebrow"><span>02</span>読みやすさ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
           <h2>読む順が、<br class="sp">そのまま動く順。</h2>
           <p class="lead">「偶数だけ選んで、2 倍して、合計する」。同じことを、2 つの書き方でくらべてみましょう。</p>
         </header>
@@ -174,7 +191,7 @@
     <section class="section lab" id="lab">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>03</span>遊ぶ</p>
+          <p class="eyebrow"><span>03</span>遊ぶ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span><span class="how how-drag"><svg aria-hidden="true"><use href="#i-drag"/></svg>ドラッグ</span><span class="how how-hold"><svg aria-hidden="true"><use href="#i-hold"/></svg>長押し</span></span></p>
           <h2>パイプライン工作室</h2>
           <p class="lead">ブロックをつないで、値がどう流れるか見てみよう。エラーになっても、だいじょうぶ。</p>
         </header>
@@ -191,7 +208,7 @@
               <div class="lab-actions">
                 <button class="btn btn-small btn-yellow" id="labReplay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>もう一度流す</button>
                 <a class="btn btn-small btn-blue" id="labOpen" href="playground/">Playground で開く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
-                <button class="btn btn-small btn-paper" id="labClear" type="button">ぜんぶ外す</button>
+                <button class="btn btn-small btn-paper hold-btn" id="labClear" type="button">ぜんぶ外す<small>長押し</small></button>
               </div>
             </div>
             <pre class="code code-dark" id="labCode"></pre>
@@ -203,7 +220,7 @@
     <section class="section check" id="check">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>04</span>条件分岐</p>
+          <p class="eyebrow"><span>04</span>条件分岐<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
           <h2>条件は、<br class="sp">上から順に。</h2>
           <p class="lead"><code>Check</code> は <code>when</code> を上から調べて、最初に合ったものを選びます。数字をタップしてみよう。</p>
         </header>
@@ -226,7 +243,7 @@
     <section class="section tools" id="tools">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>05</span>道具</p>
+          <p class="eyebrow"><span>05</span>道具<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>入力</span></span></p>
           <h2>ちょっと便利な記号と、<br class="sp">やさしいエラー。</h2>
           <p class="lead">流れを止めずに、のぞいたり、守ったり、分けたり。まちがえたときは、日本語で教えてくれます。</p>
         </header>
@@ -313,7 +330,7 @@
     <section class="section try" id="try">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>06</span>試す</p>
+          <p class="eyebrow"><span>06</span>試す<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>入力</span></span></p>
           <h2>本物の PopCorn を、<br class="sp">ここで。</h2>
           <p class="lead">Playground と同じ処理系が、このページの中で動きます。書きかえて、<b>実行</b> を押してみよう。</p>
         </header>
@@ -345,7 +362,7 @@
     <section class="section learn" id="learn">
       <div class="wrap">
         <header class="section-head reveal">
-          <p class="eyebrow"><span>07</span>学ぶ</p>
+          <p class="eyebrow"><span>07</span>学ぶ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
           <h2>ロボット君と、<br class="sp">いっしょに。</h2>
           <p class="lead">Playground の「ロボット君」には、8 つのレッスンがあります。答え合わせは本物の処理系で。ヒントも、答えも、エラーの説明もあります。</p>
         </header>
@@ -411,6 +428,7 @@ popcorn program.pop</pre>
         <p class="finale-kicker">Ready?</p>
         <h2>さあ、<br class="sp">ポップしよう。</h2>
         <a class="btn btn-huge btn-yellow" href="playground/" id="finaleBtn">Playground をひらく<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <p class="finale-hint" id="finaleHint" hidden><span class="hows"><span class="sr-only">さわり方：</span><span class="how how-throw"><svg aria-hidden="true"><use href="#i-throw"/></svg>つかんで投げる</span></span>空いているところをタップすると、もっと弾けます</p>
       </div>
     </section>
   </main>
@@ -433,6 +451,7 @@ popcorn program.pop</pre>
 
   <script src="popcorn-localization.js"></script>
   <script src="lp/data.js"></script>
+  <script src="lp/play.js"></script>
   <script src="lp/lp.js"></script>
 </body>
 </html>
