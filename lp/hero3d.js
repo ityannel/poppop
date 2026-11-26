@@ -264,7 +264,15 @@ function start() {
       const flat = Math.abs(out.x) > 0.5;
       const right = flat && !narrow && p.x + Math.abs(out.x) * gap + wide * 0.5 < halfAt(p.z + 0.6)[0] - px(6);
       if (flat ? out.x > 0 !== right : out.y > 0) out.negate();
-      label.position.copy(p).addScaledVector(out, gap).add(new THREE.Vector3(0, 0, 0.6));
+      if (flat && !narrow && !right) {
+        const up = tangent.clone().setZ(0).normalize();
+        if (up.y < 0) up.negate();
+        label.position.copy(p).addScaledVector(up, R * 1.1 + wide * 0.3).add(new THREE.Vector3(0, 0, 0.6));
+      } else {
+        label.position.copy(p).addScaledVector(out, gap).add(new THREE.Vector3(0, 0, 0.6));
+      }
+      const edge = halfAt(label.position.z)[0] - px(6) - wide / 2;
+      label.position.x = THREE.MathUtils.clamp(label.position.x, -edge, edge);
       label.scale.set(wide, wide / 2, 1);
       label.renderOrder = 5;
       pipeGroup.add(label);
