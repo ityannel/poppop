@@ -90,7 +90,8 @@ The site has two pages:
   `lp/hero3d.js`, built on three.js (`lp/vendor/`, MIT). It is skipped when
   WebGL is missing or the visitor prefers reduced motion. The first visit asks
   whether to play sound and remembers the answer; add `?sound-check` to the
-  URL to see that screen again.
+  URL to see that screen again. The symbol background of the last blue band
+  is `lp/field.js`.
 - `/en/` is the English introduction site. `en/index.html` is built from
   `index.html` by `python tools/build_en_page.py`; run it after editing the
   Japanese page. Its words for the demos live in `lp/data.en.js`.

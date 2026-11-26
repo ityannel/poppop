@@ -2515,3 +2515,7 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
 }
 .rule-card:nth-child(2)::before { rotate: 3deg; background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(0 0 0 / 4%)), rgb(255 190 214 / 80%); }
 .rule-card:nth-child(3)::before { rotate: -2deg; background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(0 0 0 / 4%)), rgb(190 232 255 / 80%); }
+
+/* 最後の帯の背景：PopCorn の記号のドット（lp/field.js） */
+.finale-field { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.finale.has-field { background: var(--blue); }
