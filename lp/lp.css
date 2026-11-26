@@ -2326,3 +2326,192 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
 .btn { transition: transform .06s steps(2), box-shadow .06s steps(2), background .2s; }
 .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
 .btn:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--ink); }
+
+/* ---------- レトロ：カーソルと、番号つきメニュー ---------- */
+.nav-logo { display: flex; align-items: flex-end; gap: 4px; text-decoration: none; }
+.nav-logo::after, .hero-catch::after {
+  content: "";
+  display: inline-block;
+  background: var(--ink);
+  animation: caret 1.05s steps(1) infinite;
+}
+.nav-logo::after { width: 9px; height: 17px; margin-bottom: 2px; }
+.hero-catch::after { width: .45em; height: .86em; margin-left: .12em; vertical-align: -.08em; }
+@keyframes caret { 50% { opacity: 0; } }
+.nav-links a { display: inline-flex; align-items: baseline; gap: 6px; }
+.nav-links a::before {
+  display: inline-block;
+  width: 2.2ch;
+  color: var(--pink);
+  font: 700 11px/1 "Silkscreen", "DotGothic16", monospace;
+}
+.nav-links a:nth-child(1)::before { content: "01"; }
+.nav-links a:nth-child(2)::before { content: "03"; }
+.nav-links a:nth-child(3)::before { content: "06"; }
+.nav-links a:nth-child(4)::before { content: "07"; }
+.nav-links a:hover::before, .nav-links a:focus-visible::before { content: "▶"; animation: caret .7s steps(1) infinite; }
+.nav-links a:hover { background: var(--ink); color: var(--cream); }
+.eyebrow .scramble { font-style: normal; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-logo::after, .hero-catch::after { animation: none; }
+}
+
+/* ---------- 本物っぽい質感を、ところどころに（スキューモーフィズム） ---------- */
+:root { --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* トップのコード窓は、ベージュのブラウン管モニターの中 */
+.crt {
+  position: relative;
+  padding: 22px 22px 0;
+  border-radius: 24px 24px 16px 16px !important;
+  background:
+    var(--paper-grain),
+    radial-gradient(120% 80% at 25% 0%, rgb(255 255 255 / 60%), transparent 55%),
+    linear-gradient(180deg, #f1e8d2, #ddd1b3 70%, #cbbd9b);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 85%),
+    inset 3px 0 0 rgb(255 255 255 / 35%),
+    inset -3px 0 0 rgb(0 0 0 / 7%),
+    inset 0 -4px 0 rgb(0 0 0 / 12%),
+    0 3px 0 #b2a37f,
+    0 30px 44px -16px rgb(19 32 74 / 50%),
+    0 10px 16px rgb(19 32 74 / 16%);
+  transform: rotate(1.2deg);
+}
+.crt .window {
+  border: 0;
+  border-radius: 16px / 22px !important;
+  box-shadow: 0 0 0 5px #2c2722, 0 0 0 7px #b8aa86, 0 0 0 8px rgb(255 255 255 / 55%);
+  transform: none;
+}
+.crt .window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit !important;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 12%) 0 1px, transparent 1px 3px),
+    radial-gradient(70% 45% at 28% 6%, rgb(255 255 255 / 20%), transparent 70%),
+    radial-gradient(ellipse at center, transparent 58%, rgb(0 0 0 / 38%));
+}
+.crt-chin {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 46px;
+  padding: 0 8px;
+}
+.crt-brand {
+  color: #ad9d78;
+  font: 700 12px/1 "Silkscreen", "DotGothic16", monospace;
+  letter-spacing: .08em;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 75%), 0 -1px 0 rgb(0 0 0 / 18%);
+}
+.crt-vents {
+  flex: 1;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, rgb(0 0 0 / 22%) 0 3px, rgb(255 255 255 / 50%) 3px 4px, transparent 4px 9px);
+  opacity: .6;
+}
+.crt-led {
+  width: 11px;
+  height: 11px;
+  border-radius: 50% !important;
+  background: radial-gradient(circle at 35% 35%, #d4ffe9, #2ed3a0 55%, #11815f);
+  box-shadow: 0 0 10px 2px rgb(46 211 160 / 70%), inset 0 -1px 1px rgb(0 0 0 / 30%);
+  animation: led 2.4s ease-in-out infinite;
+}
+@keyframes led { 50% { box-shadow: 0 0 4px 1px rgb(46 211 160 / 45%), inset 0 -1px 1px rgb(0 0 0 / 30%); } }
+.hero.is-3d .crt {
+  transform: perspective(1100px) rotateY(calc(var(--tilt-x, 0) * 7deg)) rotateX(calc(var(--tilt-y, 0) * -5deg)) rotate(1.2deg);
+  transition: transform .2s ease-out;
+}
+.hero.is-3d .crt .window { transform: none; }
+@media (max-width: 600px) {
+  .crt { padding: 14px 14px 0; }
+  .crt-chin { height: 38px; }
+}
+
+/* 大事なボタンは、押せるキーボードのキー */
+.hero-cta .btn, #finaleBtn {
+  --key-top: #fffdf6;
+  --key-bottom: #ece4d2;
+  --key-side: #c3b896;
+  border: 2px solid rgb(19 32 74 / 70%);
+  border-radius: 12px !important;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgb(255 255 255 / 55%), transparent 70%),
+    linear-gradient(180deg, var(--key-top), var(--key-bottom));
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 75%),
+    inset 0 -3px 6px rgb(0 0 0 / 10%),
+    0 7px 0 var(--key-side),
+    0 7px 0 2px rgb(19 32 74 / 70%),
+    0 16px 20px -4px rgb(19 32 74 / 35%);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 60%);
+  transition: transform .07s ease, box-shadow .07s ease;
+}
+.hero-cta .btn-blue { --key-top: #5d87ff; --key-bottom: #2557ec; --key-side: #163fae; text-shadow: 0 -1px 0 rgb(0 0 0 / 30%); }
+#finaleBtn { --key-top: #ffe88d; --key-bottom: #ffcf33; --key-side: #c4920c; }
+.hero-cta .btn:hover, #finaleBtn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 75%),
+    inset 0 -3px 6px rgb(0 0 0 / 10%),
+    0 8px 0 var(--key-side),
+    0 8px 0 2px rgb(19 32 74 / 70%),
+    0 18px 22px -4px rgb(19 32 74 / 35%);
+}
+.hero-cta .btn:active, #finaleBtn:active {
+  transform: translateY(6px);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 60%),
+    inset 0 -2px 4px rgb(0 0 0 / 12%),
+    0 1px 0 var(--key-side),
+    0 1px 0 2px rgb(19 32 74 / 70%),
+    0 4px 6px rgb(19 32 74 / 30%);
+}
+
+/* ポップした数は、機械じかけのカウンター */
+.pop-count b {
+  display: inline-block;
+  min-width: 3.2em;
+  padding: 4px 6px 3px;
+  border-radius: 3px !important;
+  background: linear-gradient(180deg, #3a3a3a, #111 46%, #050505 50%, #1c1c1c 54%, #343434);
+  color: #fbf3dc;
+  font: 400 15px/1 "DotGothic16", monospace;
+  letter-spacing: .16em;
+  text-align: right;
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 80%), inset 0 -1px 0 rgb(255 255 255 / 18%), 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+/* きまりのカードは、マスキングテープでとめた紙 */
+.rule-card {
+  position: relative;
+  background-image: var(--paper-grain);
+  box-shadow: 0 2px 2px rgb(19 32 74 / 10%), 0 18px 24px -10px rgb(19 32 74 / 35%), 6px 6px 0 var(--ink);
+}
+.rule-card:nth-child(1) { rotate: -1deg; }
+.rule-card:nth-child(2) { rotate: .8deg; }
+.rule-card:nth-child(3) { rotate: -.6deg; }
+.rule-card::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -16px;
+  left: 50%;
+  width: 104px;
+  height: 30px;
+  translate: -50% 0;
+  rotate: -4deg;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(0 0 0 / 4%)),
+    rgb(240 228 196 / 85%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+  clip-path: polygon(0 6%, 4% 0, 8% 8%, 12% 1%, 16% 7%, 20% 0, 80% 0, 84% 6%, 88% 0, 92% 8%, 96% 1%, 100% 5%, 100% 95%, 96% 100%, 92% 92%, 88% 100%, 84% 93%, 80% 100%, 20% 100%, 16% 94%, 12% 100%, 8% 92%, 4% 100%, 0 94%);
+}
+.rule-card:nth-child(2)::before { rotate: 3deg; background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(0 0 0 / 4%)), rgb(255 190 214 / 80%); }
+.rule-card:nth-child(3)::before { rotate: -2deg; background: linear-gradient(180deg, rgb(255 255 255 / 30%), rgb(0 0 0 / 4%)), rgb(190 232 255 / 80%); }

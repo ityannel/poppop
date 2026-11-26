@@ -657,12 +657,54 @@
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
+  /* ---------- 文字がほどける（見出しの札と、メニュー） ---------- */
+  const GLYPHS_HALF = ">@.:#%*+=";
+  const GLYPHS_FULL = "＞＠：．＃％＊＋＝";
+  function scramble(node, ms = 560) {
+    if (reduced || node.dataset.scrambling) return;
+    const text = node.dataset.text || node.textContent;
+    node.dataset.text = text;
+    node.dataset.scrambling = "1";
+    const chars = Array.from(text);
+    const start = performance.now();
+    const pick = (c) => {
+      const set = c.charCodeAt(0) > 0x2e80 ? GLYPHS_FULL : GLYPHS_HALF;
+      return set[Math.floor(Math.random() * set.length)];
+    };
+    let last = 0;
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / ms);
+      if (now - last > 45 || k >= 1) {
+        last = now;
+        const fixed = Math.floor(k * chars.length);
+        node.textContent = k >= 1 ? text : chars.map((c, i) => (i < fixed || /\s/.test(c) ? c : pick(c))).join("");
+      }
+      if (k < 1) requestAnimationFrame(step);
+      else delete node.dataset.scrambling;
+    };
+    requestAnimationFrame(step);
+  }
+  $$(".eyebrow").forEach((eyebrow) => {
+    const num = eyebrow.querySelector(":scope > span");
+    const label = num && num.nextSibling;
+    if (!label || label.nodeType !== 3 || !label.textContent.trim()) return;
+    const wrap = document.createElement("i");
+    wrap.className = "scramble";
+    wrap.textContent = label.textContent.trim();
+    label.replaceWith(wrap, " ");
+  });
+  $$(".nav-links a").forEach((link) => {
+    link.addEventListener("pointerenter", () => scramble(link, 380));
+    link.addEventListener("focus", () => scramble(link, 380));
+  });
+
   /* ---------- reveal ---------- */
   const revealer = "IntersectionObserver" in window
     ? new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
           entry.target.classList.add("in");
+          entry.target.querySelectorAll(".scramble").forEach((node) => scramble(node));
           revealer.unobserve(entry.target);
         }
       }

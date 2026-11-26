@@ -6,7 +6,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 
 const hero = document.querySelector(".hero");
-const win = hero ? hero.querySelector(".hero-demo .window") : null;
+const win = hero ? hero.querySelector(".hero-demo .crt") || hero.querySelector(".hero-demo .window") : null;
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (hero && win && !reduced) start();
 
