@@ -105,6 +105,7 @@
     </nav>
     <div class="nav-tools">
       <span class="pop-count" title="Pops"><svg aria-hidden="true"><use href="#i-pop"/></svg><b id="popCount">0</b><span class="sr-only"> pops</span></span>
+      <button class="icon-btn" type="button" data-open-games aria-haspopup="dialog" title="Mini games"><span aria-hidden="true">🎮</span><span class="sr-only">Mini games</span></button>
       <button id="soundToggle" class="icon-btn" type="button" aria-pressed="false" title="Pop sound">
         <span class="sound-on" aria-hidden="true">🔊</span><span class="sound-off" aria-hidden="true">🔇</span><span class="sr-only">Pop sound</span>
       </button>
@@ -390,6 +391,7 @@
           <div class="lesson-path">
             <ol class="lessons" id="lessons"></ol>
             <p class="learn-note">You can also ask an AI tutor (Gemini) questions or for practice problems. Your progress is saved in your browser.</p>
+            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 Review with a game</button>
             <a class="btn btn-big btn-blue" href="../playground/">Go meet Robot<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </div>
         </div>
@@ -462,6 +464,8 @@ popcorn program.pop</pre>
   <script src="../lp/data.js"></script>
   <script src="../lp/data.en.js"></script>
   <script src="../lp/play.js"></script>
+  <script src="../lp/games-data.js"></script>
+  <script src="../lp/games.js"></script>
   <script src="../lp/lp.js"></script>
   <script src="../lp/field.js"></script>
   <script type="module" src="../lp/hero3d.js"></script>

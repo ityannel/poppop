@@ -104,6 +104,7 @@
     </nav>
     <div class="nav-tools">
       <span class="pop-count" title="ポップした数"><svg aria-hidden="true"><use href="#i-pop"/></svg><b id="popCount">0</b><span class="sr-only">回ポップ</span></span>
+      <button class="icon-btn" type="button" data-open-games aria-haspopup="dialog" title="ミニゲーム"><span aria-hidden="true">🎮</span><span class="sr-only">ミニゲーム</span></button>
       <button id="soundToggle" class="icon-btn" type="button" aria-pressed="false" title="ポップの音">
         <span class="sound-on" aria-hidden="true">🔊</span><span class="sound-off" aria-hidden="true">🔇</span><span class="sr-only">ポップの音</span>
       </button>
@@ -389,6 +390,7 @@
           <div class="lesson-path">
             <ol class="lessons" id="lessons"></ol>
             <p class="learn-note">わからないところは、AI の先生（Gemini）に聞いたり、練習問題を作ってもらったりもできます。進みぐあいは、ブラウザに保存されます。</p>
+            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 ゲームで、おさらいする</button>
             <a class="btn btn-big btn-blue" href="playground/">ロボット君に会いに行く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </div>
         </div>
@@ -461,6 +463,8 @@ popcorn program.pop</pre>
   <script src="popcorn-localization.js"></script>
   <script src="lp/data.js"></script>
   <script src="lp/play.js"></script>
+  <script src="lp/games-data.js"></script>
+  <script src="lp/games.js"></script>
   <script src="lp/lp.js"></script>
   <script src="lp/field.js"></script>
   <script type="module" src="lp/hero3d.js"></script>

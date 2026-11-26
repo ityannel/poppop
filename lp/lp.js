@@ -608,6 +608,7 @@
     countBox.classList.add("bump");
     if (MILESTONES.has(pops)) toast(MILESTONES.get(pops));
     if (pops === 1) track("pc_lp_pop");
+    if (pops === 10 && window.PopGames) window.PopGames.invite();
     playSound(power);
     const now = performance.now();
     const count = reduced ? 3 : Math.round(5 + 6 * power);
@@ -1770,6 +1771,13 @@
   }
 
   ["#labTrack", "#labCode", ".tool-box"].forEach((selector) => smoothHeight($(selector)));
+
+  if (window.PopGames) {
+    window.PopGames.init({
+      esc, highlight, localize, playgroundUrl, playSound, track, store, smoothHeight, reduced,
+      popImg: () => FX.popImg(),
+    });
+  }
 
   $$('a[href$="playground/"]').forEach((a) => a.addEventListener("click", () => track("pc_lp_cta", a.closest("section, header, footer")?.id || "nav")));
 })();

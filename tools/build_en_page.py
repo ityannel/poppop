@@ -59,6 +59,9 @@ TEXT = [
     ('title="ポップした数"', 'title="Pops"'),
     ('<span class="sr-only">回ポップ</span>', '<span class="sr-only"> pops</span>'),
     ('title="ポップの音"', 'title="Pop sound"'),
+    ('title="ミニゲーム"', 'title="Mini games"'),
+    ('<span class="sr-only">ミニゲーム</span>', '<span class="sr-only">Mini games</span>'),
+    ('🎮 ゲームで、おさらいする', '🎮 Review with a game'),
     ('<span class="sr-only">ポップの音</span>', '<span class="sr-only">Pop sound</span>'),
     # hero
     ("実験中のアルファ版", "Experimental alpha"),
