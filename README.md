@@ -82,14 +82,23 @@ The example gallery uses consistent Japanese category names and includes
 FizzBuzz, a fortune teller, number guessing, rock-paper-scissors, a dice game,
 a quiz, a countdown, and smaller pipeline exercises.
 
+The site has two pages:
+
+- `/` is the introduction site (`index.html` and `lp/`). Every demo on it uses
+  output checked against the real interpreter. The examples and the optional
+  background music credit live in `lp/data.js`.
+- `/playground/` is the Playground (`playground/index.html`).
+
 Start it locally from the repository root:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000`. Opening `index.html` directly is not
-supported because browsers block the source requests used by the runtime.
+Then open `http://localhost:8000/` for the introduction site and
+`http://localhost:8000/playground/` for the Playground. Opening the HTML files
+directly is not supported because browsers block the source requests used by
+the runtime.
 
 For the AI tutor, deploy the Playground with Vercel and set `GEMINI_API_KEY` in
 the Vercel project environment variables. The browser calls `/api/gemini`; the
@@ -108,7 +117,7 @@ $env:GEMINI_API_KEY = "your-key"
 python popcorn_playground_server.py
 ```
 
-Then open `http://127.0.0.1:8765`. The browser calls `/api/gemini`; the API key
+Then open `http://127.0.0.1:8765/playground/`. The browser calls `/api/gemini`; the API key
 stays on the server. If `/api/gemini` is not available, the Playground can still
 ask for a personal browser key and save it locally.
 
