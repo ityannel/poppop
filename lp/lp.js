@@ -169,9 +169,106 @@
     soundOn = !soundOn;
     store.set("popcorn.lp.sound", soundOn ? "1" : "0");
     soundToggle.setAttribute("aria-pressed", String(soundOn));
-    toast(soundOn ? "ポップの音：オン" : "ポップの音：オフ", "sound", 1600);
-    if (soundOn) playSound(1);
+    if (soundOn) {
+      playSound(1);
+      if (BGM) bgmPlay(true);
+      else toast("ポップの音：オン", "sound", 1600);
+    } else {
+      bgmStop();
+      toast(BGM ? "音：オフ" : "ポップの音：オフ", "sound", 1600);
+    }
   });
+
+  /* ---------- BGM：🔊 を押したときだけ、フェードで入ってループする ---------- */
+  const BGM = DATA.bgm && DATA.bgm.src ? DATA.bgm : null;
+  const BGM_VOLUME = 0.32;
+  let bgmEl = null;
+  let bgmGain = null;
+  let bgmTimer = 0;
+  let bgmRamp = 0;
+  if (BGM) {
+    soundToggle.title = "音（BGM とポップ）";
+    $(".sr-only", soundToggle).textContent = "音（BGM とポップ）";
+    const credit = $("#bgmCredit");
+    const link = (text, url) => (url ? `<a href="${esc(url)}" rel="noopener">${esc(text)}</a>` : esc(text));
+    credit.innerHTML = `BGM：「${esc(BGM.title)}」${link(BGM.author, BGM.authorUrl)}${BGM.license ? `（${link(BGM.license, BGM.licenseUrl)}）` : ""}`;
+    credit.hidden = false;
+  }
+
+  function bgmSetup() {
+    if (bgmEl) return;
+    bgmEl = new Audio();
+    bgmEl.crossOrigin = "anonymous";
+    bgmEl.loop = true;
+    bgmEl.preload = "auto";
+    bgmEl.src = BGM.src;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const source = audio.createMediaElementSource(bgmEl);
+      bgmGain = audio.createGain();
+      bgmGain.gain.value = 0;
+      source.connect(bgmGain).connect(audio.destination);
+    } catch {
+      bgmGain = null;
+      bgmEl.volume = 0;
+    }
+  }
+
+  function bgmTo(target, ms) {
+    if (!bgmEl) return;
+    if (bgmGain) {
+      const t = audio.currentTime;
+      bgmGain.gain.cancelScheduledValues(t);
+      bgmGain.gain.setValueAtTime(bgmGain.gain.value, t);
+      bgmGain.gain.linearRampToValueAtTime(target, t + ms / 1000);
+      return;
+    }
+    clearInterval(bgmRamp);
+    const from = bgmEl.volume;
+    const start = performance.now();
+    bgmRamp = setInterval(() => {
+      const k = Math.min(1, (performance.now() - start) / ms);
+      try { bgmEl.volume = from + (target - from) * k; } catch { /* 音量を変えられない端末もある */ }
+      if (k >= 1) clearInterval(bgmRamp);
+    }, 40);
+  }
+
+  async function bgmPlay(announce = false) {
+    if (!BGM || !soundOn || document.hidden) return;
+    bgmSetup();
+    clearTimeout(bgmTimer);
+    try {
+      if (audio && audio.state === "suspended") await audio.resume();
+      await bgmEl.play();
+    } catch {
+      return;
+    }
+    bgmTo(BGM_VOLUME, 1400);
+    if (announce) toast(`♪ ${BGM.title}`, "sound", 2400);
+  }
+
+  function bgmStop(ms = 600) {
+    if (!bgmEl || bgmEl.paused) return;
+    bgmTo(0, ms);
+    clearTimeout(bgmTimer);
+    bgmTimer = setTimeout(() => bgmEl.pause(), ms + 40);
+  }
+
+  if (BGM) {
+    if (soundOn) {
+      const startOnce = () => {
+        document.removeEventListener("pointerdown", startOnce, true);
+        document.removeEventListener("keydown", startOnce, true);
+        bgmPlay(true);
+      };
+      document.addEventListener("pointerdown", startOnce, true);
+      document.addEventListener("keydown", startOnce, true);
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) bgmStop(300);
+      else if (soundOn && bgmEl) bgmPlay();
+    });
+  }
 
   function playSound(power = 1) {
     if (!soundOn) return;

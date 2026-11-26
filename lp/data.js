@@ -392,5 +392,13 @@ window.POPCORN_LP = {
       "title": "5まで数えて止めよう",
       "intro": "Loopで数字を一つずつ増やし、Breakと後置whenで安全に止めてみよう。"
     }
-  ]
+  ],
+  "bgm": {
+    "src": "",
+    "title": "",
+    "author": "",
+    "authorUrl": "",
+    "license": "",
+    "licenseUrl": ""
+  }
 };
