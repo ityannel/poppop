@@ -86,7 +86,9 @@ The site has two pages:
 
 - `/` is the introduction site (`index.html` and `lp/`). Every demo on it uses
   output checked against the real interpreter. The examples and the optional
-  background music credit live in `lp/data.js`.
+  background music credit live in `lp/data.js`. The 3D pipe at the top is
+  `lp/hero3d.js`, built on three.js (`lp/vendor/`, MIT). It is skipped when
+  WebGL is missing or the visitor prefers reduced motion.
 - `/en/` is the English introduction site. `en/index.html` is built from
   `index.html` by `python tools/build_en_page.py`; run it after editing the
   Japanese page. Its words for the demos live in `lp/data.en.js`.
