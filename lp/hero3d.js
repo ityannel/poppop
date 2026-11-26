@@ -111,7 +111,7 @@ function start() {
     g.fill();
     g.stroke();
     g.fillStyle = fg;
-    g.font = "800 64px 'JetBrains Mono', ui-monospace, monospace";
+    g.font = "700 58px Silkscreen, DotGothic16, monospace";
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillText(text, 122, 64);
@@ -148,7 +148,7 @@ function start() {
     g.fill();
     g.stroke();
     g.fillStyle = "#13204a";
-    g.font = "800 58px Fredoka, 'LINE Seed JP', sans-serif";
+    g.font = "700 50px Silkscreen, DotGothic16, monospace";
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.rotate(-0.12);
@@ -157,7 +157,7 @@ function start() {
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
-  const popTexture = burstTexture();
+  let popTexture = burstTexture();
 
   /* ---------- 写真のポップコーン ---------- */
   const loader = new THREE.TextureLoader();
@@ -533,7 +533,12 @@ function start() {
   resize();
   const ro = new ResizeObserver(() => resize());
   ro.observe(hero);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => resize());
+  if (document.fonts && document.fonts.load) {
+    Promise.all([document.fonts.load("700 58px Silkscreen"), document.fonts.ready]).then(() => {
+      popTexture = burstTexture();
+      resize();
+    }, () => {});
+  }
   new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
     if (visible) play(); else pause();

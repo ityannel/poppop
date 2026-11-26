@@ -2245,3 +2245,84 @@ html.gate-open { overflow: hidden; }
   .gate-speaker, .gate-corn-art, .gate-shadow, .gate-note, .gate-btn::before { animation: none; }
   .gate-note { opacity: 1; }
 }
+
+/* ---------- レトロ：ドットの文字と、角ばった枠 ---------- */
+:root {
+  --jp: "DotGothic16", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  --round: "Silkscreen", "DotGothic16", system-ui, sans-serif;
+  --mono: "DotGothic16", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --radius: 0px;
+  --line: 3px solid var(--ink);
+  --shadow: 6px 6px 0 var(--ink);
+  --shadow-s: 4px 4px 0 var(--ink);
+}
+*, *::before, *::after { border-radius: 0 !important; }
+body {
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+  letter-spacing: .02em;
+}
+h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
+.hero-catch { text-shadow: 4px 4px 0 var(--yellow-l); }
+.section-head h2 { text-shadow: 3px 3px 0 rgb(19 32 74 / 16%); }
+.finale h2 { text-shadow: 5px 5px 0 var(--ink); }
+.finale-kicker, .eyebrow span { font-family: "Silkscreen", "DotGothic16", monospace; font-weight: 700; }
+
+.hero {
+  background:
+    linear-gradient(90deg, var(--cream) 19px, transparent 0) 0 0 / 22px 22px,
+    linear-gradient(var(--cream) 19px, transparent 0) 0 0 / 22px 22px,
+    #e5dfd2;
+}
+.finale {
+  background:
+    linear-gradient(90deg, var(--blue) 21px, transparent 0) 0 0 / 24px 24px,
+    linear-gradient(var(--blue) 21px, transparent 0) 0 0 / 24px 24px,
+    #5585ff;
+}
+.robot-stage {
+  background:
+    linear-gradient(90deg, var(--paper) 17px, transparent 0) 0 0 / 20px 20px,
+    linear-gradient(var(--paper) 17px, transparent 0) 0 0 / 20px 20px,
+    #e3e5ec;
+}
+.gate-card {
+  background:
+    linear-gradient(90deg, var(--cream) 13px, transparent 0) 0 0 / 16px 16px,
+    linear-gradient(var(--cream) 13px, transparent 0) 0 0 / 16px 16px,
+    #e5dfd2;
+}
+
+/* 窓のバーは、昔のパソコンのように横じま */
+.window-bar, .gate-bar {
+  background:
+    repeating-linear-gradient(180deg, var(--ink) 0 2px, transparent 2px 5px) content-box,
+    var(--yellow);
+}
+.window-bar .window-dots, .window-bar .window-name, .gate-bar .window-dots, .gate-bar > span:last-child {
+  padding: 2px 8px;
+  background: var(--yellow);
+}
+.window-bar .window-name { margin-right: auto; }
+.window-dots i { border-width: 2.5px; }
+
+/* 帯は、市松もようのふち */
+.ribbon {
+  border-block: 0;
+  padding-block: 8px;
+  background:
+    conic-gradient(var(--ink) 25%, var(--paper) 0 50%, var(--ink) 0 75%, var(--paper) 0) 0 0 / 8px 8px repeat-x,
+    conic-gradient(var(--ink) 25%, var(--paper) 0 50%, var(--ink) 0 75%, var(--paper) 0) 0 100% / 8px 8px repeat-x,
+    var(--blue);
+}
+.footer {
+  border-top: 0;
+  background:
+    conic-gradient(var(--yellow) 25%, var(--ink) 0 50%, var(--yellow) 0 75%, var(--ink) 0) 0 0 / 10px 10px repeat-x,
+    var(--ink);
+}
+
+/* ボタンは、押すとカチッと沈む */
+.btn { transition: transform .06s steps(2), box-shadow .06s steps(2), background .2s; }
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+.btn:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--ink); }

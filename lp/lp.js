@@ -465,11 +465,6 @@
     const hint = L("あとから右上の 🔊 で切り替えられます。", "You can switch it anytime with 🔊 at the top.");
     const yesText = L("はい", "Yes");
     const noText = L("いいえ", "No");
-    const font = document.createElement("link");
-    font.rel = "stylesheet";
-    font.href = `https://fonts.googleapis.com/css2?family=DotGothic16&display=swap&text=${encodeURIComponent([...new Set(title + hint + yesText + noText + "VOLUME")].join(""))}`;
-    document.head.append(font);
-
     const gate = document.createElement("div");
     gate.className = "gate";
     gate.setAttribute("role", "dialog");
