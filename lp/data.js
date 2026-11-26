@@ -394,18 +394,18 @@ window.POPCORN_LP = {
     }
   ],
   "bgm": {
-    "src": "",
-    "title": "",
-    "author": "",
-    "authorUrl": "",
-    "license": "",
-    "licenseUrl": ""
+    "src": "lp/audio/jazz-brunch.mp3",
+    "title": "Jazz Brunch",
+    "author": "Kevin MacLeod",
+    "authorUrl": "https://incompetech.com",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
   },
   "popSound": {
-    "src": "",
+    "src": "lp/audio/pops.mp3",
     "step": 0.25,
-    "count": 0,
-    "credit": "",
-    "creditUrl": ""
+    "count": 12,
+    "credit": "BigSoundBank (CC0)",
+    "creditUrl": "https://bigsoundbank.com/pop-corn-corn-bursting-s0413.html"
   }
 };

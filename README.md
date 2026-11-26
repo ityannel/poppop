@@ -92,6 +92,10 @@ The site has two pages:
   whether to play sound and remembers the answer; add `?sound-check` to the
   URL to see that screen again. The symbol background of the last blue band
   is `lp/field.js`.
+  Sound files are in `lp/audio/`: the background music "Jazz Brunch" by Kevin
+  MacLeod (incompetech.com, CC BY 4.0) and a sprite of 12 single pops (0.25 s
+  each) cut from "Pop-Corn: Corn bursting" on BigSoundBank (CC0). Both credits
+  are shown in the page footer from `bgm` and `popSound` in `lp/data.js`.
 - `/en/` is the English introduction site. `en/index.html` is built from
   `index.html` by `python tools/build_en_page.py`; run it after editing the
   Japanese page. Its words for the demos live in `lp/data.en.js`.
