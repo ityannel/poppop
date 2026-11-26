@@ -1,6 +1,9 @@
 (() => {
   "use strict";
 
+  // このスクリプトのある場所（リポジトリのいちばん上）。画面は /playground/ にあるので、ほかのファイルはここから探す
+  const APP_ROOT = new URL(".", document.currentScript?.src || location.href);
+
   // 計測（itya.site の /t.js）。書いたコード・出力・質問の文章は、送らない。「種類」と「回数」だけ
   const track = (name, v) => {
     try { window.itya?.track(name, v === undefined ? undefined : { v: String(v).slice(0, 60) }); } catch { /* 計測で、動作を止めない */ }
@@ -700,7 +703,7 @@ doubled >> Display.`;
     elements.runButton.disabled = true;
     elements.checkLessonButton.disabled = true;
     setRuntimeStatus("loading", "実行環境を準備しています");
-    worker = new Worker("playground-worker.js");
+    worker = new Worker(new URL("playground-worker.js", APP_ROOT));
     worker.addEventListener("message", handleWorkerMessage);
     worker.addEventListener("error", (event) => {
       finishRun();
@@ -1101,7 +1104,7 @@ doubled >> Display.`;
 
   async function loadSpecification() {
     try {
-      const url = new URL("popcorn_specification.md", location.href);
+      const url = new URL("popcorn_specification.md", APP_ROOT);
       url.searchParams.set("spec", String(Date.now()));
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1835,7 +1838,7 @@ doubled >> Display.`;
 
   async function callGeminiOnce(promptText, jsonMode = false, task = "chat") {
     track("pc_ai_call", task);
-    const proxyResponse = await fetch("api/gemini", {
+    const proxyResponse = await fetch(new URL("api/gemini", APP_ROOT), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: promptText, json: jsonMode, task }),
@@ -1857,7 +1860,7 @@ doubled >> Display.`;
     task = "chat",
     onText = () => {},
   ) {
-    const proxyResponse = await fetch("api/gemini", {
+    const proxyResponse = await fetch(new URL("api/gemini", APP_ROOT), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
