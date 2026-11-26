@@ -167,6 +167,27 @@
 
   let audio = null;
   let soundOn = store.get("popcorn.lp.sound") === "1";
+
+  /* 音量は 0〜8 の 8 段。6 がふつう */
+  const VOLUME_STEPS = 8;
+  const savedVolume = store.get("popcorn.lp.volume");
+  let volume = savedVolume === null ? 6 : Math.max(0, Math.min(VOLUME_STEPS, Math.round(Number(savedVolume)) || 0));
+  const level = () => volume / 6;
+  let master = null;
+  function out() {
+    if (!master) {
+      master = audio.createGain();
+      master.connect(audio.destination);
+    }
+    master.gain.value = level();
+    return master;
+  }
+  function setVolume(n) {
+    volume = Math.max(0, Math.min(VOLUME_STEPS, n));
+    store.set("popcorn.lp.volume", String(volume));
+    if (master) master.gain.value = level();
+    if (bgmEl && !bgmGain && !bgmEl.paused) bgmEl.volume = Math.min(1, BGM_VOLUME * level());
+  }
   const soundToggle = $("#soundToggle");
   soundToggle.setAttribute("aria-pressed", String(soundOn));
   soundToggle.addEventListener("click", () => {
@@ -243,7 +264,7 @@
     src.buffer = popBuf;
     src.playbackRate.value = 0.88 + Math.random() * 0.26 + 0.06 * power;
     g.gain.value = Math.min(1, 0.5 + 0.35 * power);
-    src.connect(g).connect(audio.destination);
+    src.connect(g).connect(out());
     src.start(now, i * POP.step, POP.step * 0.92);
   }
 
@@ -261,7 +282,7 @@
       const source = audio.createMediaElementSource(bgmEl);
       bgmGain = audio.createGain();
       bgmGain.gain.value = 0;
-      source.connect(bgmGain).connect(audio.destination);
+      source.connect(bgmGain).connect(out());
     } catch {
       bgmGain = null;
       bgmEl.volume = 0;
@@ -297,7 +318,7 @@
     } catch {
       return;
     }
-    bgmTo(BGM_VOLUME, 1400);
+    bgmTo(bgmGain ? BGM_VOLUME : Math.min(1, BGM_VOLUME * level()), 1400);
     if (announce) toast(`♪ ${BGM.title}`, "sound", 2400);
   }
 
@@ -324,8 +345,8 @@
     });
   }
 
-  function playSound(power = 1) {
-    if (!soundOn) return;
+  function playSound(power = 1, force = false) {
+    if (!soundOn && !force) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === "suspended") audio.resume();
@@ -344,7 +365,7 @@
       gain.gain.setValueAtTime(0.0001, t);
       gain.gain.exponentialRampToValueAtTime(0.22, t + 0.008);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-      osc.connect(gain).connect(audio.destination);
+      osc.connect(gain).connect(out());
       osc.start(t);
       osc.stop(t + 0.14);
       const len = Math.floor(audio.sampleRate * 0.03);
@@ -358,9 +379,192 @@
       filter.frequency.value = 1800;
       ng.gain.value = 0.14;
       noise.buffer = buffer;
-      noise.connect(filter).connect(ng).connect(audio.destination);
+      noise.connect(filter).connect(ng).connect(out());
       noise.start(t);
     } catch { /* 音が出せなくても、動く */ }
+  }
+
+  /* ---------- はじめに：音を出すかを聞く（答えは覚える。?sound-check で、もう一度出す） ---------- */
+  const PIXELS = {
+    corn: [
+      "........kkkk........",
+      ".......kwwwwk.......",
+      "....kkkwwhhwwkkk....",
+      "...kwwwwwwwwwwwwk...",
+      "..kwwhwcwwwycwhwwk..",
+      ".kwwwwwcwwwwcwwwcck.",
+      ".kwwwwwwcwwcwwwwcck.",
+      ".kwwccwwwwwwwwccwwk.",
+      "kwwwwwwhwcwwhwcwwwwk",
+      "kwwwywwwwccwwwcywwck",
+      "kwkwwwwwwwwwwwwwwkck",
+      ".kwyyyyyyyyyyyyyywk.",
+      "..kkkkkkkkkkkkkkkk..",
+      "...krwwrrwwrrwwrk...",
+      "...krwwehwwrehwrk...",
+      "...krwwerwwrewwrk...",
+      "...krwprewwerpwrk...",
+      "...krwwrreerrwwrk...",
+      "....kwwrrwwrrwwk....",
+      "....kwwrrwwrrwwk....",
+      "....kwwrrwwrrwwk....",
+      ".....kkkkkkkkkk.....",
+    ],
+    speaker: [
+      "kkkkkkkkkkkkkk",
+      "kbbbbbbbbbbbbk",
+      "knbbbbbbbbbbbk",
+      "knbbbkkkkbbbbk",
+      "knbbbhsskbbbbk",
+      "knbbksssskbbbk",
+      "knbbbksskbbbbk",
+      "knbbbkkkkbbbbk",
+      "knbbbbbbbbbbbk",
+      "knbbkkkkkkbbbk",
+      "knbkhsssskkbbk",
+      "knbksskksskbbk",
+      "knbkskkkkskbbk",
+      "knbkskkkkskbbk",
+      "knbksskksskbbk",
+      "knbkksssskkbbk",
+      "knbbkkkkkkbbbk",
+      "knbbbbbbbbbbbk",
+      "knbbbbbbbbbbbk",
+      "kkkkkkkkkkkkkk",
+    ],
+    note: [
+      "...kk.",
+      "...kkk",
+      "...k.k",
+      "...k..",
+      "...k..",
+      ".kkk..",
+      "kkkk..",
+      ".kk...",
+    ],
+  };
+  const PIXEL_COLORS = { k: "#13204a", w: "#fffaf0", c: "#f3d49a", y: "#ffd23f", r: "#ff4f8b", b: "#2563ff", s: "#d7e5ff", e: "#13204a", h: "#ffffff", p: "#ffb3cd", n: "#1747d6" };
+
+  function pixelArt(rows, className) {
+    let rects = "";
+    rows.forEach((row, y) => {
+      for (let x = 0; x < row.length;) {
+        let n = 1;
+        while (row[x + n] === row[x]) n += 1;
+        if (row[x] !== ".") rects += `<rect x="${x}" y="${y}" width="${n}" height="1" fill="${PIXEL_COLORS[row[x]]}"/>`;
+        x += n;
+      }
+    });
+    return `<svg class="${className}" viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+  }
+
+  if (store.get("popcorn.lp.sound") === null || new URLSearchParams(location.search).has("sound-check")) openGate();
+
+  function openGate() {
+    const title = L("音が出ますが、よろしいですか？", "This site has sound. Is that OK?");
+    const hint = L("あとから右上の 🔊 で切り替えられます。", "You can switch it anytime with 🔊 at the top.");
+    const yesText = L("はい", "Yes");
+    const noText = L("いいえ", "No");
+    const font = document.createElement("link");
+    font.rel = "stylesheet";
+    font.href = `https://fonts.googleapis.com/css2?family=DotGothic16&display=swap&text=${encodeURIComponent([...new Set(title + hint + yesText + noText + "VOLUME")].join(""))}`;
+    document.head.append(font);
+
+    const gate = document.createElement("div");
+    gate.className = "gate";
+    gate.setAttribute("role", "dialog");
+    gate.setAttribute("aria-modal", "true");
+    gate.setAttribute("aria-labelledby", "gateTitle");
+    gate.innerHTML = `
+      <div class="gate-card">
+        <div class="gate-bar" aria-hidden="true"><span class="window-dots"><i></i><i></i><i></i></span><span>sound-check.pop</span></div>
+        <div class="gate-stage">
+          ${pixelArt(PIXELS.speaker, "gate-speaker")}
+          <div class="gate-corn">${pixelArt(PIXELS.corn, "gate-corn-art")}<span class="gate-shadow"></span></div>
+          ${pixelArt(PIXELS.speaker, "gate-speaker gate-speaker-r")}
+          ${pixelArt(PIXELS.note, "gate-note gate-note-a")}
+          ${pixelArt(PIXELS.note, "gate-note gate-note-b")}
+        </div>
+        <p class="gate-title" id="gateTitle">${esc(title)}</p>
+        <div class="gate-volume">
+          <span class="gate-volume-label" id="gateVolume">VOLUME</span>
+          <div class="gate-blocks" role="slider" tabindex="0" aria-labelledby="gateVolume" aria-valuemin="0" aria-valuemax="${VOLUME_STEPS}">${"<i></i>".repeat(VOLUME_STEPS)}</div>
+        </div>
+        <div class="gate-actions">
+          <button class="gate-btn gate-yes" type="button">${esc(yesText)}</button>
+          <button class="gate-btn gate-no" type="button">${esc(noText)}</button>
+        </div>
+        <p class="gate-hint">${esc(hint)}</p>
+      </div>`;
+
+    const blocks = $(".gate-blocks", gate);
+    const cells = $$("i", blocks);
+    const yes = $(".gate-yes", gate);
+    const no = $(".gate-no", gate);
+    const stage = $(".gate-stage", gate);
+    function paint() {
+      cells.forEach((cell, i) => cell.classList.toggle("on", i < volume));
+      blocks.setAttribute("aria-valuenow", String(volume));
+      blocks.setAttribute("aria-valuetext", `${volume} / ${VOLUME_STEPS}`);
+      stage.style.setProperty("--loud", String(volume / VOLUME_STEPS));
+    }
+    function changeVolume(n) {
+      setVolume(n);
+      paint();
+      playSound(0.7, true);
+    }
+    paint();
+    blocks.addEventListener("click", (event) => {
+      const i = cells.indexOf(event.target.closest("i"));
+      if (i >= 0) changeVolume(i + 1 === volume ? i : i + 1);
+    });
+    blocks.addEventListener("keydown", (event) => {
+      const next = { ArrowRight: volume + 1, ArrowUp: volume + 1, ArrowLeft: volume - 1, ArrowDown: volume - 1, Home: 0, End: VOLUME_STEPS }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      changeVolume(next);
+    });
+
+    const hidden = Array.from(document.body.children).filter((el) => el !== gate && !el.inert);
+    hidden.forEach((el) => { el.inert = true; });
+    document.documentElement.classList.add("gate-open");
+    const before = document.activeElement;
+    document.body.append(gate);
+    requestAnimationFrame(() => {
+      gate.classList.add("is-open");
+      yes.focus({ preventScroll: true });
+    });
+
+    function finish(on) {
+      soundOn = on;
+      store.set("popcorn.lp.sound", on ? "1" : "0");
+      soundToggle.setAttribute("aria-pressed", String(on));
+      track("pc_lp_sound_gate", on ? "yes" : "no");
+      if (on) {
+        popFetch();
+        playSound(1.2);
+        if (BGM) bgmPlay(true);
+      }
+      gate.classList.add("is-leaving");
+      hidden.forEach((el) => { el.inert = false; });
+      document.documentElement.classList.remove("gate-open");
+      if (before && before !== document.body && before.focus) before.focus({ preventScroll: true });
+      setTimeout(() => gate.remove(), reduced ? 0 : 420);
+    }
+    yes.addEventListener("click", () => finish(true));
+    no.addEventListener("click", () => finish(false));
+    gate.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const order = [blocks, yes, no];
+      const i = order.indexOf(document.activeElement);
+      event.preventDefault();
+      order[(i + (event.shiftKey ? order.length - 1 : 1)) % order.length].focus();
+    });
   }
 
   const countEl = $("#popCount");
