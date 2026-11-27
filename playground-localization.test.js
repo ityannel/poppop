@@ -79,3 +79,14 @@ assert.equal(
   localizeError("TypeError: Cannot cast 'true' (Bool) to Num"),
   "型エラー: 「true」（Bool）は数に変換できません。",
 );
+
+for (const [input, expected] of [
+  ["RuntimeError: Median requires a non-empty List", "実行時エラー: 「Median」には、空でないリスト を渡してください。"],
+  ["TypeError: Take requires (List or Str, n)", "型エラー: 「Take」には、(リストか文字列, n) を渡してください。"],
+  ["RuntimeError: Mod divisor must not be 0", "実行時エラー: 「Mod」の割る数は 0 にできません。"],
+  ["RuntimeError: Chunk size must be at least 1", "実行時エラー: 「Chunk」の大きさは 1 以上にしてください。"],
+  ["RuntimeError: Clamp requires min <= max", "実行時エラー: 「Clamp」は、最小を最大以下にしてください。"],
+  ["RuntimeError: FromBase cannot read 'zz' in base 2", "実行時エラー: 「zz」は 2 進数として読めません。"],
+]) {
+  assert.equal(localizeError(input), expected);
+}
