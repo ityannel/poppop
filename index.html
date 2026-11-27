@@ -1,395 +1,452 @@
 <!doctype html>
-<html lang="ja" data-theme="dark">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
-  <script>
-    if (
-      window.location.hostname === "ityannel.github.io"
-      && window.location.pathname.startsWith("/popcorn")
-    ) {
-      const destination = new URL("https://popcorn-playground.vercel.app/");
-      destination.search = window.location.search;
-      destination.hash = window.location.hash;
-      window.location.replace(destination.href);
-    }
-  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PopCorn をブラウザで試せる公式 Playground">
-  <meta name="theme-color" content="#0b1730">
+  <title>PopCorn｜書いた順に動く、小さなプログラミング言語</title>
+  <meta name="description" content="PopCorn は、値を >> で左から右へつないでいく、小さなプログラミング言語。読んだ順に、何が起きるかがわかります。ブラウザですぐに試せます。">
+  <meta name="theme-color" content="#fff6e3">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PopCorn">
-  <meta property="og:title" content="PopCorn Playground">
-  <meta property="og:description" content="小さく、読みやすく、ポップする言語。ブラウザですぐに試せます。">
-  <meta property="og:url" content="https://popcorn-playground.vercel.app/">
-  <meta property="og:image" content="https://popcorn-playground.vercel.app/popcorn-ogp.png">
+  <meta property="og:title" content="PopCorn｜書いた順に動く、小さなプログラミング言語">
+  <meta property="og:description" content="値を >> で左から右へつないでいく、小さなプログラミング言語。ブラウザですぐに試せます。">
+  <meta property="og:url" content="https://popcorn.itya.site/">
+  <meta property="og:image" content="https://popcorn.itya.site/popcorn-ogp.png">
   <meta property="og:image:width" content="2506">
   <meta property="og:image:height" content="1624">
   <meta property="og:image:alt" content="PopCorn 1">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PopCorn Playground">
-  <meta name="twitter:description" content="小さく、読みやすく、ポップする言語。ブラウザですぐに試せます。">
-  <meta name="twitter:image" content="https://popcorn-playground.vercel.app/popcorn-ogp.png">
-  <meta name="twitter:image:alt" content="PopCorn 1">
-  <title>PopCorn Playground</title>
-  <link rel="canonical" href="https://popcorn-playground.vercel.app/">
+  <meta name="twitter:title" content="PopCorn｜書いた順に動く、小さなプログラミング言語">
+  <meta name="twitter:description" content="値を >> で左から右へつないでいく、小さなプログラミング言語。ブラウザですぐに試せます。">
+  <meta name="twitter:image" content="https://popcorn.itya.site/popcorn-ogp.png">
+  <link rel="canonical" href="https://popcorn.itya.site/">
+  <link rel="alternate" hreflang="ja" href="https://popcorn.itya.site/">
+  <link rel="alternate" hreflang="en" href="https://popcorn.itya.site/en/">
+  <link rel="alternate" hreflang="x-default" href="https://popcorn.itya.site/">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="favicon.png">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Kosugi&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="playground.css">
-  <link rel="stylesheet" href="popcorn-visual.css">
-  <link rel="stylesheet" href="itya-theme.css">
-  <!-- アクセス数（Vercel Analytics）: itya.site/popcorn/ で開いたとき、itya.site の計測に入る。Cookie は使わない -->
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="lp/lp.css">
   <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
   <script defer src="/_vercel/insights/script.js"></script>
-  <!-- 計測（itya.site の中でだけ）: Cookie なし・書いたコードは送らない。見るのは itya.site/analytics -->
-  <script>if (/(^|\.)itya\.site$/.test(location.hostname)) { var s = document.createElement("script"); s.src = "/t.js"; s.defer = true; document.head.appendChild(s); }</script>
+  <script>if (/(^|\.)itya\.site$/.test(location.hostname)) { var s = document.createElement("script"); s.src = "https://itya.site/t.js"; s.defer = true; document.head.appendChild(s); }</script>
 </head>
 <body>
-  <a class="skip-link" href="#editor">エディターへ移動</a>
-  <div id="appStatus" class="sr-only" role="status" aria-live="polite"></div>
+  <a class="skip" href="#main">本文へ</a>
+  <canvas id="popLayer" class="pop-layer" aria-hidden="true"></canvas>
 
-  <header class="app-header">
-    <div class="brand">
-      <img class="brand-logo" src="popcorn-logo.png" alt="PopCorn">
-      <img class="popcorn-logo" src="popcorn-logo.png" alt="PopCorn">
-      <h1 class="sr-only">PopCorn Playground</h1>
-    </div>
-    <div class="header-status">
-      <span id="runtimeStatus">PopCorn 1 Playground</span>
+  <svg width="0" height="0" class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="kernelFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffe27a"/>
+        <stop offset="1" stop-color="#ff9f1c"/>
+      </linearGradient>
+      <symbol id="i-kernel" viewBox="0 0 64 64">
+        <path d="M32 6c11 9 18 22 18 33 0 11-8 19-18 19s-18-8-18-19C14 28 21 15 32 6z" fill="url(#kernelFill)" stroke="#13204a" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M24 30c1-6 4-12 8-16" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+      </symbol>
+      <symbol id="i-pop" viewBox="0 0 64 64">
+        <g fill="#fff5d6" stroke="#13204a" stroke-width="3.4">
+          <circle cx="21" cy="31" r="12"/>
+          <circle cx="40" cy="21" r="13"/>
+          <circle cx="45" cy="38" r="11"/>
+          <circle cx="29" cy="45" r="11"/>
+          <circle cx="25" cy="18" r="10"/>
+        </g>
+        <g fill="#fff5d6">
+          <circle cx="32" cy="32" r="12"/>
+        </g>
+        <path d="M27 49c3 7 9 7 12 0" fill="#ff9f1c" stroke="#13204a" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="38" cy="17" r="3" fill="#fff"/>
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="8" y="8" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M16 5.5V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-tap" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" fill="currentColor"/>
+        <circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.2" opacity=".45"/>
+      </symbol>
+      <symbol id="i-drag" viewBox="0 0 24 24">
+        <path d="M12 3v18M3 12h18M12 3 9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-hold" viewBox="0 0 24 24">
+        <circle cx="12" cy="13.5" r="7.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M12 13.5v-4M10 2.5h4M12 2.5V6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type" viewBox="0 0 24 24">
+        <rect x="2.5" y="6" width="19" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M6.5 10h1M10.5 10h1M14.5 10h1M8 14h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-throw" viewBox="0 0 24 24">
+        <path d="M4 19c2-8 8-12.5 15-12.5M19 6.5l-4-2.4M19 6.5l-2.2 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <header class="nav" id="nav">
+    <a class="nav-logo" href="#top" aria-label="PopCorn のトップへ">
+      <img src="lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267">
+    </a>
+    <nav class="nav-links" aria-label="ページの中">
+      <a href="#rules">きまり</a>
+      <a href="#lab">遊ぶ</a>
+      <a href="#try">試す</a>
+      <a href="#learn">学ぶ</a>
+    </nav>
+    <div class="nav-tools">
+      <span class="pop-count" title="ポップした数"><svg aria-hidden="true"><use href="#i-pop"/></svg><b id="popCount">0</b><span class="sr-only">回ポップ</span></span>
+      <button class="icon-btn" type="button" data-open-games aria-haspopup="dialog" title="ミニゲーム"><span aria-hidden="true">🎮</span><span class="sr-only">ミニゲーム</span></button>
+      <button id="soundToggle" class="icon-btn" type="button" aria-pressed="false" title="ポップの音">
+        <span class="sound-on" aria-hidden="true">🔊</span><span class="sound-off" aria-hidden="true">🔇</span><span class="sr-only">ポップの音</span>
+      </button>
+      <a class="lang-link" href="en/" hreflang="en" lang="en" title="English">EN</a>
+      <a class="btn btn-small btn-blue" href="playground/">Playground</a>
     </div>
   </header>
 
-  <nav class="toolbar toolbar-empty" aria-hidden="true"></nav>
-
-  <main class="workspace">
-    <aside class="sidebar" aria-label="レッスン、サンプル、リファレンス">
-      <div class="side-tabs left-bar" role="tablist" aria-label="ツール">
-        <button id="explorerTab" class="side-tab active" role="tab" aria-selected="true" aria-controls="explorerPanel" tabindex="0" title="ファイル" aria-label="ファイル">ファイル</button>
-        <button id="examplesTab" class="side-tab" role="tab" aria-selected="false" aria-controls="examplesPanel" tabindex="-1">例</button>
-        <button id="lessonTab" class="side-tab lesson-tab" role="tab" aria-selected="false" aria-controls="lessonPanel" tabindex="-1">
-          ロボット君 <span id="lessonTabProgress" class="count">0/0</span>
-        </button>
-        <div class="left-tools">
-    <span id="runFeedback" class="run-feedback" aria-hidden="true"></span>
-    <span class="toolbar-spacer"></span>
-    </div>
-      </div>
-      <section id="explorerPanel" class="side-panel explorer" role="tabpanel" aria-labelledby="explorerTab">
-      <div class="explorer-head">
-        <span class="explorer-title" aria-label="エクスプローラー"></span>
-        <div class="explorer-actions">
-          <button id="newFileButton" class="vs-icon" type="button" title="新しいファイル" aria-label="新しいファイル"><span class="ci" data-icon="new-file" aria-hidden="true"></span></button>
-          <button id="newFolderButton" class="vs-icon" type="button" title="新しいフォルダー" aria-label="新しいフォルダー"><span class="ci" data-icon="new-folder" aria-hidden="true"></span></button>
-          <button id="renameButton" class="vs-icon" type="button" title="名前を変える" aria-label="名前を変える"><span class="ci" data-icon="edit" aria-hidden="true"></span></button>
-          <button id="deleteButton" class="vs-icon" type="button" title="削除" aria-label="削除"><span class="ci" data-icon="trash" aria-hidden="true"></span></button>
-          <button id="uploadFileButton" class="vs-icon" type="button" title="アップロード" aria-label="アップロード"><span class="ci" data-icon="cloud-upload" aria-hidden="true"></span></button>
-          <button id="downloadFileButton" class="vs-icon" type="button" title="ダウンロード" aria-label="ダウンロード"><span class="ci" data-icon="cloud-download" aria-hidden="true"></span></button>
-        </div>
-      </div>
-      <input id="uploadInput" class="sr-only" type="file" multiple accept=".pop,.popcorn,.txt,.md,text/plain">
-      <ul id="fileList" class="file-list" role="list"></ul>
-      </section>
-      <section id="examplesPanel" class="side-panel" role="tabpanel" aria-labelledby="examplesTab" hidden>
-        <label class="search-box">
-          <span class="sr-only">コード例を検索</span>
-          <input id="exampleSearch" type="search" placeholder="検索">
-        </label>
-        <div id="exampleList" class="card-list" aria-live="polite">
-          <p class="muted">仕様書から読み込み中…</p>
-        </div>
-      </section>
-
-
-      <section id="lessonPanel" class="side-panel lesson-panel" role="tabpanel" aria-labelledby="lessonTab" hidden>
-        <div class="tutor-header">
-          <div id="robotAvatar" class="robot-avatar" role="img" aria-label="ロボット君">
-            <span class="robot-antenna"></span>
-            <span class="robot-eye left"></span>
-            <span class="robot-eye right"></span>
-            <span class="robot-mouth"></span>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="decor" id="decor" aria-hidden="true"></div>
+      <div class="hero-inner wrap">
+        <div class="hero-copy">
+          <p class="badge"><span>PopCorn 1</span>実験中のアルファ版</p>
+          <h1 class="hero-title">
+            <img class="hero-logo" src="lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267">
+            <span class="hero-catch">書いた順に、<em>動く</em></span>
+          </h1>
+          <p class="hero-lead">PopCorn（ポップコーン）は、値を <code class="pipe-chip">&gt;&gt;</code> でつなぐ、小さなプログラミング言語</p>
+          <div class="hero-cta">
+            <a class="btn btn-big btn-blue" href="playground/">ブラウザで試す<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-big btn-paper" href="#lab">さわって遊ぶ</a>
           </div>
-          <div>
-            <strong>ロボット君</strong>
-            <span id="tutorStatus" class="tutor-online"><i></i> Gemini先生</span>
-          </div>
-          <button id="resetLessonButton" class="tutor-reset" type="button" aria-label="進捗とAI設定をリセット">↻ 全リセット</button>
+          <ul class="hero-facts">
+            <li>インストールなしで動く</li>
+            <li>エラーは日本語</li>
+            <li>テストも書ける</li>
+          </ul>
         </div>
-
-        <section id="tutorWelcome" class="tutor-welcome" aria-labelledby="tutorWelcomeTitle">
-          <span class="welcome-spark spark-one" aria-hidden="true">✦</span>
-          <span class="welcome-spark spark-two" aria-hidden="true">●</span>
-          <div id="welcomeIntro" class="welcome-intro">
-            <h2 id="tutorWelcomeTitle">いっしょに<br>PopCornしよう。</h2>
-            <p>コードを書いて、動かして、困ったらすぐ聞けるよ。</p>
-            <button id="welcomeTutorButton" type="button">
-              ロボット君と始める <span class="ci" data-icon="arrow-right" aria-hidden="true"></span>
-            </button>
-            <small>次からは、すぐレッスンを開きます</small>
-          </div>
-
-          <form id="tutorProfileForm" class="tutor-profile" hidden>
-            <h2>あなたに合う<br>問題をつくるね。</h2>
-            <fieldset>
-              <legend>プログラミングはどのくらい？</legend>
-              <div class="level-options">
-                <label><input type="radio" name="tutorLevel" value="はじめて" checked><span>はじめて</span></label>
-                <label><input type="radio" name="tutorLevel" value="少し書ける"><span>少し書ける</span></label>
-                <label><input type="radio" name="tutorLevel" value="慣れている"><span>慣れている</span></label>
-              </div>
-            </fieldset>
-            <label class="profile-goal" for="tutorGoal">
-              <span>何を作ってみたい？</span>
-              <input id="tutorGoal" type="text" maxlength="80" placeholder="ゲーム、占い、データ整理…" required>
-            </label>
-            <details class="profile-optional">
-              <summary>もう少し教える <span>任意</span></summary>
-              <p>問題の題材や説明を、よりあなたに合わせるために使います。</p>
-              <div class="profile-optional-grid">
-                <label for="tutorAge">
-                  <span>年齢</span>
-                  <select id="tutorAge">
-                    <option value="">回答しない</option>
-                    <option value="12歳以下">12歳以下</option>
-                    <option value="13〜18歳">13〜18歳</option>
-                    <option value="19〜24歳">19〜24歳</option>
-                    <option value="25〜34歳">25〜34歳</option>
-                    <option value="35〜49歳">35〜49歳</option>
-                    <option value="50歳以上">50歳以上</option>
-                  </select>
-                </label>
-                <label for="tutorGender">
-                  <span>性別</span>
-                  <select id="tutorGender">
-                    <option value="">回答しない</option>
-                    <option value="女性">女性</option>
-                    <option value="男性">男性</option>
-                    <option value="ノンバイナリー">ノンバイナリー</option>
-                    <option value="その他">その他</option>
-                  </select>
-                </label>
-                <label for="tutorLocation">
-                  <span>場所</span>
-                  <select id="tutorLocation">
-                    <option value="">回答しない</option>
-                    <option value="北海道">北海道</option>
-                    <option value="東北">東北</option>
-                    <option value="関東">関東</option>
-                    <option value="中部">中部</option>
-                    <option value="近畿">近畿</option>
-                    <option value="中国">中国</option>
-                    <option value="四国">四国</option>
-                    <option value="九州・沖縄">九州・沖縄</option>
-                    <option value="日本以外">日本以外</option>
-                  </select>
-                </label>
-                <label for="tutorOccupation">
-                  <span>職業</span>
-                  <select id="tutorOccupation">
-                    <option value="">回答しない</option>
-                    <option value="小学生">小学生</option>
-                    <option value="中学生">中学生</option>
-                    <option value="高校生">高校生</option>
-                    <option value="大学生・専門学生">大学生・専門学生</option>
-                    <option value="会社員">会社員</option>
-                    <option value="自営業・フリーランス">自営業・フリーランス</option>
-                    <option value="教育関係">教育関係</option>
-                    <option value="その他">その他</option>
-                  </select>
-                </label>
-              </div>
-            </details>
-            <button type="submit">
-              わたし向けに始める <span class="ci" data-icon="arrow-right" aria-hidden="true"></span>
-            </button>
-          </form>
-        </section>
-
-        <div id="tutorSession" class="tutor-session" hidden>
-          <div id="lessonTuning" class="lesson-tuning" role="status" hidden>
-            <div class="lesson-tuning-icon" aria-hidden="true">
-              <i></i><i></i><i></i>
+        <figure class="hero-demo" aria-label="パイプラインの例">
+          <div class="crt">
+          <div class="window">
+            <div class="window-bar">
+              <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-name">pipeline.pop</span>
+              <button class="mini-btn" id="heroReplay" type="button">もう一回</button>
             </div>
-            <strong>あなた向けの問題を準備中</strong>
-            <p>題名・説明・コードをまとめて切り替えます。</p>
+            <ol class="hero-lines" id="heroLines"></ol>
           </div>
-          <div class="lesson-progress" aria-label="レッスン進捗">
-            <div class="lesson-progress-label">
-              <span>進捗</span>
-              <strong id="lessonProgressText">0 / 0</strong>
-            </div>
-            <div class="progress-track" role="progressbar" aria-label="レッスン進捗" aria-valuemin="0" aria-valuemax="8" aria-valuenow="0">
-              <span id="lessonProgressBar"></span>
-            </div>
+          <div class="crt-chin" aria-hidden="true"><span class="crt-brand">PopCorn 1</span><i class="crt-vents"></i><i class="crt-led"></i></div>
           </div>
-
-          <div class="lesson-picker">
-            <button id="previousLessonButton" class="lesson-arrow" type="button" aria-label="前のレッスン">←</button>
-            <button id="lessonTitleButton" class="lesson-title-button" type="button">
-              <span id="lessonBadge">—</span>
-              <strong id="lessonTitle">準備中…</strong>
-            </button>
-            <button id="nextLessonButton" class="lesson-arrow" type="button" aria-label="次のレッスン">→</button>
-          </div>
-
-          <div class="lesson-goal"><span class="ci" data-icon="target" aria-hidden="true"></span><span id="lessonGoal">読み込み中…</span></div>
-
-          <div id="lessonChat" class="lesson-chat" aria-live="polite" aria-label="ロボット君との会話"></div>
-          <div id="tutorThinking" class="tutor-thinking" role="status" hidden>
-            <span class="thinking-icon" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span>考え中</span>
-          </div>
-
-          <div class="lesson-actions">
-            <button id="checkLessonButton" class="button lesson-check" type="button" disabled><span class="ci" data-icon="check" aria-hidden="true"></span> 答え合わせ</button>
-            <button id="hintButton" class="button" type="button" disabled aria-label="ヒント"><span aria-hidden="true">💡</span> ヒント</button>
-            <button id="showAnswerButton" class="button" type="button" disabled aria-label="答えを見る"><span aria-hidden="true">👀</span> 答え</button>
-            <button id="aiLessonButton" class="button" type="button"><span class="ci" data-icon="sparkle" aria-hidden="true"></span> おまかせ問題</button>
-          </div>
-          <button id="advanceLessonButton" class="advance-lesson" type="button" hidden>
-            次のレッスンへ <span class="ci" data-icon="arrow-right" aria-hidden="true"></span>
-          </button>
-
-          <form id="lessonQuestionForm" class="lesson-question">
-            <label class="sr-only" for="lessonQuestion">ロボット君に質問</label>
-            <input id="lessonQuestion" placeholder="ここでロボット君に聞けます" autocomplete="off">
-            <button type="submit" aria-label="質問を送信">➤</button>
-          </form>
-        </div>
-      </section>
-    </aside>
-
-    <div
-      id="sidebarResizer"
-      class="workspace-resizer sidebar-resizer"
-      role="separator"
-      aria-label="学習棚の幅を変更"
-      aria-orientation="vertical"
-      aria-valuemin="230"
-      aria-valuemax="420"
-      tabindex="0"
-    ></div>
-
-    <section class="editor-column" aria-label="コードエディター">
-      <div class="editor-top">
-        <div id="editorTabs" class="editor-tabs" role="tablist"></div>
-        <div class="editor-actions">
-      <details id="moreTools" class="tool-menu">
-      <summary aria-label="その他の操作" title="その他"><span class="ci" data-icon="ellipsis" aria-hidden="true"></span></summary>
-      <div class="tool-menu-popover">
-      <button id="copyCodeButton" class="button" type="button"><span class="ci" data-icon="copy" aria-hidden="true"></span> コピー</button>
-      <button id="downloadButton" class="button" type="button"><span class="ci" data-icon="save" aria-hidden="true"></span> 保存</button>
-      <button id="loadFileButton" class="button" type="button"><span class="ci" data-icon="folder-opened" aria-hidden="true"></span> 読み込む</button>
-      <input id="fileInput" class="sr-only" type="file" accept=".pop,.popcorn,text/plain">
-      <button id="shareButton" class="button" type="button"><span class="ci" data-icon="share" aria-hidden="true"></span> 共有</button>
-      <span class="tool-menu-rule" aria-hidden="true"></span>
-      <span class="tool-menu-heading">画面レイアウト</span>
-      <div class="layout-presets" role="group" aria-label="画面レイアウト">
-      <button class="layout-preset" type="button" data-layout-preset="focus">
-      <span class="ci" data-icon="screen-full" aria-hidden="true"></span><span>集中</span>
-      </button>
-      <button class="layout-preset" type="button" data-layout-preset="try">
-      <span class="ci" data-icon="layout-sidebar-right" aria-hidden="true"></span><span>試す</span>
-      </button>
-      <button class="layout-preset" type="button" data-layout-preset="learn">
-      <span class="ci" data-icon="layout-sidebar-left" aria-hidden="true"></span><span>学ぶ</span>
-      </button>
+        </figure>
       </div>
-      <span class="tool-menu-rule" aria-hidden="true"></span>
-      <button id="decreaseFontButton" class="button" type="button"><span class="ci" data-icon="zoom-out" aria-hidden="true"></span> 文字を小さく</button>
-      <button id="increaseFontButton" class="button" type="button"><span class="ci" data-icon="zoom-in" aria-hidden="true"></span> 文字を大きく</button>
-      <button id="themeButton" class="button" type="button" aria-label="配色を切り替える" aria-pressed="false"><span class="ci" data-icon="color-mode" aria-hidden="true"></span> 配色を切り替える</button>
-      </div>
-      </details>
-          <button id="formatButton" class="icon-btn" type="button" title="整形（Shift+Alt+F）" aria-label="整形"><span class="ci" data-icon="wand" aria-hidden="true"></span></button>
-          <button id="stopButton" class="icon-btn danger" type="button" title="停止" aria-label="停止" disabled><span class="ci" data-icon="debug-stop" aria-hidden="true"></span></button>
-          <button id="runButton" class="icon-btn run" type="button" title="実行（Ctrl+Enter）" aria-label="実行" disabled><span class="ci" data-icon="play" aria-hidden="true"></span></button>
-        </div>
-      </div>
-      <div class="pane-title">
-        <span id="activeName"></span>
-        <span id="saveStatus" class="muted">自動保存</span>
-      </div>
-      <div id="editor" aria-label="PopCorn コード"></div>
-      <article id="mdView" class="md-view" aria-label="仕様書" hidden></article>
-      <textarea id="editorFallback" aria-label="PopCorn コード" spellcheck="false"></textarea>
-      <div class="editor-statusbar">
-        <span id="cursorStatus">行 1, 列 1</span>
-        <span id="characterStatus">0 文字</span>
-        <span>UTF-8</span>
-        <span>PopCorn</span>
+      <div class="hero-hint wrap">
+        <div class="tray" id="kernels" role="group" aria-label="ポップコーンの粒"></div>
+        <p>粒をタップ</p>
       </div>
     </section>
 
-    <div
-      id="resultResizer"
-      class="workspace-resizer result-resizer"
-      role="separator"
-      aria-label="結果棚の幅を変更"
-      aria-orientation="vertical"
-      aria-valuemin="280"
-      aria-valuemax="500"
-      tabindex="0"
-    ></div>
+    <div class="ribbon" aria-hidden="true">
+      <div class="ribbon-track" id="ribbon"></div>
+    </div>
 
-    <section class="result-column" aria-label="実行結果">
-      <div class="mobile-result-grip">
-        <button id="resultDrawerHandle" type="button" aria-label="結果棚を広げる" aria-expanded="false">
-          <span class="drawer-grip" aria-hidden="true"></span>
-          <span>実行結果</span>
-        </button>
-        <button id="closeResultDrawerButton" type="button" aria-label="結果棚を閉じる">×</button>
+    <section class="section rules" id="rules">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>01</span>きまり<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
+          <h2>覚えることは、<br class="sp">3つだけ</h2>
+        </header>
+        <div class="rule-grid" id="ruleGrid"></div>
       </div>
-      <div class="result-tabs">
-        <div class="result-tab-list" role="tablist">
-          <button id="outputTab" class="result-tab active" data-result-tab="output" role="tab" aria-selected="true" aria-controls="outputPanel" tabindex="0">出力</button>
-          <button id="diagnosticsTab" class="result-tab" data-result-tab="diagnostics" role="tab" aria-selected="false" aria-controls="diagnosticsPanel" tabindex="-1">
-            診断 <span id="diagnosticCount" class="count">0</span>
-          </button>
-          <button id="astTab" class="result-tab detail-tab" data-result-tab="ast" role="tab" aria-selected="false" aria-controls="astPanel" tabindex="-1">詳細</button>
+    </section>
+
+    <section class="section order" id="order">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>02</span>読みやすさ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
+          <h2>読む順が、<br class="sp">そのまま動く順</h2>
+        </header>
+        <div class="order-grid reveal">
+          <article class="order-card order-nested">
+            <h3>入れ子の書き方<small>（Python の例）</small></h3>
+            <div class="order-code" id="orderNested"></div>
+          </article>
+          <article class="order-card order-pop">
+            <h3>PopCorn<small>（書いた順に）</small></h3>
+            <div class="order-code" id="orderPop"></div>
+          </article>
         </div>
-        <button id="copyResultButton" class="copy-result" type="button">コピー</button>
+        <div class="center reveal">
+          <button class="btn btn-big btn-pink" id="orderPlay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>動く順に光らせる</button>
+          <p class="order-result" id="orderResult" aria-live="polite"></p>
+        </div>
       </div>
-      <div id="resultBody" class="result-body">
-        <pre id="outputPanel" class="result-panel" role="tabpanel" aria-labelledby="outputTab" tabindex="0"><span class="muted">実行結果はここに表示されます。</span></pre>
-        <div id="diagnosticsPanel" class="result-panel diagnostics-panel" role="tabpanel" aria-labelledby="diagnosticsTab" tabindex="0" hidden>構文上の問題はありません。</div>
-        <pre id="astPanel" class="result-panel" role="tabpanel" aria-labelledby="astTab" tabindex="0" hidden>実行後に構文木を表示します。</pre>
-        <form id="terminalInputForm" class="terminal-input" hidden>
-          <label id="terminalPrompt" for="terminalInput">入力</label>
-          <input id="terminalInput" autocomplete="off" spellcheck="false">
-          <button type="submit" aria-label="入力を送信" title="Enterで送信">↵</button>
-        </form>
+    </section>
+
+    <section class="section lab" id="lab">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>03</span>遊ぶ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span><span class="how how-drag"><svg aria-hidden="true"><use href="#i-drag"/></svg>ドラッグ</span><span class="how how-hold"><svg aria-hidden="true"><use href="#i-hold"/></svg>長押し</span></span></p>
+          <h2>パイプライン工作室</h2>
+        </header>
+        <div class="lab-board reveal" data-nopop>
+          <div class="lab-presets">
+            <span class="lab-label">おすすめ</span>
+            <div class="chip-row" id="labPresets"></div>
+          </div>
+          <div class="lab-palette" id="labPalette" aria-label="ブロック置き場"></div>
+          <ol class="lab-track" id="labTrack" aria-live="polite"></ol>
+          <div class="lab-code">
+            <div class="lab-code-head">
+              <span class="lab-label">いまのコード</span>
+              <div class="lab-actions">
+                <button class="btn btn-small btn-yellow" id="labReplay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>もう一度流す</button>
+                <a class="btn btn-small btn-blue" id="labOpen" href="playground/">Playground で開く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+                <button class="btn btn-small btn-paper hold-btn" id="labClear" type="button">ぜんぶ外す<small>長押し</small></button>
+              </div>
+            </div>
+            <pre class="code code-dark" id="labCode"></pre>
+          </div>
+        </div>
       </div>
-      <footer class="run-meta">
-        <span id="runState">待機中</span>
-        <span id="runTime">— ms</span>
-        <span title="実行時にリポジトリの Python ソースを直接読み込みます">実装同期: ON</span>
-      </footer>
+    </section>
+
+    <section class="section check" id="check">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>04</span>条件分岐<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
+          <h2>条件は、<br class="sp">上から順に</h2>
+        </header>
+        <div class="check-grid reveal">
+          <div class="check-left">
+            <pre class="code code-paper" id="fbCode"></pre>
+            <div class="fb-trace" id="fbTrace" aria-live="polite"></div>
+          </div>
+          <div class="check-right">
+            <div class="fb-tiles" id="fbTiles" role="group" aria-label="1 から 30 までの数"></div>
+            <div class="fb-legend">
+              <span class="lg lg-fb">FizzBuzz</span><span class="lg lg-f">Fizz</span><span class="lg lg-b">Buzz</span><span class="lg lg-n">そのまま</span>
+              <button class="btn btn-small btn-paper" id="fbPlay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>1 から順に</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tools" id="tools">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>05</span>道具<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>入力</span></span></p>
+          <h2>ちょっと便利な記号と、<br class="sp">やさしいエラー</h2>
+        </header>
+        <div class="tool-box reveal" data-nopop>
+          <div class="tool-tabs" role="tablist" aria-label="道具" id="toolTabs">
+            <button role="tab" id="tab-peek" aria-controls="panel-peek" aria-selected="true"><code>&gt;?&gt;</code>のぞく</button>
+            <button role="tab" id="tab-fallback" aria-controls="panel-fallback" aria-selected="false" tabindex="-1"><code>&gt;!&gt;</code>差し替える</button>
+            <button role="tab" id="tab-fork" aria-controls="panel-fork" aria-selected="false" tabindex="-1"><code>Fork</code>分ける</button>
+            <button role="tab" id="tab-test" aria-controls="panel-test" aria-selected="false" tabindex="-1"><code>Test</code>確かめる</button>
+            <button role="tab" id="tab-error" aria-controls="panel-error" aria-selected="false" tabindex="-1"><code>!</code>エラー</button>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-peek" aria-labelledby="tab-peek">
+            <div class="tool-text">
+              <h3>流れの途中を、のぞく</h3>
+            </div>
+            <div class="tool-demo">
+              <div class="code code-dark peek-code" id="peekCode"></div>
+              <pre class="console" id="peekOut" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-fallback" aria-labelledby="tab-fallback" hidden>
+            <div class="tool-text">
+              <h3>失敗したら、差し替える</h3>
+            </div>
+            <div class="tool-demo">
+              <label class="fb-input">
+                <span><code>text</code> に入れる文字</span>
+                <input id="fallbackInput" type="text" value="17" autocomplete="off" spellcheck="false">
+              </label>
+              <div class="chip-row" id="fallbackChips"></div>
+              <pre class="code code-dark" id="fallbackCode"></pre>
+              <div class="fallback-flow" id="fallbackFlow" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-fork" aria-labelledby="tab-fork" hidden>
+            <div class="tool-text">
+              <h3>ひとつの値から、いくつも計算する</h3>
+            </div>
+            <div class="tool-demo">
+              <div class="fork-inputs" id="forkInputs"></div>
+              <pre class="code code-dark" id="forkCode"></pre>
+              <div class="fork-tree" id="forkTree" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" hidden>
+            <div class="tool-text">
+              <h3>テストも、PopCorn で書ける</h3>
+              <label class="switch">
+                <input type="checkbox" id="testBug">
+                <span class="switch-ui" aria-hidden="true"></span>
+                <span>わざとバグを入れる（<code>+</code> を <code>-</code> に）</span>
+              </label>
+            </div>
+            <div class="tool-demo">
+              <pre class="code code-dark" id="testCode"></pre>
+              <pre class="console" id="testOut" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-error" aria-labelledby="tab-error" hidden>
+            <div class="tool-text">
+              <h3>まちがえても、日本語で</h3>
+              <div class="chip-row" id="errorChips"></div>
+            </div>
+            <div class="tool-demo">
+              <pre class="code code-dark" id="errorCode"></pre>
+              <pre class="console" id="errorOut" aria-live="polite"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section try" id="try">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>06</span>試す<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>入力</span></span></p>
+          <h2>本物の PopCorn を、<br class="sp">ここで</h2>
+        </header>
+        <div class="ide reveal" data-nopop>
+          <div class="ide-examples" id="tryExamples" role="group" aria-label="例"></div>
+          <div class="ide-main">
+            <div class="ide-bar">
+              <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-name" id="tryName">main.pop</span>
+              <span class="ide-status" id="tryStatus" data-state="idle">まだ準備していません</span>
+            </div>
+            <div class="editor">
+              <pre class="editor-hl code" aria-hidden="true"><code id="tryHighlight"></code></pre>
+              <textarea id="tryEditor" class="editor-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="PopCorn のコード"></textarea>
+            </div>
+            <div class="ide-actions">
+              <button class="btn btn-yellow" id="tryRun" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>実行<kbd>Ctrl + Enter</kbd></button>
+              <button class="btn btn-ghost-dark" id="tryStop" type="button" hidden>止める</button>
+              <a class="btn btn-ghost-dark" id="tryOpen" href="playground/">Playground で開く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            </div>
+            <div class="ide-console" id="tryConsole" aria-live="polite">
+              <p class="console-hint">「実行」を押す</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section learn" id="learn">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>07</span>学ぶ<span class="hows"><span class="sr-only">さわり方：</span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>タップ</span></span></p>
+          <h2>ロボット君と、<br class="sp">いっしょに</h2>
+        </header>
+        <div class="learn-grid reveal">
+          <div class="robot-stage">
+            <button class="robot" id="robot" type="button" aria-label="ロボット君">
+              <span class="robot-antenna"></span>
+              <span class="robot-face">
+                <span class="robot-eye"><i></i></span>
+                <span class="robot-eye"><i></i></span>
+                <span class="robot-mouth"></span>
+              </span>
+              <span class="robot-cheek l"></span><span class="robot-cheek r"></span>
+            </button>
+            <div class="robot-bubble" id="robotBubble" aria-live="polite">やあ！ レッスンをタップしてね</div>
+          </div>
+          <div class="lesson-path">
+            <ol class="lessons" id="lessons"></ol>
+            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 ゲーム</button>
+            <a class="btn btn-big btn-blue" href="playground/">ロボット君に会いに行く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section start" id="start">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>08</span>はじめる</p>
+          <h2>書く場所を、<br class="sp">えらべる</h2>
+        </header>
+        <div class="start-grid">
+          <article class="start-card c-blue reveal">
+            <p class="start-tag">いちばん手軽</p>
+            <h3>Playground</h3>
+            <a class="btn btn-paper" href="playground/">開く<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+          <article class="start-card c-yellow reveal">
+            <p class="start-tag">Python 3.10 以上</p>
+            <h3>コマンド</h3>
+            <div class="copy-box">
+              <pre id="installCmd">git clone https://github.com/ityannel/poppop
+cd poppop
+python -m pip install .
+popcorn program.pop</pre>
+              <button class="copy-btn" type="button" data-copy="installCmd" aria-label="コマンドをコピー"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
+            </div>
+          </article>
+          <article class="start-card c-pink reveal">
+            <p class="start-tag">VS Code</p>
+            <h3>エディター拡張</h3>
+            <a class="btn btn-paper" href="https://github.com/ityannel/poppop/tree/main/vscode-popcorn" rel="noopener">GitHub で見る<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="finale" id="finale">
+      <div class="wrap">
+        <p class="finale-kicker">Ready?</p>
+        <h2>さあ、<br class="sp">ポップしよう</h2>
+        <a class="btn btn-huge btn-yellow" href="playground/" id="finaleBtn">Playground をひらく<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <p class="finale-hint" id="finaleHint" hidden><span class="hows"><span class="sr-only">さわり方：</span><span class="how how-throw"><svg aria-hidden="true"><use href="#i-throw"/></svg>つかんで投げる</span></span>空いている所をタップ</p>
+      </div>
     </section>
   </main>
 
-  <nav class="mobile-dock" aria-label="作業画面">
-    <button class="mobile-pane-button" type="button" data-mobile-pane="learn" aria-pressed="false">
-      <span class="ci" data-icon="book" aria-hidden="true"></span><span>学ぶ</span>
-    </button>
-    <button class="mobile-pane-button active" type="button" data-mobile-pane="code" aria-pressed="true">
-      <span class="ci" data-icon="code" aria-hidden="true"></span><span>コード</span>
-    </button>
-    <button class="mobile-pane-button" type="button" data-mobile-pane="result" aria-pressed="false">
-      <span class="ci" data-icon="output" aria-hidden="true"></span><span>結果</span>
-    </button>
-  </nav>
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="footer-about">
+        <img src="lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267" loading="lazy">
+        <p>函館高専の「いちゃ」がつくっている、実験中のプログラミング言語</p>
+      </div>
+      <ul class="footer-links">
+        <li><a href="playground/">Playground</a></li>
+        <li><a href="https://github.com/ityannel/poppop" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/ityannel/poppop/blob/main/popcorn_specification.md" rel="noopener">言語仕様</a></li>
+        <li><a href="https://itya.site/">itya.site</a></li>
+        <li><a href="en/" hreflang="en" lang="en">English</a></li>
+      </ul>
+      <p class="footer-bgm" id="bgmCredit" hidden></p>
+      <p class="footer-credit">デザイン・開発 <a href="https://itya.site/">いちゃ</a> ― 会いに行くデザイン。<span>コードは MIT ライセンス</span></p>
+    </div>
+  </footer>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-  <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict/ace.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.5/src-min-noconflict/ext-language_tools.js"></script>
-  <script src="popcorn-formatter.js"></script>
   <script src="popcorn-localization.js"></script>
-  <script src="popcorn-icons.js"></script>
-  <script src="playground.js"></script>
+  <script src="lp/data.js"></script>
+  <script src="lp/play.js"></script>
+  <script src="lp/games-data.js"></script>
+  <script src="lp/games.js"></script>
+  <script src="lp/lp.js"></script>
+  <script src="lp/field.js"></script>
+  <script type="module" src="lp/hero3d.js"></script>
 </body>
 </html>

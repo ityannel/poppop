@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PopCorn | A tiny language that runs in the order you write</title>
+  <meta name="description" content="PopCorn is a tiny programming language where values flow left to right through >>. Read it once and you know what happens. Try it right in your browser.">
+  <meta name="theme-color" content="#fff6e3">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PopCorn">
+  <meta property="og:title" content="PopCorn | A tiny language that runs in the order you write">
+  <meta property="og:description" content="A tiny programming language where values flow left to right through >>. Try it right in your browser.">
+  <meta property="og:url" content="https://popcorn.itya.site/en/">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://popcorn.itya.site/popcorn-ogp.png">
+  <meta property="og:image:width" content="2506">
+  <meta property="og:image:height" content="1624">
+  <meta property="og:image:alt" content="PopCorn 1">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PopCorn | A tiny language that runs in the order you write">
+  <meta name="twitter:description" content="A tiny programming language where values flow left to right through >>. Try it right in your browser.">
+  <meta name="twitter:image" content="https://popcorn.itya.site/popcorn-ogp.png">
+  <link rel="canonical" href="https://popcorn.itya.site/en/">
+  <link rel="alternate" hreflang="ja" href="https://popcorn.itya.site/">
+  <link rel="alternate" hreflang="en" href="https://popcorn.itya.site/en/">
+  <link rel="alternate" hreflang="x-default" href="https://popcorn.itya.site/">
+  <link rel="icon" type="image/png" href="../favicon.png">
+  <link rel="apple-touch-icon" href="../favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../lp/lp.css">
+  <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+  <script defer src="/_vercel/insights/script.js"></script>
+  <script>if (/(^|\.)itya\.site$/.test(location.hostname)) { var s = document.createElement("script"); s.src = "https://itya.site/t.js"; s.defer = true; document.head.appendChild(s); }</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <canvas id="popLayer" class="pop-layer" aria-hidden="true"></canvas>
+
+  <svg width="0" height="0" class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="kernelFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffe27a"/>
+        <stop offset="1" stop-color="#ff9f1c"/>
+      </linearGradient>
+      <symbol id="i-kernel" viewBox="0 0 64 64">
+        <path d="M32 6c11 9 18 22 18 33 0 11-8 19-18 19s-18-8-18-19C14 28 21 15 32 6z" fill="url(#kernelFill)" stroke="#13204a" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M24 30c1-6 4-12 8-16" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+      </symbol>
+      <symbol id="i-pop" viewBox="0 0 64 64">
+        <g fill="#fff5d6" stroke="#13204a" stroke-width="3.4">
+          <circle cx="21" cy="31" r="12"/>
+          <circle cx="40" cy="21" r="13"/>
+          <circle cx="45" cy="38" r="11"/>
+          <circle cx="29" cy="45" r="11"/>
+          <circle cx="25" cy="18" r="10"/>
+        </g>
+        <g fill="#fff5d6">
+          <circle cx="32" cy="32" r="12"/>
+        </g>
+        <path d="M27 49c3 7 9 7 12 0" fill="#ff9f1c" stroke="#13204a" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="38" cy="17" r="3" fill="#fff"/>
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="8" y="8" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M16 5.5V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-tap" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" fill="currentColor"/>
+        <circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.2" opacity=".45"/>
+      </symbol>
+      <symbol id="i-drag" viewBox="0 0 24 24">
+        <path d="M12 3v18M3 12h18M12 3 9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-hold" viewBox="0 0 24 24">
+        <circle cx="12" cy="13.5" r="7.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M12 13.5v-4M10 2.5h4M12 2.5V6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type" viewBox="0 0 24 24">
+        <rect x="2.5" y="6" width="19" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M6.5 10h1M10.5 10h1M14.5 10h1M8 14h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-throw" viewBox="0 0 24 24">
+        <path d="M4 19c2-8 8-12.5 15-12.5M19 6.5l-4-2.4M19 6.5l-2.2 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <header class="nav" id="nav">
+    <a class="nav-logo" href="#top" aria-label="PopCorn home">
+      <img src="../lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267">
+    </a>
+    <nav class="nav-links" aria-label="On this page">
+      <a href="#rules">Rules</a>
+      <a href="#lab">Play</a>
+      <a href="#try">Try</a>
+      <a href="#learn">Learn</a>
+    </nav>
+    <div class="nav-tools">
+      <span class="pop-count" title="Pops"><svg aria-hidden="true"><use href="#i-pop"/></svg><b id="popCount">0</b><span class="sr-only"> pops</span></span>
+      <button class="icon-btn" type="button" data-open-games aria-haspopup="dialog" title="Mini games"><span aria-hidden="true">🎮</span><span class="sr-only">Mini games</span></button>
+      <button id="soundToggle" class="icon-btn" type="button" aria-pressed="false" title="Pop sound">
+        <span class="sound-on" aria-hidden="true">🔊</span><span class="sound-off" aria-hidden="true">🔇</span><span class="sr-only">Pop sound</span>
+      </button>
+      <a class="lang-link" href="../" hreflang="ja" lang="ja" title="日本語">JA</a>
+      <a class="btn btn-small btn-blue" href="../playground/">Playground</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="decor" id="decor" aria-hidden="true"></div>
+      <div class="hero-inner wrap">
+        <div class="hero-copy">
+          <p class="badge"><span>PopCorn 1</span>Experimental alpha</p>
+          <h1 class="hero-title">
+            <img class="hero-logo" src="../lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267">
+            <span class="hero-catch">Runs the way <em>you write</em></span>
+          </h1>
+          <p class="hero-lead">PopCorn is a tiny programming language that connects values with <code class="pipe-chip">&gt;&gt;</code></p>
+          <div class="hero-cta">
+            <a class="btn btn-big btn-blue" href="../playground/">Try it in your browser<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-big btn-paper" href="#lab">Play with it</a>
+          </div>
+          <ul class="hero-facts">
+            <li>No install</li>
+            <li>Made for beginners</li>
+            <li>Tests built in</li>
+          </ul>
+        </div>
+        <figure class="hero-demo" aria-label="A pipeline example">
+          <div class="crt">
+          <div class="window">
+            <div class="window-bar">
+              <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-name">pipeline.pop</span>
+              <button class="mini-btn" id="heroReplay" type="button">Replay</button>
+            </div>
+            <ol class="hero-lines" id="heroLines"></ol>
+          </div>
+          <div class="crt-chin" aria-hidden="true"><span class="crt-brand">PopCorn 1</span><i class="crt-vents"></i><i class="crt-led"></i></div>
+          </div>
+        </figure>
+      </div>
+      <div class="hero-hint wrap">
+        <div class="tray" id="kernels" role="group" aria-label="Popcorn kernels"></div>
+        <p>Tap a kernel</p>
+      </div>
+    </section>
+
+    <div class="ribbon" aria-hidden="true">
+      <div class="ribbon-track" id="ribbon"></div>
+    </div>
+
+    <section class="section rules" id="rules">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>01</span>Rules<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
+          <h2>Just three things<br class="sp"> to learn</h2>
+        </header>
+        <div class="rule-grid" id="ruleGrid"></div>
+      </div>
+    </section>
+
+    <section class="section order" id="order">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>02</span>Reading<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
+          <h2>Read order<br class="sp"> is run order</h2>
+        </header>
+        <div class="order-grid reveal">
+          <article class="order-card order-nested">
+            <h3>Nested calls<small> (Python)</small></h3>
+            <div class="order-code" id="orderNested"></div>
+          </article>
+          <article class="order-card order-pop">
+            <h3>PopCorn<small> (in order)</small></h3>
+            <div class="order-code" id="orderPop"></div>
+          </article>
+        </div>
+        <div class="center reveal">
+          <button class="btn btn-big btn-pink" id="orderPlay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>Light it up in run order</button>
+          <p class="order-result" id="orderResult" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section lab" id="lab">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>03</span>Play<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span><span class="how how-drag"><svg aria-hidden="true"><use href="#i-drag"/></svg>Drag</span><span class="how how-hold"><svg aria-hidden="true"><use href="#i-hold"/></svg>Hold</span></span></p>
+          <h2>Pipeline workshop</h2>
+        </header>
+        <div class="lab-board reveal" data-nopop>
+          <div class="lab-presets">
+            <span class="lab-label">Try these</span>
+            <div class="chip-row" id="labPresets"></div>
+          </div>
+          <div class="lab-palette" id="labPalette" aria-label="Blocks"></div>
+          <ol class="lab-track" id="labTrack" aria-live="polite"></ol>
+          <div class="lab-code">
+            <div class="lab-code-head">
+              <span class="lab-label">The code</span>
+              <div class="lab-actions">
+                <button class="btn btn-small btn-yellow" id="labReplay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>Run it again</button>
+                <a class="btn btn-small btn-blue" id="labOpen" href="../playground/">Open in Playground<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+                <button class="btn btn-small btn-paper hold-btn" id="labClear" type="button">Remove all<small>hold</small></button>
+              </div>
+            </div>
+            <pre class="code code-dark" id="labCode"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section check" id="check">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>04</span>Conditions<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
+          <h2>Conditions,<br class="sp"> top to bottom</h2>
+        </header>
+        <div class="check-grid reveal">
+          <div class="check-left">
+            <pre class="code code-paper" id="fbCode"></pre>
+            <div class="fb-trace" id="fbTrace" aria-live="polite"></div>
+          </div>
+          <div class="check-right">
+            <div class="fb-tiles" id="fbTiles" role="group" aria-label="Numbers 1 to 30"></div>
+            <div class="fb-legend">
+              <span class="lg lg-fb">FizzBuzz</span><span class="lg lg-f">Fizz</span><span class="lg lg-b">Buzz</span><span class="lg lg-n">Number</span>
+              <button class="btn btn-small btn-paper" id="fbPlay" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>Count from 1</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section tools" id="tools">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>05</span>Tools<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>Type</span></span></p>
+          <h2>Handy symbols,<br class="sp"> clear errors</h2>
+        </header>
+        <div class="tool-box reveal" data-nopop>
+          <div class="tool-tabs" role="tablist" aria-label="Tools" id="toolTabs">
+            <button role="tab" id="tab-peek" aria-controls="panel-peek" aria-selected="true"><code>&gt;?&gt;</code>Peek</button>
+            <button role="tab" id="tab-fallback" aria-controls="panel-fallback" aria-selected="false" tabindex="-1"><code>&gt;!&gt;</code>Fallback</button>
+            <button role="tab" id="tab-fork" aria-controls="panel-fork" aria-selected="false" tabindex="-1"><code>Fork</code>Split</button>
+            <button role="tab" id="tab-test" aria-controls="panel-test" aria-selected="false" tabindex="-1"><code>Test</code>Test</button>
+            <button role="tab" id="tab-error" aria-controls="panel-error" aria-selected="false" tabindex="-1"><code>!</code>Errors</button>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-peek" aria-labelledby="tab-peek">
+            <div class="tool-text">
+              <h3>Peek into the flow</h3>
+            </div>
+            <div class="tool-demo">
+              <div class="code code-dark peek-code" id="peekCode"></div>
+              <pre class="console" id="peekOut" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-fallback" aria-labelledby="tab-fallback" hidden>
+            <div class="tool-text">
+              <h3>If it fails, swap it</h3>
+            </div>
+            <div class="tool-demo">
+              <label class="fb-input">
+                <span>Value of <code>text</code></span>
+                <input id="fallbackInput" type="text" value="17" autocomplete="off" spellcheck="false">
+              </label>
+              <div class="chip-row" id="fallbackChips"></div>
+              <pre class="code code-dark" id="fallbackCode"></pre>
+              <div class="fallback-flow" id="fallbackFlow" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-fork" aria-labelledby="tab-fork" hidden>
+            <div class="tool-text">
+              <h3>One value, many results</h3>
+            </div>
+            <div class="tool-demo">
+              <div class="fork-inputs" id="forkInputs"></div>
+              <pre class="code code-dark" id="forkCode"></pre>
+              <div class="fork-tree" id="forkTree" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" hidden>
+            <div class="tool-text">
+              <h3>Tests, written in PopCorn</h3>
+              <label class="switch">
+                <input type="checkbox" id="testBug">
+                <span class="switch-ui" aria-hidden="true"></span>
+                <span>Add a bug on purpose (<code>+</code> becomes <code>-</code>)</span>
+              </label>
+            </div>
+            <div class="tool-demo">
+              <pre class="code code-dark" id="testCode"></pre>
+              <pre class="console" id="testOut" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div class="tool-panel" role="tabpanel" id="panel-error" aria-labelledby="tab-error" hidden>
+            <div class="tool-text">
+              <h3>Errors that point at the spot</h3>
+              <div class="chip-row" id="errorChips"></div>
+            </div>
+            <div class="tool-demo">
+              <pre class="code code-dark" id="errorCode"></pre>
+              <pre class="console" id="errorOut" aria-live="polite"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section try" id="try">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>06</span>Try<span class="hows"><span class="sr-only">How to play: </span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>Type</span></span></p>
+          <h2>Real PopCorn,<br class="sp"> right here</h2>
+        </header>
+        <div class="ide reveal" data-nopop>
+          <div class="ide-examples" id="tryExamples" role="group" aria-label="Examples"></div>
+          <div class="ide-main">
+            <div class="ide-bar">
+              <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="window-name" id="tryName">main.pop</span>
+              <span class="ide-status" id="tryStatus" data-state="idle">Not loaded yet</span>
+            </div>
+            <div class="editor">
+              <pre class="editor-hl code" aria-hidden="true"><code id="tryHighlight"></code></pre>
+              <textarea id="tryEditor" class="editor-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="PopCorn code"></textarea>
+            </div>
+            <div class="ide-actions">
+              <button class="btn btn-yellow" id="tryRun" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg>Run<kbd>Ctrl + Enter</kbd></button>
+              <button class="btn btn-ghost-dark" id="tryStop" type="button" hidden>Stop</button>
+              <a class="btn btn-ghost-dark" id="tryOpen" href="../playground/">Open in Playground<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            </div>
+            <div class="ide-console" id="tryConsole" aria-live="polite">
+              <p class="console-hint">Press Run</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section learn" id="learn">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>07</span>Learn<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
+          <h2>Learn with<br class="sp"> Robot</h2>
+        </header>
+        <div class="learn-grid reveal">
+          <div class="robot-stage">
+            <button class="robot" id="robot" type="button" aria-label="Robot">
+              <span class="robot-antenna"></span>
+              <span class="robot-face">
+                <span class="robot-eye"><i></i></span>
+                <span class="robot-eye"><i></i></span>
+                <span class="robot-mouth"></span>
+              </span>
+              <span class="robot-cheek l"></span><span class="robot-cheek r"></span>
+            </button>
+            <div class="robot-bubble" id="robotBubble" aria-live="polite">Hi! Tap a lesson</div>
+          </div>
+          <div class="lesson-path">
+            <ol class="lessons" id="lessons"></ol>
+            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 Games</button>
+            <a class="btn btn-big btn-blue" href="../playground/">Go meet Robot<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section start" id="start">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow"><span>08</span>Start</p>
+          <h2>Pick where<br class="sp"> to write</h2>
+        </header>
+        <div class="start-grid">
+          <article class="start-card c-blue reveal">
+            <p class="start-tag">Easiest</p>
+            <h3>Playground</h3>
+            <a class="btn btn-paper" href="../playground/">Open<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+          <article class="start-card c-yellow reveal">
+            <p class="start-tag">Python 3.10+</p>
+            <h3>Command line</h3>
+            <div class="copy-box">
+              <pre id="installCmd">git clone https://github.com/ityannel/poppop
+cd poppop
+python -m pip install .
+popcorn program.pop</pre>
+              <button class="copy-btn" type="button" data-copy="installCmd" aria-label="Copy the commands"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
+            </div>
+          </article>
+          <article class="start-card c-pink reveal">
+            <p class="start-tag">VS Code</p>
+            <h3>Editor extension</h3>
+            <a class="btn btn-paper" href="https://github.com/ityannel/poppop/tree/main/vscode-popcorn" rel="noopener">View on GitHub<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="finale" id="finale">
+      <div class="wrap">
+        <p class="finale-kicker">Ready?</p>
+        <h2>Now,<br class="sp"> let's pop</h2>
+        <a class="btn btn-huge btn-yellow" href="../playground/" id="finaleBtn">Open the Playground<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <p class="finale-hint" id="finaleHint" hidden><span class="hows"><span class="sr-only">How to play: </span><span class="how how-throw"><svg aria-hidden="true"><use href="#i-throw"/></svg>Grab and throw</span></span>Tap anywhere</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="footer-about">
+        <img src="../lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267" loading="lazy">
+        <p>An experimental programming language by Itya, NIT Hakodate College</p>
+      </div>
+      <ul class="footer-links">
+        <li><a href="../playground/">Playground</a></li>
+        <li><a href="https://github.com/ityannel/poppop" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/ityannel/poppop/blob/main/popcorn_specification.md" rel="noopener">Language spec (Japanese)</a></li>
+        <li><a href="https://itya.site/">itya.site</a></li>
+        <li><a href="../" hreflang="ja" lang="ja">日本語</a></li>
+      </ul>
+      <p class="footer-bgm" id="bgmCredit" hidden></p>
+      <p class="footer-credit">Design and code by <a href="https://itya.site/">Itya</a> ― 会いに行くデザイン。<span>Code under the MIT License</span></p>
+    </div>
+  </footer>
+
+  <script src="../lp/data.js"></script>
+  <script src="../lp/data.en.js"></script>
+  <script src="../lp/play.js"></script>
+  <script src="../lp/games-data.js"></script>
+  <script src="../lp/games.js"></script>
+  <script src="../lp/lp.js"></script>
+  <script src="../lp/field.js"></script>
+  <script type="module" src="../lp/hero3d.js"></script>
+</body>
+</html>

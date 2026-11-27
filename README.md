@@ -82,14 +82,34 @@ The example gallery uses consistent Japanese category names and includes
 FizzBuzz, a fortune teller, number guessing, rock-paper-scissors, a dice game,
 a quiz, a countdown, and smaller pipeline exercises.
 
+The site has two pages:
+
+- `/` is the introduction site (`index.html` and `lp/`). Every demo on it uses
+  output checked against the real interpreter. The examples and the optional
+  background music credit live in `lp/data.js`. The 3D pipe at the top is
+  `lp/hero3d.js`, built on three.js (`lp/vendor/`, MIT). It is skipped when
+  WebGL is missing or the visitor prefers reduced motion. Every visit starts
+  by asking whether to play sound (only the volume is remembered). The symbol
+  background of the last blue band is `lp/field.js`.
+  Sound files are in `lp/audio/`: the background music "Jazz Brunch" by Kevin
+  MacLeod (incompetech.com, CC BY 4.0) and a sprite of 12 single pops (0.25 s
+  each) cut from "Pop-Corn: Corn bursting" on BigSoundBank (CC0). Both credits
+  are shown in the page footer from `bgm` and `popSound` in `lp/data.js`.
+- `/en/` is the English introduction site. `en/index.html` is built from
+  `index.html` by `python tools/build_en_page.py`; run it after editing the
+  Japanese page. Its words for the demos live in `lp/data.en.js`.
+- `/playground/` is the Playground (`playground/index.html`).
+
 Start it locally from the repository root:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000`. Opening `index.html` directly is not
-supported because browsers block the source requests used by the runtime.
+Then open `http://localhost:8000/` for the introduction site and
+`http://localhost:8000/playground/` for the Playground. Opening the HTML files
+directly is not supported because browsers block the source requests used by
+the runtime.
 
 For the AI tutor, deploy the Playground with Vercel and set `GEMINI_API_KEY` in
 the Vercel project environment variables. The browser calls `/api/gemini`; the
@@ -108,7 +128,7 @@ $env:GEMINI_API_KEY = "your-key"
 python popcorn_playground_server.py
 ```
 
-Then open `http://127.0.0.1:8765`. The browser calls `/api/gemini`; the API key
+Then open `http://127.0.0.1:8765/playground/`. The browser calls `/api/gemini`; the API key
 stays on the server. If `/api/gemini` is not available, the Playground can still
 ask for a personal browser key and save it locally.
 
