@@ -142,7 +142,83 @@
     match = message.match(/^Index (.+) out of bounds\.?$/);
     if (match) return `添字 ${match[1]} は範囲外です。`;
 
+    const stdlib = translateStdlib(message);
+    if (stdlib) return stdlib;
+
     return message;
+  }
+
+  const PARAM_NAMES = { length: "長さ", count: "回数", width: "幅", size: "大きさ", n: "個数", divisor: "割る数", base: "基数", part: "探す文字", fill: "うめる文字" };
+
+  const REQUIRES_WORDS = [
+    [/,\s*or\b/g, " か"],
+    [/\bList or Str\b/g, "リストか文字列"],
+    [/\bList of Str, Num, Bool or null\b/g, "文字・数・真偽・null のリスト"],
+    [/\bList of Str\b/g, "文字列のリスト"],
+    [/\bLists of the same length\b/g, "長さの同じリスト"],
+    [/\bnon-empty List\b/g, "空でないリスト"],
+    [/\bwhole Nums\b/g, "整数"],
+    [/\bwhole Num\b/g, "整数"],
+    [/\bStr, Num or Bool\b/g, "文字・数・真偽"],
+    [/\bList\b/g, "リスト"],
+    [/\bDict\b/g, "辞書"],
+    [/\bNum\b/g, "数"],
+    [/\bStr\b/g, "文字列"],
+    [/\bBool\b/g, "真偽"],
+    [/\bone-character\s+/g, "1 文字の"],
+    [/\bvalid code point\b/g, "正しい文字コード"],
+    [/\b(?:a|an) (?=[^\s])/g, ""],
+    [/\bfrom (-?\d+) to (-?\d+)\b/g, "$1〜$2"],
+    [/\bor\b/g, "か"],
+    [/\band\b/g, "と"],
+  ];
+
+  function translateStdlib(message) {
+    const fixed = [
+      [/^(\w+) requires min <= max$/, (m) => `「${m[1]}」は、最小を最大以下にしてください`],
+      [/^(\w+) (\w+) must not be 0$/, (m) => `「${m[1]}」の${PARAM_NAMES[m[2]] || m[2]}は 0 にできません`],
+      [/^(\w+) (\w+) must not be negative$/, (m) => `「${m[1]}」の${PARAM_NAMES[m[2]] || m[2]}は 0 以上にしてください`],
+      [/^(\w+) (\w+) must be at least (\d+)$/, (m) => `「${m[1]}」の${PARAM_NAMES[m[2]] || m[2]}は ${m[3]} 以上にしてください`],
+      [/^(\w+) base must be from (\d+) to (\d+)$/, (m) => `「${m[1]}」の基数は ${m[2]}〜${m[3]} にしてください`],
+      [/^(\w+) (\w+) must not be empty$/, (m) => `「${m[1]}」の${PARAM_NAMES[m[2]] || m[2]}は空にできません`],
+      [/^(\w+) fill must be one character$/, (m) => `「${m[1]}」のうめる文字は 1 文字にしてください`],
+      [/^Sample n must not be larger than the List$/, () => "Sample の個数が、リストの長さより多いです"],
+      [/^FromBase cannot read '(.*)' in base (\d+)$/, (m) => `「${m[1]}」は ${m[2]} 進数として読めません`],
+      [/^ParseDate cannot read '(.*)'$/, (m) => `「${m[1]}」は日付として読めません`],
+      [/^ParseCsv cannot read the CSV: (.+)$/, (m) => `CSV として読めません（${m[1]}）`],
+      [/^Base64Decode cannot read the text as Base64 of UTF-8$/, () => "Base64 として読めません"],
+      [/^(\w+) timestamp is out of range$/, (m) => `「${m[1]}」の時刻が、扱える範囲の外です`],
+      [/^(\w+) received a date that does not exist$/, (m) => `「${m[1]}」に、存在しない日付が渡されました`],
+      [/^(\w+) would create too many items$/, (m) => `「${m[1]}」の結果が多すぎます`],
+      [/^Distance inputs are too long$/, () => "Distance の文字列が長すぎます"],
+      [/^SetPath requires a non-empty path$/, () => "SetPath の道すじは、空にできません"],
+      [/^SetPath can only go inside Dict or List$/, () => "SetPath は、辞書かリストの中にだけ進めます"],
+      [/^(Ask|AskJson) is not available in the browser Playground yet$/, (m) => `「${m[1]}」は、ブラウザの Playground ではまだ使えません。popcorn コマンドで動かしてください`],
+      [/^(Ask|AskJson) needs the environment variable (\w+)$/, (m) => `「${m[1]}」を使うには、環境変数 ${m[2]} を設定してください`],
+      [/^(Ask|AskJson) needs a model: set the environment variable (\w+) or the option model$/, (m) => `「${m[1]}」にはモデル名が必要です。環境変数 ${m[2]} か、オプション model で指定してください`],
+      [/^(POPCORN_AI_URL) must start with http:\/\/ or https:\/\/$/, (m) => `${m[1]} は http:// か https:// で始めてください`],
+      [/^(POPCORN_AI_PROTOCOL) must be one of: (.+)$/, (m) => `${m[1]} は ${m[2]} のどちらかにしてください`],
+      [/^(Ask|AskJson) option '(.+)' is not known$/, (m) => `「${m[1]}」のオプション「${m[2]}」は、ありません`],
+      [/^(Ask|AskJson) option (\w+) must be (?:a )?(Str|Num)(.*)$/, (m) => `「${m[1]}」のオプション ${m[2]} は ${m[3] === "Str" ? "文字列" : "数"} にしてください`],
+      [/^(Ask|AskJson) options must be a Dict$/, (m) => `「${m[1]}」のオプションは辞書で渡してください`],
+      [/^(Ask|AskJson) was refused with status (\d+)(?:: (.*))?$/, (m) => `「${m[1]}」は、送り先に断られました（状態 ${m[2]}${m[3] ? `: ${m[3]}` : ""}）`],
+      [/^(Ask|AskJson) could not reach the AI: (.+)$/, (m) => `「${m[1]}」は AI につながりませんでした（${m[2]}）`],
+      [/^(Ask|AskJson) got a reply that is not JSON$/, (m) => `「${m[1]}」は、JSON でない答えを受け取りました`],
+      [/^(Ask|AskJson) got a reply in an unexpected shape \(protocol: (\w+)\)$/, (m) => `「${m[1]}」が受け取った答えは、${m[2]} の形ではありませんでした。POPCORN_AI_PROTOCOL と URL を確かめてください`],
+      [/^AskJson could not read the reply as JSON$/, () => "AskJson は、AI の答えを JSON として読めませんでした"],
+      [/^SetPath keys for a Dict must be Str$/, () => "SetPath で辞書に入るキーは、文字列にしてください"],
+    ];
+    for (const [pattern, build] of fixed) {
+      const m = pattern.exec(message);
+      if (m) return build(m);
+    }
+    const requires = /^([A-Z][A-Za-z0-9]*) requires (.+)$/.exec(message);
+    if (requires) {
+      let rest = requires[2];
+      for (const [pattern, text] of REQUIRES_WORDS) rest = rest.replace(pattern, text);
+      return `「${requires[1]}」には、${rest.replace(/\s{2,}/g, " ").trim()} を渡してください`;
+    }
+    return null;
   }
 
   function localizeError(value) {

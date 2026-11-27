@@ -1417,3 +1417,5 @@ for _name, _fn in (
     ("Expect", builtin_Expect), ("Assert", builtin_Assert), ("ExpectError", builtin_ExpectError),
 ):
     BUILTIN_REGISTRY[_name] = _fn
+
+from . import pop_stdlib  # noqa: E402,F401

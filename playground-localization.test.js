@@ -79,3 +79,17 @@ assert.equal(
   localizeError("TypeError: Cannot cast 'true' (Bool) to Num"),
   "型エラー: 「true」（Bool）は数に変換できません。",
 );
+
+for (const [input, expected] of [
+  ["RuntimeError: Median requires a non-empty List", "実行時エラー: 「Median」には、空でないリスト を渡してください。"],
+  ["TypeError: Take requires (List or Str, n)", "型エラー: 「Take」には、(リストか文字列, n) を渡してください。"],
+  ["RuntimeError: Mod divisor must not be 0", "実行時エラー: 「Mod」の割る数は 0 にできません。"],
+  ["RuntimeError: Chunk size must be at least 1", "実行時エラー: 「Chunk」の大きさは 1 以上にしてください。"],
+  ["RuntimeError: Ask needs the environment variable POPCORN_AI_URL", "実行時エラー: 「Ask」を使うには、環境変数 POPCORN_AI_URL を設定してください。"],
+  ["NetworkError: Ask was refused with status 401: bad", "通信エラー: 「Ask」は、送り先に断られました（状態 401: bad）。"],
+  ["TypeError: Ask option 'colour' is not known", "型エラー: 「Ask」のオプション「colour」は、ありません。"],
+  ["RuntimeError: Clamp requires min <= max", "実行時エラー: 「Clamp」は、最小を最大以下にしてください。"],
+  ["RuntimeError: FromBase cannot read 'zz' in base 2", "実行時エラー: 「zz」は 2 進数として読めません。"],
+]) {
+  assert.equal(localizeError(input), expected);
+}

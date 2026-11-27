@@ -2039,17 +2039,6 @@ b { font-weight: 800; }
 }
 .section-head .eyebrow .hows .sr-only { width: 1px; height: 1px; border: 0; box-shadow: none; background: none; }
 
-/* ---------- トップの 3D（lp/hero3d.js） ---------- */
-.hero-3d { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; pointer-events: none; }
-.hero.is-3d .decor { display: none; }
-.hero.is-3d .window {
-  transform: perspective(1100px) rotateY(calc(var(--tilt-x, 0) * 7deg)) rotateX(calc(var(--tilt-y, 0) * -5deg)) rotate(1.2deg);
-  transition: transform .2s ease-out;
-}
-@media (max-width: 979px) {
-  .hero.is-3d { padding-bottom: 92px; }
-}
-
 /* ---------- はじめの「音が出ますが、よろしいですか？」 ---------- */
 html.gate-open { overflow: hidden; }
 .gate {
@@ -2424,11 +2413,6 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
   animation: led 2.4s ease-in-out infinite;
 }
 @keyframes led { 50% { box-shadow: 0 0 4px 1px rgb(46 211 160 / 45%), inset 0 -1px 1px rgb(0 0 0 / 30%); } }
-.hero.is-3d .crt {
-  transform: perspective(1100px) rotateY(calc(var(--tilt-x, 0) * 7deg)) rotateX(calc(var(--tilt-y, 0) * -5deg)) rotate(1.2deg);
-  transition: transform .2s ease-out;
-}
-.hero.is-3d .crt .window { transform: none; }
 @media (max-width: 600px) {
   .crt { padding: 14px 14px 0; }
   .crt-chin { height: 38px; }
@@ -2896,3 +2880,345 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
 }
 
 .gm-choice.is-wrong { animation: gm-shake .4s ease; }
+
+/* ---------- 映画館：席に座ったまま、スクリーンの中で場面が変わる（lp/scenes.js・lp/theater.js） ---------- */
+@property --sweep { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.is-theater, .is-theater body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.is-theater { scroll-behavior: auto; }
+.is-theater body {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, #1d1816 0%, #0b0908 58%, #050404 100%);
+  color: #e8e2d6;
+  touch-action: pan-x pan-y;
+}
+.theater-room {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.theater-room.theater-front { z-index: 12; }
+.is-theater .pop-layer { z-index: 40; }
+
+/* 天井の帯：メニュー */
+.is-theater .nav {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 30;
+  height: var(--scr-t);
+  padding-bottom: 6px;
+  background: linear-gradient(rgb(5 4 4 / 92%), rgb(5 4 4 / 0));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  color: #ddd6c9;
+  transition: opacity .8s;
+}
+.is-theater .nav.scrolled { box-shadow: none; }
+.is-theater .nav-links a { color: #cfc8ba; }
+.is-theater .nav-links a:hover { background: rgb(255 255 255 / 8%); }
+.is-theater .nav-tools { filter: invert(.9) grayscale(1) sepia(.22); }
+.is-theater .nav-logo img { filter: grayscale(1) sepia(.3) brightness(1.15) drop-shadow(0 0 12px rgb(255 230 180 / 18%)); }
+.is-theater .nav-logo::after { background: #e9dfca; }
+.is-theater .nav-links a::before { color: #d6a24c; }
+.is-theater .nav-links a:hover { background: rgb(255 255 255 / 10%); color: #f4ecdc; }
+
+/* スクリーン */
+.is-theater .screen {
+  position: fixed;
+  left: var(--scr-l);
+  top: var(--scr-t);
+  z-index: 10;
+  width: var(--scr-w);
+  height: var(--scr-h);
+  overflow: hidden;
+  border-radius: 2px;
+  background: #d8d3c8;
+  color: var(--ink);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 70%), 0 0 90px rgb(255 244 222 / 16%), 0 0 260px rgb(255 244 222 / 7%);
+  opacity: 0;
+  transition: opacity 1.1s ease;
+  will-change: transform;
+  isolation: isolate;
+}
+.is-leader .screen, .is-showing .screen { opacity: 1; }
+.is-theater #main { position: absolute; inset: 0; }
+.is-theater .ribbon, .is-theater .decor, .is-theater .hero-hint { display: none; }
+
+.is-theater .scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(20px, 5vh, 52px) 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 35%) transparent;
+  filter: grayscale(1) sepia(.14) contrast(1.06) brightness(.97);
+}
+.is-theater .scene:not(.is-current) { display: none; }
+.is-theater .scene { justify-content: safe center; }
+.is-theater .scene::before, .is-theater .scene::after { display: none; }
+.is-theater .scene:focus, .is-theater .scene h1:focus, .is-theater .scene h2:focus { outline: none; }
+.is-theater .scene.hero { padding-block: clamp(16px, 4vh, 40px); }
+.is-theater .footer.scene { justify-content: center; }
+
+/* 場面の切り替え：フィルムがつながる一瞬 */
+.screen.is-cutting .scene.is-current { opacity: 0; transition: opacity .2s ease; }
+.screen.is-arriving .scene.is-current { animation: scene-in .42s cubic-bezier(.2, .7, .2, 1); }
+.screen[data-dir="prev"].is-arriving .scene.is-current { --from: -14px; }
+@keyframes scene-in {
+  0% { opacity: 0; transform: translateY(var(--from, 14px)); filter: grayscale(1) sepia(.14) contrast(1.06) brightness(1.9) blur(2px); }
+  100% { opacity: 1; transform: none; filter: grayscale(1) sepia(.14) contrast(1.06) brightness(.97); }
+}
+
+/* フィルムの質感：粒子、ふちの暗さ、ちらつき、切り替えの合図 */
+.film {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 58%, rgb(20 14 8 / 34%) 100%);
+}
+.film-grain {
+  position: absolute;
+  inset: -40%;
+  background-image: var(--paper-grain);
+  background-size: 180px 180px;
+  opacity: .9;
+  mix-blend-mode: multiply;
+  animation: film-grain .48s steps(4) infinite;
+}
+.film::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(255 250 238);
+  opacity: 0;
+  mix-blend-mode: soft-light;
+  animation: film-flicker 2.6s steps(26) infinite;
+}
+.film-cue {
+  position: absolute;
+  top: 7%;
+  right: 6%;
+  width: clamp(14px, 2.6vw, 26px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 252 240 / 95%) 30%, rgb(255 252 240 / 0) 72%);
+  opacity: 0;
+}
+.film-more {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: 14px;
+  height: 14px;
+  border-right: 3px solid rgb(30 24 18 / 70%);
+  border-bottom: 3px solid rgb(30 24 18 / 70%);
+  rotate: 45deg;
+  opacity: 0;
+  transition: opacity .3s;
+  animation: hint-bob 1.4s ease-in-out infinite;
+}
+.screen.has-more .film-more { opacity: 1; }
+.screen.is-cutting .film-cue { animation: film-cue .26s steps(2); }
+.screen.is-cutting .film::after { opacity: .55; animation: none; transition: opacity .12s; }
+@keyframes film-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-4%, 3%); }
+  50% { transform: translate(3%, -2%); }
+  75% { transform: translate(-2%, -4%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes film-flicker {
+  0%, 100% { opacity: 0; }
+  12% { opacity: .07; }
+  31% { opacity: .02; }
+  47% { opacity: .1; }
+  63% { opacity: .03; }
+  80% { opacity: .08; }
+}
+@keyframes film-cue { 0%, 100% { opacity: 1; } }
+
+/* 上映前のカウントダウン */
+.leader {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #e7e1d4 0%, #bdb6a8 100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .35s, visibility 0s .35s;
+}
+.leader::before, .leader::after {
+  content: "";
+  position: absolute;
+  background: rgb(28 24 20 / 70%);
+}
+.leader::before { left: 0; right: 0; top: 50%; height: 2px; }
+.leader::after { top: 0; bottom: 0; left: 50%; width: 2px; }
+.is-leader .leader { opacity: 1; visibility: visible; transition: opacity .2s; }
+.leader-ring {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: min(70%, 74vh);
+  max-width: calc(var(--scr-h) * .78);
+  aspect-ratio: 1;
+  border: 3px solid #1d1915;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 calc(var(--scr-h) * .045) rgb(255 255 255 / 35%), inset 0 0 0 calc(var(--scr-h) * .05) #1d1915;
+}
+.leader-ring, .leader-sweep { border-radius: 50% !important; }
+.leader-sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(rgb(20 16 12 / 38%) var(--sweep), transparent 0);
+}
+.leader.tick .leader-sweep { animation: leader-sweep .62s linear; }
+.leader-num {
+  position: relative;
+  color: #15120f;
+  font: 700 calc(var(--scr-h) * .44) / 1 Georgia, "Times New Roman", "Hiragino Mincho ProN", serif;
+}
+@keyframes leader-sweep { from { --sweep: 0deg; } to { --sweep: 360deg; } }
+
+/* 足もとの帯：コマ送りと、手元のポップコーン */
+.theater-ui { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+.theater-ui > * { pointer-events: auto; }
+.theater-ui > .leader { pointer-events: none; }
+.reel {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 999px;
+  background: rgb(12 10 9 / 72%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity .8s ease .2s;
+}
+.is-showing .reel { opacity: 1; }
+.reel-frames { display: flex; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.reel-frames button {
+  display: block;
+  width: 22px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 26%);
+  border-radius: 2px;
+  background: rgb(255 255 255 / 5%);
+  cursor: pointer;
+  transition: background .25s, box-shadow .25s, transform .2s;
+}
+.reel-frames button:hover { background: rgb(255 255 255 / 18%); }
+.reel-frames button[aria-current] {
+  border-color: #f4ecdc;
+  background: #f1e9d8;
+  box-shadow: 0 0 12px rgb(255 236 200 / 55%);
+}
+.reel-step {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 50%;
+  background: transparent;
+  color: #ece5d7;
+  cursor: pointer;
+  transition: background .2s, opacity .2s;
+}
+.reel-step svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.reel-step:hover { background: rgb(255 255 255 / 10%); }
+.reel-step:disabled { opacity: .25; cursor: default; }
+.reel :focus-visible, .bucket:focus-visible { outline: 2px solid #f4ecdc; outline-offset: 3px; }
+
+.bucket {
+  position: fixed;
+  right: max(8px, 3.2vw);
+  bottom: calc(-1 * min(5vh, 34px));
+  width: clamp(78px, 15vh, 156px);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: grab;
+  opacity: 0;
+  transform: translateY(30%);
+  transition: opacity .8s ease .4s, transform .8s cubic-bezier(.2, .8, .2, 1) .4s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bucket img { width: 100%; height: auto; filter: drop-shadow(0 -6px 24px rgb(255 226 170 / 16%)) brightness(.82); pointer-events: none; }
+.is-showing .bucket { opacity: 1; transform: none; }
+.bucket:hover img { filter: drop-shadow(0 -6px 30px rgb(255 226 170 / 28%)) brightness(.95); }
+.bucket.is-shaking { animation: bucket-shake .38s ease; }
+@keyframes bucket-shake {
+  0%, 100% { rotate: 0deg; translate: 0 0; }
+  30% { rotate: -7deg; translate: 0 -10px; }
+  60% { rotate: 4deg; translate: 0 -4px; }
+}
+
+.scene-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  margin: 0;
+  color: rgb(240 232 216 / 70%);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity .5s;
+}
+.scene-hint svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.scene-hint i { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; rotate: 45deg; animation: hint-bob 1.4s ease-in-out infinite; }
+.scene-hint.is-gone { opacity: 0; }
+@keyframes hint-bob { 0%, 100% { translate: 0 -2px; } 50% { translate: 0 4px; } }
+@media (pointer: coarse) { .scene-hint svg { display: none; } }
+
+/* 場面の中の大きさ（スクリーンに収める） */
+.is-theater .section { padding: clamp(14px, 3.2vh, 40px) 0; }
+.is-theater .section-head { margin-bottom: clamp(14px, 3vh, 30px); }
+.is-theater .wrap { width: 100%; }
+.is-theater .finale { min-height: 100%; }
+.is-theater .footer { padding: clamp(20px, 5vh, 48px) 0; }
+
+/* ミニゲームと、音の確認も、白黒の映画に */
+.is-theater .gm, .is-theater .gm-invite, .is-theater .gate { color: var(--ink); }
+.is-theater .gm-card, .is-theater .gm-invite, .is-theater .gate-card { filter: grayscale(1) sepia(.14) contrast(1.05); }
+@media (min-width: 400px) { .is-theater .hero-catch { white-space: nowrap; } }
+
+@media (max-width: 719px) {
+  .reel { gap: 4px; padding: 4px 6px; }
+  .reel-frames { gap: 3px; }
+  .reel-frames button { width: 14px; height: 11px; }
+  .reel-step { width: 34px; height: 34px; }
+  .is-theater .nav-links { display: none; }
+  .bucket { right: 6px; width: clamp(64px, 12vh, 96px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film-grain, .film::after, .scene-hint i, .film-more { animation: none; }
+  .is-theater .screen, .reel, .bucket { transition: none; }
+  .screen.is-arriving .scene.is-current { animation: none; }
+}

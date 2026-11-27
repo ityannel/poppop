@@ -18,6 +18,8 @@ const SOURCE_FILES = [
   "parser.py",
   "evaluator.py",
   "pop_builtins.py",
+  "pop_stdlib.py",
+  "pop_ai.py",
   "cli.py",
   "migrate.py",
   "modules.py",

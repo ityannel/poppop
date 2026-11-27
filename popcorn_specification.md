@@ -228,6 +228,39 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 数値 | `E` | 入力は使いません | ネイピア数 `2.71828…` の `Num` を返します。処理名だけで書けます。 |
 | 数値 | `Random` | `(minimum, maximum)` の 2つの整数値（`Num`） | 両端を含む範囲からランダムな整数値の `Num` を返します。`minimum > maximum` は `RuntimeError`。外部効果あり。 |
 | 数値 | `Range` | `(start, end)` の 2つの整数値（`Num`） | `start` から `end` まで（両端を含む）の `Num` の `List` を返します。`start > end` なら空 `List` `[]`。 |
+| 数値 | `Sign` | `Num` | 正なら `1`、負なら `-1`、`0` なら `0` を返します。例：`-8 >> Sign` は `-1`。 |
+| 数値 | `Trunc` | `Num` | 小数点以下を 0 に近い方向へ切り捨てた、整数値の `Num` を返します（`-3.7` は `-3`）。例：`-3.7 >> Trunc` は `-3`。 |
+| 数値 | `Clamp` | `(x, min, max)` | `x` を `min` 以上 `max` 以下に収めた `Num` を返します。`min > max` は `RuntimeError`。例：`15 >> Clamp(0, 10)` は `10`。 |
+| 数値 | `Between` | `(x, min, max)` | `x` が `min` 以上 `max` 以下なら `true` を返します。例：`5 >> Between(1, 10)` は `true`。 |
+| 数値 | `Mod` | `(a, b)` | `a` を `b` で割った余りを、`b` が正なら 0 以上で返します（`-1 >> Mod(5)` は `4`）。`b` が 0 は `RuntimeError`。例：`-1 >> Mod(5)` は `4`。 |
+| 数値 | `Gcd` | `(a, b)` の 2つの整数値 | 最大公約数の `Num` を返します。例：`(12, 18) >> Gcd` は `6`。 |
+| 数値 | `Lcm` | `(a, b)` の 2つの整数値 | 最小公倍数の `Num` を返します。どちらかが `0` なら `0`。例：`(4, 6) >> Lcm` は `12`。 |
+| 数値 | `Factorial` | 0 から 170 までの整数値 | 階乗の `Num` を返します（`5 >> Factorial` は `120`）。範囲の外は `RuntimeError`。例：`5 >> Factorial` は `120`。 |
+| 数値 | `Product` | `Num` の `List` | すべてを掛けた `Num` を返します。空の `List` は `1`。例：`[2, 3, 4] >> Product` は `24`。 |
+| 数値 | `Median` | 空でない `Num` の `List` | 中央値の `Num` を返します。個数が偶数なら、まん中 2つの平均です。例：`[5, 1, 3] >> Median` は `3`。 |
+| 数値 | `Mode` | 空でない `List` | いちばん多く現れる要素を返します。同数なら、先に現れた方です。例：`[1, 2, 2, 3, 3] >> Mode` は `2`。 |
+| 数値 | `Variance` | 空でない `Num` の `List` | 分散（母集団。平均からのずれの 2 乗の平均）の `Num` を返します。例：`[1, 2, 3, 4, 5] >> Variance` は `2`。 |
+| 数値 | `StdDev` | 空でない `Num` の `List` | 標準偏差（母集団。`Variance` の平方根）の `Num` を返します。例：`[2, 4, 4, 4, 5, 5, 7, 9] >> StdDev` は `2`。 |
+| 数値 | `Cumulative` | `Num` の `List` | ここまでの合計を並べた `List` を返します（`[1, 2, 3]` は `[1, 3, 6]`）。例：`[1, 2, 3, 4] >> Cumulative` は `[1, 3, 6, 10]`。 |
+| 数値 | `Atan` | `Num` | 逆正接（ラジアン）の `Num` を返します。例：`1 >> Atan >> Degrees >> Round` は `45`。 |
+| 数値 | `Asin` | -1 から 1 の `Num` | 逆正弦（ラジアン）の `Num` を返します。範囲の外は `RuntimeError`。例：`1 >> Asin >> Degrees` は `90`。 |
+| 数値 | `Acos` | -1 から 1 の `Num` | 逆余弦（ラジアン）の `Num` を返します。範囲の外は `RuntimeError`。例：`0 >> Acos >> Degrees` は `90`。 |
+| 数値 | `Atan2` | `(y, x)` | 原点から `(x, y)` への角度（ラジアン）の `Num` を返します。例：`(1, 1) >> Atan2 >> Degrees >> Round` は `45`。 |
+| 数値 | `Degrees` | `Num`（ラジアン） | ラジアンを度にした `Num` を返します。例：`Pi >> Degrees` は `180`。 |
+| 数値 | `Radians` | `Num`（度） | 度をラジアンにした `Num` を返します。例：`180 >> Radians >> Round(5)` は `3.14159`。 |
+| 数値 | `Hypot` | `(a, b)` | 直角三角形の斜辺（`a` と `b` の 2 乗の和の平方根）の `Num` を返します。例：`(3, 4) >> Hypot` は `5`。 |
+| 数値 | `Cbrt` | `Num` | 立方根の `Num` を返します。負の数も使えます（`-8` は `-2`）。例：`27 >> Cbrt >> Round` は `3`。 |
+| 数値 | `IsPrime` | 0 以上の整数値（10^12 まで） | 素数なら `true` を返します。例：`97 >> IsPrime` は `true`。 |
+| 数値 | `ToBase` | `(n, base)` | 整数値 `n` を `base` 進数（2 から 36）の `Str` にします（`255 >> ToBase(16)` は `"ff"`）。例：`255 >> ToBase(16)` は `"ff"`。 |
+| 数値 | `FromBase` | `(text, base)` | `base` 進数（2 から 36）で書かれた `Str` を、`Num` にします。読めないときは `RuntimeError`。例：`"ff" >> FromBase(16)` は `255`。 |
+| 数値 | `Log2` | 0 より大きい `Num` | 2 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。例：`8 >> Log2` は `3`。 |
+| 数値 | `Log10` | 0 より大きい `Num` | 10 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。例：`1000 >> Log10` は `3`。 |
+| 数値 | `Percentile` | `(values, p)`（`p` は 0 から 100） | 並べたときの `p` パーセントの位置の値を、間を直線でつないで求めた `Num` を返します（50 は `Median` と同じ）。例：`([1, 2, 3, 4, 5], 50) >> Percentile` は `3`。 |
+| 数値 | `BitAnd` | `(a, b)` の 2つの整数値 | ビットごとの AND の `Num` を返します。例：`(12, 10) >> BitAnd` は `8`。 |
+| 数値 | `BitOr` | `(a, b)` の 2つの整数値 | ビットごとの OR の `Num` を返します。例：`(12, 10) >> BitOr` は `14`。 |
+| 数値 | `BitXor` | `(a, b)` の 2つの整数値 | ビットごとの XOR の `Num` を返します。例：`(12, 10) >> BitXor` は `6`。 |
+| 数値 | `ShiftLeft` | `(n, bits)`（`bits` は 0 から 52） | `n` を左に `bits` ビットずらした `Num` を返します（`1 >> ShiftLeft(3)` は `8`）。例：`(1, 3) >> ShiftLeft` は `8`。 |
+| 数値 | `ShiftRight` | `(n, bits)`（`bits` は 0 から 52） | `n` を右に `bits` ビットずらした `Num` を返します（負の数は符号を保ちます）。例：`(8, 3) >> ShiftRight` は `1`。 |
 | 文字列 | `Uppercase` | `Str` | 大文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Lowercase` | `Str` | 小文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Trim` | `Str` | 前後の空白（全角の空白も）を取り除いた新しい `Str` を返します。非破壊。 |
@@ -242,6 +275,33 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 文字列 | `Match` | `(text, pattern)` | `text` の中に、正規表現 `pattern` に合う部分があれば `true` を返します。 |
 | 文字列 | `FindAll` | `(text, pattern)` | 正規表現 `pattern` に合う部分を、前から重ならないように探し、合った文字列の `List` を返します。 |
 | 文字列 | `ReplaceAll` | `(text, pattern, replacement)` | 正規表現 `pattern` に合う部分を、すべて `replacement` に置き換えた `Str` を返します。`replacement` の中の `$1`、`$2` はグループに合った文字列、`$$` は `$` そのものです。 |
+| 文字列 | `Capitalize` | `Str` | 最初の 1 文字を大文字、残りを小文字にした `Str` を返します。例：`"pOPCORN" >> Capitalize` は `"Popcorn"`。 |
+| 文字列 | `TitleCase` | `Str` | 英単語の先頭を大文字、残りを小文字にした `Str` を返します。例：`"hello big world" >> TitleCase` は `"Hello Big World"`。 |
+| 文字列 | `SwapCase` | `Str` | 大文字と小文字を入れ替えた `Str` を返します。例：`"Pop" >> SwapCase` は `"pOP"`。 |
+| 文字列 | `TrimStart` | `Str` | 前の空白（全角の空白も）だけを取り除いた `Str` を返します。例：`"  hi  " >> TrimStart` は `"hi  "`。 |
+| 文字列 | `TrimEnd` | `Str` | うしろの空白（全角の空白も）だけを取り除いた `Str` を返します。例：`"  hi  " >> TrimEnd` は `"  hi"`。 |
+| 文字列 | `TrimPrefix` | `(text, prefix)` | `text` が `prefix` で始まるなら、それを取り除いた `Str` を返します。例：`"v1.2" >> TrimPrefix("v")` は `"1.2"`。 |
+| 文字列 | `TrimSuffix` | `(text, suffix)` | `text` が `suffix` で終わるなら、それを取り除いた `Str` を返します。例：`"main.pop" >> TrimSuffix(".pop")` は `"main"`。 |
+| 文字列 | `Lines` | `Str` | 行ごとに分けた `Str` の `List` を返します。例：`"a\nb\nc" >> Lines` は `["a", "b", "c"]`。 |
+| 文字列 | `Words` | `Str` | 空白（全角の空白も）で区切った単語の `List` を返します。続く空白は 1 つとして扱います。例：`"  pop  corn  " >> Words` は `["pop", "corn"]`。 |
+| 文字列 | `Chars` | `Str` | 1 文字ずつの `Str` の `List` を返します（コードポイント単位）。例：`"pop" >> Chars` は `["p", "o", "p"]`。 |
+| 文字列 | `Center` | `(text, width)` または `(text, width, fill)` | `text` の両側を `fill`（1 文字。省くと空白）で埋めて、長さ `width` にした `Str` を返します。例：`"pop" >> Center(7, "*")` は `"**pop**"`。 |
+| 文字列 | `Truncate` | `(text, length)` または `(text, length, suffix)` | `length` 文字までに切り詰めます。切ったときは、うしろに `suffix`（省くと `…`）を付けて、全体を `length` 文字に収めます。例：`"popcorn" >> Truncate(5)` は `"popc…"`。 |
+| 文字列 | `Wrap` | `(text, width)` | 英語の文を、1 行が `width` 文字までになるように折り返して、行の `List` を返します。例：`"the quick brown fox" >> Wrap(10)` は `["the quick", "brown fox"]`。 |
+| 文字列 | `IsBlank` | `Str` | 空、または空白（全角の空白も）だけなら `true` を返します。例：`"  " >> IsBlank` は `true`。 |
+| 文字列 | `Occurrences` | `(text, part)` | `part` が `text` に、重ならずに何回現れるかを `Num` で返します。`part` は空でない `Str`。例：`"banana" >> Occurrences("an")` は `2`。 |
+| 文字列 | `CodePoint` | 1 文字の `Str` | その文字のコードポイントの `Num` を返します（`"A"` は `65`）。例：`"A" >> CodePoint` は `65`。 |
+| 文字列 | `FromCodePoint` | 整数値 | コードポイントの文字 1 つの `Str` を返します（`65` は `"A"`）。例：`65 >> FromCodePoint` は `"A"`。 |
+| 文字列 | `SnakeCase` | `Str` | `snake_case`（小文字を `_` でつなぐ書き方）にした `Str` を返します。例：`"helloBigWorld" >> SnakeCase` は `"hello_big_world"`。 |
+| 文字列 | `KebabCase` | `Str` | `kebab-case`（小文字を `-` でつなぐ書き方）にした `Str` を返します。例：`"helloBigWorld" >> KebabCase` は `"hello-big-world"`。 |
+| 文字列 | `CamelCase` | `Str` | `camelCase`（2 語目から先頭を大文字にしてつなぐ書き方）にした `Str` を返します。例：`"hello big_world" >> CamelCase` は `"helloBigWorld"`。 |
+| 文字列 | `Distance` | `(a, b)` の 2つの `Str` | 2つの文字列が何文字ちがうかを表す、編集距離（レーベンシュタイン距離）の `Num` を返します。例：`("kitten", "sitting") >> Distance` は `3`。 |
+| 文字列 | `Capture` | `(text, pattern)` | 最初に合った部分の、かっこ `( )` の中身を `Str` の `List` で返します。かっこがなければ合った部分全体の 1 つ。合わなければ `null`。例：`"2026-11-27" >> Capture("(\\d+)-(\\d+)-(\\d+)")` は `["2026", "11", "27"]`。 |
+| 文字列 | `CaptureAll` | `(text, pattern)` | 合った部分すべてについて、かっこ `( )` の中身の `List` を並べた `List` を返します。例：`"a=1, b=2" >> CaptureAll("(\\w)=(\\d)")` は `[["a", "1"], ["b", "2"]]`。 |
+| 文字列 | `Basename` | `Str`（パス） | パスの最後の部分（ファイル名）を返します。例：`"docs/notes/readme.md" >> Basename` は `"readme.md"`。 |
+| 文字列 | `Dirname` | `Str`（パス） | パスの、最後の部分より前（フォルダ）を返します。なければ空の `Str`。例：`"docs/notes/readme.md" >> Dirname` は `"docs/notes"`。 |
+| 文字列 | `Extension` | `Str`（パス） | ファイル名の最後の `.` から後ろを、`.` つきで返します。なければ空の `Str`。例：`"docs/readme.md" >> Extension` は `".md"`。 |
+| 文字列 | `JoinPath` | `List` の `Str`、または値リスト | `/` でつないで、重なった `/` を 1 つにした `Str` を返します。例：`("docs/", "/notes", "a.md") >> JoinPath` は `"docs/notes/a.md"`。 |
 | コレクション | `Length` | `List`、`Dict`、`Str`、値リスト | 要素数、キー数、または Unicode コードポイント数を `Num` で返します。 |
 | コレクション | `Reverse` | `List` または `Str` | 逆順にした新しい `List` または `Str`（コードポイント単位）を返します。非破壊。 |
 | コレクション | `Get` | `(target, key)` または `(target, key, default)` | `List`・`Str` の添字（負ならうしろから。`Str` は 1 文字の `Str`）や `Dict` のキーに対応する値を返します。見つからないとき（`target` が `null` のときも）、`default` があればそれを返し、なければ `IndexError` / `KeyError`。 |
@@ -267,10 +327,43 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | コレクション | `Enumerate` | `List` | 0 から数えた番号つきの `[index, item]` の `List` を返します。 |
 | コレクション | `FromEntries` | `[key, value]` の `List` | `Entries` の逆です。`Dict` を返します。`key` は `Str`。同じ `key` が複数あるときは、後のものが勝ちます。 |
 | コレクション | `GetPath` | `(target, path)` または `(target, path, default)` | 深い `Dict` / `List` の中身を、`path`（`Str` のキーと整数値の添字の `List`）でたどって返します。途中で見つからなければ、エラーにせず `default`（なければ `null`）を返します。 |
+| コレクション | `Take` | `(target, n)` | `List` または `Str` の、前から `n` 個を返します。足りなければ全部です。例：`[1, 2, 3, 4] >> Take(2)` は `[1, 2]`。 |
+| コレクション | `Drop` | `(target, n)` | `List` または `Str` の、前から `n` 個を除いた残りを返します。例：`[1, 2, 3, 4] >> Drop(2)` は `[3, 4]`。 |
+| コレクション | `TakeLast` | `(target, n)` | `List` または `Str` の、うしろから `n` 個を返します。例：`[1, 2, 3, 4] >> TakeLast(2)` は `[3, 4]`。 |
+| コレクション | `Chunk` | `(items, size)` | `size` 個ずつに区切った `List` の `List` を返します。最後は短くなることがあります。例：`[1, 2, 3, 4, 5] >> Chunk(2)` は `[[1, 2], [3, 4], [5]]`。 |
+| コレクション | `Sliding` | `(items, size)` | `size` 個ぶんの窓を 1 つずつずらして並べた、`List` の `List` を返します。例：`[1, 2, 3, 4] >> Sliding(2)` は `[[1, 2], [2, 3], [3, 4]]`。 |
+| コレクション | `Rotate` | `(items, n)` | 前から `n` 個を、うしろへ回した `List` を返します。負の数は逆向きです。例：`[1, 2, 3, 4] >> Rotate(1)` は `[2, 3, 4, 1]`。 |
+| コレクション | `Compact` | `List` | `null` を取り除いた新しい `List` を返します。例：`[1, null, 2, null] >> Compact` は `[1, 2]`。 |
+| コレクション | `Union` | `(a, b)` の 2つの `List` | どちらかにある要素を、重ならないように並べた `List` を返します。例：`([1, 2], [2, 3]) >> Union` は `[1, 2, 3]`。 |
+| コレクション | `Intersect` | `(a, b)` の 2つの `List` | 両方にある要素を、重ならないように並べた `List` を返します。例：`([1, 2, 3], [2, 3, 4]) >> Intersect` は `[2, 3]`。 |
+| コレクション | `Difference` | `(a, b)` の 2つの `List` | `a` にあって `b` にない要素の `List` を返します。例：`([1, 2, 3, 4], [2, 4]) >> Difference` は `[1, 3]`。 |
+| コレクション | `Transpose` | 同じ長さの `List` の `List` | 行と列を入れ替えた `List` の `List` を返します。例：`[[1, 2, 3], [4, 5, 6]] >> Transpose` は `[[1, 4], [2, 5], [3, 6]]`。 |
+| コレクション | `Cartesian` | `(a, b)` の 2つの `List` | `a` と `b` のすべての組み合わせ `[x, y]` を並べた `List` を返します。例：`([1, 2], ["a", "b"]) >> Cartesian` は `[[1, "a"], [1, "b"], [2, "a"], [2, "b"]]`。 |
+| コレクション | `Combinations` | `(items, k)` | `items` から `k` 個を選ぶ組み合わせ（順番は区別しない）を、すべて並べた `List` を返します。10 万通りまで。例：`[1, 2, 3] >> Combinations(2)` は `[[1, 2], [1, 3], [2, 3]]`。 |
+| コレクション | `Shuffle` | `List` | ランダムに並べかえた新しい `List` を返します。外部効果あり（結果が毎回ちがう）。例：`[1, 2, 3, 4] >> Shuffle >> Sort` は `[1, 2, 3, 4]`。 |
+| コレクション | `Sample` | `(items, n)` | `items` から、重ならないように `n` 個をランダムに選んだ `List` を返します。外部効果あり。例：`[1, 2, 3, 4] >> Sample(2) >> Length` は `2`。 |
+| コレクション | `Tally` | `List` | 同じ値が何個あるかを数えた `Dict`（キーは `Str` 変換した値）を返します。例：`["a", "b", "a"] >> Tally` は `{"a": 2, "b": 1}`。 |
+| コレクション | `CountOf` | `(items, item)` | `items` の中に `item`（`==` で等しい値）が何個あるかを `Num` で返します。例：`[1, 2, 1, 1] >> CountOf(1)` は `3`。 |
+| コレクション | `IsEmpty` | `List`、`Dict`、`Str`、または `null` | 空（または `null`）なら `true` を返します。例：`[] >> IsEmpty` は `true`。 |
+| コレクション | `Pick` | `(dict, keys)` | `keys`（`Str` の `List`）にあるキーだけを残した新しい `Dict` を返します。例：`{"a": 1, "b": 2, "c": 3} >> Pick(["a", "c"])` は `{"a": 1, "c": 3}`。 |
+| コレクション | `Omit` | `(dict, keys)` | `keys`（`Str` の `List`）にあるキーを除いた新しい `Dict` を返します。例：`{"a": 1, "b": 2, "c": 3} >> Omit(["b"])` は `{"a": 1, "c": 3}`。 |
+| コレクション | `Invert` | `Dict`（値が `Str`・`Num`・`Bool`） | キーと値を入れ替えた `Dict` を返します。同じ値が複数あるときは、後のキーが勝ちます。例：`{"a": "x", "b": "y"} >> Invert` は `{"x": "a", "y": "b"}`。 |
+| コレクション | `DeepMerge` | `(left, right)` の 2つの `Dict` | 中の `Dict` まで、再帰的に合わせた新しい `Dict` を返します。同じキーは右側が優先されます。例：`({"a": {"x": 1, "y": 2}}, {"a": {"y": 3}}) >> DeepMerge` は `{"a": {"x": 1, "y": 3}}`。 |
+| コレクション | `SetPath` | `(target, path, value)` | `GetPath` と同じ `path`（`Str` のキーと整数値の添字の `List`）の先を `value` に替えた、新しい値を返します。最後のキーだけは、新しくてもかまいません。例：`{"a": {"b": 1}} >> SetPath(["a", "c"], 2)` は `{"a": {"b": 1, "c": 2}}`。 |
 | JSON | `ToJson` | JSON にできる値 | JSON 文字列を返します。 |
 | JSON | `FromJson` | JSON 文字列 | JSON を PopCorn の値に変換します。壊れた JSON は `RuntimeError`。 |
 | 時間 | `Now` | 入力は使いません | 現在日時を `year`・`month`・`day`・`hour`・`minute`・`second`・`millisecond`・`weekday`（`0` が日曜、`6` が土曜）・`timestamp`（1970-01-01 00:00 UTC からの秒数。小数つき）を持つ `Dict` で返します。かかった時間は、2 つの `timestamp` の差で測れます。外部効果あり。 |
 | 時間 | `Sleep` | 秒数を表す `Num`、または `(value, seconds)` | 指定した秒数だけ待ちます。`seconds >> Sleep` は秒数を、`value >> Sleep(seconds)` は `value` をそのまま返すので、パイプラインの途中に挟めます。負の値は `RuntimeError`。外部効果あり。 |
+| 時間 | `Date` | `(year, month, day)` または `(year, month, day, hour, minute, second)` | UTC のその日時の `timestamp`（秒数の `Num`）を返します。存在しない日付は `RuntimeError`。例：`(2026, 11, 27) >> Date >> FormatDate("YYYY-MM-DD")` は `"2026-11-27"`。 |
+| 時間 | `DateParts` | `timestamp` | `Now` と同じ形の `Dict`（`year`・`month`・`day`・`hour`・`minute`・`second`・`weekday`・`timestamp`）を UTC で返します。例：`0 >> DateParts >> Get("year")` は `1970`。 |
+| 時間 | `FormatDate` | `(timestamp, pattern)` | `timestamp` を UTC で `pattern` に当てはめた `Str` を返します。使える印は `YYYY` `YY` `MM` `DD` `HH` `mm` `ss`。例：`0 >> FormatDate("YYYY/MM/DD HH:mm:ss")` は `"1970/01/01 00:00:00"`。 |
+| 時間 | `ParseDate` | `Str`（`2026-11-27` または `2026-11-27 12:30:00`） | UTC の `timestamp` にして返します。読めない書き方や存在しない日付は `RuntimeError`。例：`"1970-01-02" >> ParseDate` は `86400`。 |
+| 時間 | `AddDays` | `(timestamp, days)` | `days` 日あとの `timestamp` を返します。負の数は前の日です。例：`(0, 2) >> AddDays` は `172800`。 |
+| 時間 | `AddMonths` | `(timestamp, months)` | `months` か月あとの `timestamp` を返します。日が存在しなければ、その月の最後の日にします（1/31 の 1 か月後は 2/28 か 2/29）。例：`("2026-01-31" >> ParseDate, 1) >> AddMonths >> FormatDate("YYYY-MM-DD")` は `"2026-02-28"`。 |
+| 時間 | `DiffDays` | `(from, to)` の 2つの `timestamp` | `from` から `to` までの日数の `Num` を返します（`to` が後なら正）。端数は小数です。例：`(0, 172800) >> DiffDays` は `2`。 |
+| 時間 | `Weekday` | `timestamp` | UTC での曜日を `Num` で返します（`0` が日曜、`6` が土曜）。例：`"2026-11-27" >> ParseDate >> Weekday` は `5`。 |
+| 時間 | `DaysInMonth` | `(year, month)` | その月の日数の `Num` を返します。例：`(2024, 2) >> DaysInMonth` は `29`。 |
+| 時間 | `IsLeapYear` | 年（整数値） | うるう年なら `true` を返します。例：`2024 >> IsLeapYear` は `true`。 |
 | 入出力 | `Display` | 任意の値 | 値を `Str` 変換して表示し、元の値をそのまま返します。外部効果あり。 |
 | 入出力 | `Input` | 表示するプロンプト（`Str`） | ユーザーが入力した `Str` を返します。外部効果あり。 |
 | 入出力 | `Debug` | 任意の値 | デバッグ用に型と値を表示し、元の値をそのまま返します。外部効果あり。パイプラインの途中では、場所も表示する `>?>` が便利です（4章）。 |
@@ -287,6 +380,43 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | テスト | `Expect` | `(actual, expected)` または `(actual, expected, message)` | `actual == expected` なら `actual` をそのまま返します。ちがえば、期待した値と実際の値を示す `AssertionError` を起こします（17章）。 |
 | テスト | `Assert` | `Bool` または `(condition, message)` | `true` なら `true` を返します。`false` なら `AssertionError`（`message` があれば、それを説明にします）。`Bool` 以外は `TypeError`。 |
 | テスト | `ExpectError` | 任意の値と、丸括弧に書いた式（と、省略できるエラーの分類 `Str`） | 式を、入力値を `@` にして計算し、エラーになれば `{"type": Str, "message": Str}` を返します。エラーにならないときや、分類がちがうときは `AssertionError`（17章）。 |
+| 値 | `Default` | `(value, fallback)` | `value` が `null` のときだけ `fallback` を返します。それ以外は `value` のままです（`0` や `""` もそのまま）。例：`null >> Default(5)` は `5`。 |
+| 値 | `Coalesce` | 値リスト `(a, b, ...)` または `List` | 最初の `null` でない値を返します。すべて `null` なら `null`。例：`(null, null, 3, 4) >> Coalesce` は `3`。 |
+| 値 | `IsNull` | 任意の値 | `null` なら `true` を返します。例：`null >> IsNull` は `true`。 |
+| 値 | `Compare` | `(a, b)` の、どちらも `Num` か、どちらも `Str` | `a < b` なら `-1`、等しければ `0`、`a > b` なら `1` を返します。例：`(1, 2) >> Compare` は `-1`。 |
+| 変換 | `ToCsv` | `List` の `List` | 行の `List` を CSV の `Str` にします。各値は `Str` 変換され、必要なら `"` で囲まれます。例：`[["a", "b"], [1, "x,y"]] >> ToCsv` は `"a,b\n1,\"x,y\""`。 |
+| 変換 | `ParseCsv` | CSV の `Str` | 行ごとの `Str` の `List` の `List` にします。数も `Str` のままなので、必要なら `Num` で変換します。例：`"a,b\n1,2" >> ParseCsv` は `[["a", "b"], ["1", "2"]]`。 |
+| 変換 | `Base64Encode` | `Str` | UTF-8 で Base64 にした `Str` を返します。例：`"popcorn" >> Base64Encode` は `"cG9wY29ybg=="`。 |
+| 変換 | `Base64Decode` | Base64 の `Str` | Base64 を、UTF-8 の `Str` に戻します。読めないときは `RuntimeError`。例：`"cG9wY29ybg==" >> Base64Decode` は `"popcorn"`。 |
+| 変換 | `UrlEncode` | `Str` | URL の中に置けるように、`%` 記号で書き換えた `Str` を返します。例：`"a b&c" >> UrlEncode` は `"a%20b%26c"`。 |
+| 変換 | `UrlDecode` | `Str` | `%` 記号の書き方を、もとの文字に戻した `Str` を返します。例：`"a%20b%26c" >> UrlDecode` は `"a b&c"`。 |
+| 変換 | `EscapeHtml` | `Str` | `<` `>` `&` `"` `'` を、HTML の中で安全な書き方に替えた `Str` を返します。例：`"<b>&</b>" >> EscapeHtml` は `"&lt;b&gt;&amp;&lt;/b&gt;"`。 |
+| 変換 | `Sha256` | `Str` | UTF-8 にして SHA-256 を取った、16 進の `Str`（64 文字）を返します。例：`"abc" >> Sha256` は `"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"`。 |
+| 変換 | `Uuid` | 入力は使いません | ランダムな UUID（`xxxxxxxx-xxxx-…` の `Str`）を返します。外部効果あり（毎回ちがう）。例：`null >> Uuid >> Length` は `36`。 |
+| 変換 | `QueryString` | `Dict` | キーと値を `a=1&b=2` の形の `Str` にします（値は `Str` 変換して URL 用に書き換えます）。値が `List` の `Dict` は使えません。例：`{"q": "pop corn", "page": 2} >> QueryString` は `"q=pop%20corn&page=2"`。 |
+| 変換 | `ParseQuery` | `Str`（`a=1&b=2`、先頭の `?` はあってもなくても） | キーと値の `Dict` にします。値はすべて `Str` です。例：`"?q=pop%20corn&page=2" >> ParseQuery` は `{"q": "pop corn", "page": "2"}`。 |
+| AI | `Ask` | `Str`、または `(Str, options)` | AI に聞いて、答えの `Str` を返します。`options` は `Dict`（`model`・`system`・`temperature`・`max_tokens`・`timeout`）。つなぎ先は環境変数 `POPCORN_AI_URL`・`POPCORN_AI_KEY`・`POPCORN_AI_MODEL`・`POPCORN_AI_PROTOCOL` で決めます（ソースに鍵を書かない）。外部効果あり（結果が毎回ちがうことがあります）。例：`"PopCorn を一言で" >> Ask` は `データを >> で流して学べる言語です`。（答えは AI しだいです） |
+| AI | `AskJson` | `Str`、または `(Str, options)` | AI に「JSON だけで答えて」と頼み、答えを PopCorn の値（`Dict`・`List` など）にして返します。JSON として読めないときは `RuntimeError`。`options` は `Dict`（`model`・`system`・`temperature`・`max_tokens`・`timeout`）。つなぎ先は環境変数 `POPCORN_AI_URL`・`POPCORN_AI_KEY`・`POPCORN_AI_MODEL`・`POPCORN_AI_PROTOCOL` で決めます（ソースに鍵を書かない）。外部効果あり。例：`"りんごの色を {\"color\": ...} の形で" >> AskJson >> Get("color")` は `赤`。（答えは AI しだいです） |
+
+### AI につなぐ（`Ask`、`AskJson`）
+
+`Ask` と `AskJson` は、特定の会社やサービスに決め打ちしていません。つなぎ先は、環境変数で決めます。ソースコードには、URL も鍵も書きません。
+
+| 環境変数 | 意味 |
+|---|---|
+| `POPCORN_AI_URL` | 送り先の URL（必須。既定のサービスはありません） |
+| `POPCORN_AI_KEY` | 鍵（なくてもかまいません。手元で動かす AI には要りません） |
+| `POPCORN_AI_MODEL` | モデル名（`model` オプションで、そのつど変えられます） |
+| `POPCORN_AI_PROTOCOL` | `openai`（既定）か `anthropic` |
+
+`openai` は、多くのサービスや、手元で動かす AI が話せる `chat/completions` の形です。`anthropic` は `messages` の形です。どちらも、この 2 つの形で話せる送り先なら、URL を替えるだけで使えます。鍵や URL は、エラーの文章に出しません。
+
+```popcorn
+"りんごを英語で" >> Ask >> Display.
+("果物を 3 つ、JSON の配列で", {"system": "短く答える"}) >> AskJson >> Display.
+```
+
+ブラウザの Playground では、まだ使えません（環境変数と鍵の置き場所がないため）。`popcorn script.pop` で動かすときに使えます。
 
 ## 4. パイプライン、束縛、パイプ追加引数
 
@@ -1128,7 +1258,7 @@ x >> Check:
 value >> Reverse >> value.
 ```
 
-`Display`、`Input`、`Debug`、`ReadFile`、`WriteFile`、`Fetch`、`PostFetch`、`HttpRequest`、`Env`、`Args`、`Now`、`Sleep`、`Random` のように、画面・入出力・ネットワーク・ファイル・時間・乱数へ働きかける処理は「外部効果処理」です。
+`Display`、`Input`、`Debug`、`ReadFile`、`WriteFile`、`Fetch`、`PostFetch`、`HttpRequest`、`Ask`、`AskJson`、`Env`、`Args`、`Now`、`Sleep`、`Random` のように、画面・入出力・ネットワーク・ファイル・時間・乱数へ働きかける処理は「外部効果処理」です。
 
 外部効果処理も、特記がない限り結果の値を次のパイプ段階へ渡します。`Display` と `Debug` は表示したあとに元の値をそのまま返し、`WriteFile` は書き込んだあとに `content` をそのまま返します。
 
@@ -1145,7 +1275,7 @@ value >> Reverse >> value.
 | `KeyError` | `Dict` にないキーへのアクセス（デフォルト値なしの `Get` や `::`） |
 | `RuntimeError` | 0 除算、`NaN`/`Infinity`、`Loop` 外の `Break`、関数外の `Return`、深すぎる再帰、壊れた JSON、正しくない正規表現、輪になった `Use` |
 | `IOError` | `ReadFile` / `WriteFile` の失敗、`Use` するファイルが読めないとき |
-| `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` の通信失敗や HTTP エラー |
+| `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` / `Ask` / `AskJson` の通信失敗や HTTP エラー |
 | `UserError` | `Throw` を評価したとき |
 | `AssertionError` | `Expect`・`Assert`・`ExpectError` で確かめたことが成り立たなかったとき（17章） |
 
