@@ -39,6 +39,8 @@ class Pipeline(ASTNode):
     ops: List[str] = field(default_factory=list)
     # 演算子ごとの (行, 列)。`>?>` の表示に使う
     op_positions: List[tuple] = field(default_factory=list)
+    # `>?>` ごとの、左側の元のコード（ほかの演算子は None）
+    tap_sources: List[Optional[str]] = field(default_factory=list)
 
 
 @dataclass

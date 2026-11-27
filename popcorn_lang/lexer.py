@@ -13,6 +13,12 @@ class Token:
     column: int
 
 
+class TokenList(list):
+    """字句解析の結果。元のソース（`source`）も持つ（`>?>` で左側のコードを表示するため）。"""
+
+    source = None
+
+
 class LexerError(Exception):
     pass
 
@@ -346,4 +352,8 @@ class Lexer:
                 f"Unexpected character {ch!r} on line {start_line}, column {start_col}"
             )
 
-        return self.tokens
+        tokens = TokenList(self.tokens)
+        # 位置を元のソースに対応させられるのは、ずらしていないとき（補間の中ではないとき）だけ
+        if self.line_offset == 1 and self.col_offset == 1:
+            tokens.source = code
+        return tokens

@@ -1152,14 +1152,14 @@ def test_tap_pipe_shows_the_value_with_its_line_and_passes_it_on(capsys):
     result = run_code("(1, 4) >> Range\n    >?> Filter (@ % 2 == 0) >?> Map (@ * 10) >> out.\nout.")
     assert result == [20, 40]
     assert capsys.readouterr().out == (
-        "[>?> line 2 after Range] (List) [1, 2, 3, 4]\n"
-        "[>?> line 2 after Filter] (List) [2, 4]\n"
+        "[2行目] (1, 4) >> Range → [1, 2, 3, 4] (List)\n"
+        "[2行目] (1, 4) >> Range >?> Filter (@ % 2 == 0) → [2, 4] (List)\n"
     )
 
 
 def test_tap_pipe_before_a_binding(capsys):
     assert run_code('"7" >> Num >?> d.\nd + 1.') == 8
-    assert capsys.readouterr().out == "[>?> line 1 after Num] (Num) 7\n"
+    assert capsys.readouterr().out == '[1行目] "7" >> Num → 7 (Num)\n'
 
 
 def test_tap_pipe_needs_a_next_stage():
@@ -1214,8 +1214,8 @@ def test_user_input_example_with_tap_and_fallback(monkeypatch, capsys):
     )
     assert run_code(code) == (42, 200)
     out = capsys.readouterr().out
-    assert "[>?> line 1 after Num] (Num) 42" in out
-    assert "[>?> line 2] (Num) 200" in out
+    assert '[1行目] "整数: " >> Input >> Trim >> Num → 42 (Num)' in out
+    assert '[2行目] "実数: " >> Input >> Trim >> Num >!> 200 → 200 (Num)' in out
 
 
 # ---- Fork の 1 行書き ----
@@ -1242,3 +1242,20 @@ def test_fork_one_line_form_rejects_labels():
         assert "Fork:" in str(exc)
     else:
         assert False, "expected ParseError"
+
+
+def test_tap_pipe_shows_left_code_without_comments_on_one_line(capsys):
+    code = '[1, 2, // first two\n 3] >> Map (@ * 2) // doubled\n    >?> Sum.'
+    assert run_code(code) == 12
+    assert capsys.readouterr().out == "[3行目] [1, 2, 3] >> Map (@ * 2) → [2, 4, 6] (List)\n"
+
+
+def test_tap_pipe_keeps_double_slash_inside_strings(capsys):
+    run_code('"https://example.com" >?> url.')
+    assert capsys.readouterr().out == '[1行目] "https://example.com" → https://example.com (Str)\n'
+
+
+def test_tap_pipe_shortens_long_left_code_at_a_pipe(capsys):
+    run_code("(1, 100) >> Range >> Filter (@ % 7 == 0) >> Map (@ * @) >> Reverse >?> Length.")
+    out = capsys.readouterr().out
+    assert out.startswith("[1行目] … >> Map (@ * @) >> Reverse → [")

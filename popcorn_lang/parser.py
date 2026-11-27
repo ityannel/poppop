@@ -40,6 +40,9 @@ class Parser:
     def __init__(self, tokens: List[Token], *, legacy_braces: bool = False):
         self.tokens = tokens
         self.pos = 0
+        # 元のソース（`>?>` で左側のコードを表示するため）。ないときは表示しない
+        self.source: Optional[str] = getattr(tokens, "source", None)
+        self._source_line_starts: Optional[List[int]] = None
         # legacy_braces: 旧形式の `{ … }` ブロックも読む（`popcorn migrate` が、書きかえ位置を知るためだけに使う）
         self.legacy_braces = legacy_braces
         self.brace_blocks: List[tuple] = []  # (開き `{` の位置, 閉じ `}` の位置)
@@ -691,15 +694,20 @@ class Parser:
             raise ParseError("Unexpected end of input")
         line, col = curr.line, curr.column
 
+        first_index = self.pos
         nodes = [self.parse_expression()]
         ops = []
         op_positions = []
+        tap_sources: List[Optional[str]] = []
 
         while self.current() and self.current().type == "STREAM_OP":
             op_tok = self.current()
             op = op_tok.value
             ops.append(op)
             op_positions.append((op_tok.line, op_tok.column))
+            tap_sources.append(
+                self._source_text(first_index, self.pos) if op == ">?>" else None
+            )
             self.advance()
 
             curr = self.current()
@@ -726,7 +734,37 @@ class Parser:
                     )
             nodes.append(step)
 
-        return Pipeline(line, col, nodes, ops, op_positions)
+        return Pipeline(line, col, nodes, ops, op_positions, tap_sources)
+
+    def _token_offset(self, tok: Token) -> int:
+        if self._source_line_starts is None:
+            starts = [0]
+            for index, ch in enumerate(self.source):
+                if ch == "\n":
+                    starts.append(index + 1)
+            self._source_line_starts = starts
+        return self._source_line_starts[tok.line - 1] + tok.column - 1
+
+    def _source_text(self, start: int, end: int) -> Optional[str]:
+        """トークン `start` から `end` の手前までの、元のコード（1 行にまとめ、コメントを除く）。"""
+        if self.source is None or end <= start:
+            return None
+        pieces = []
+        for index in range(start, end):
+            tok = self.tokens[index]
+            begin = self._token_offset(tok)
+            stop = self._token_offset(self.tokens[index + 1])  # tokens[end] は `>?>` 自身
+            piece = self.source[begin:stop]
+            if "\n" in piece:
+                piece = piece.split("\n", 1)[0]
+                # 行末のコメントを除く（文字列の中の // は残す）
+                tail_from = piece.rfind('"') + 1 if tok.type in ("STRING", "INTERP_STRING") else 0
+                comment = piece.find("//", tail_from)
+                if comment != -1:
+                    piece = piece[:comment]
+                piece += " "
+            pieces.append(piece)
+        return " ".join("".join(pieces).split())
 
     def parse_expression(self) -> ASTNode:
         return self.parse_or()
