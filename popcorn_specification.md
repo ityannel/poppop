@@ -253,6 +253,14 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 数値 | `IsPrime` | 0 以上の整数値（10^12 まで） | 素数なら `true` を返します。例：`97 >> IsPrime` は `true`。 |
 | 数値 | `ToBase` | `(n, base)` | 整数値 `n` を `base` 進数（2 から 36）の `Str` にします（`255 >> ToBase(16)` は `"ff"`）。例：`255 >> ToBase(16)` は `"ff"`。 |
 | 数値 | `FromBase` | `(text, base)` | `base` 進数（2 から 36）で書かれた `Str` を、`Num` にします。読めないときは `RuntimeError`。例：`"ff" >> FromBase(16)` は `255`。 |
+| 数値 | `Log2` | 0 より大きい `Num` | 2 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。例：`8 >> Log2` は `3`。 |
+| 数値 | `Log10` | 0 より大きい `Num` | 10 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。例：`1000 >> Log10` は `3`。 |
+| 数値 | `Percentile` | `(values, p)`（`p` は 0 から 100） | 並べたときの `p` パーセントの位置の値を、間を直線でつないで求めた `Num` を返します（50 は `Median` と同じ）。例：`([1, 2, 3, 4, 5], 50) >> Percentile` は `3`。 |
+| 数値 | `BitAnd` | `(a, b)` の 2つの整数値 | ビットごとの AND の `Num` を返します。例：`(12, 10) >> BitAnd` は `8`。 |
+| 数値 | `BitOr` | `(a, b)` の 2つの整数値 | ビットごとの OR の `Num` を返します。例：`(12, 10) >> BitOr` は `14`。 |
+| 数値 | `BitXor` | `(a, b)` の 2つの整数値 | ビットごとの XOR の `Num` を返します。例：`(12, 10) >> BitXor` は `6`。 |
+| 数値 | `ShiftLeft` | `(n, bits)`（`bits` は 0 から 52） | `n` を左に `bits` ビットずらした `Num` を返します（`1 >> ShiftLeft(3)` は `8`）。例：`(1, 3) >> ShiftLeft` は `8`。 |
+| 数値 | `ShiftRight` | `(n, bits)`（`bits` は 0 から 52） | `n` を右に `bits` ビットずらした `Num` を返します（負の数は符号を保ちます）。例：`(8, 3) >> ShiftRight` は `1`。 |
 | 文字列 | `Uppercase` | `Str` | 大文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Lowercase` | `Str` | 小文字にした新しい `Str` を返します。非破壊。 |
 | 文字列 | `Trim` | `Str` | 前後の空白（全角の空白も）を取り除いた新しい `Str` を返します。非破壊。 |
@@ -288,6 +296,12 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 文字列 | `KebabCase` | `Str` | `kebab-case`（小文字を `-` でつなぐ書き方）にした `Str` を返します。例：`"helloBigWorld" >> KebabCase` は `"hello-big-world"`。 |
 | 文字列 | `CamelCase` | `Str` | `camelCase`（2 語目から先頭を大文字にしてつなぐ書き方）にした `Str` を返します。例：`"hello big_world" >> CamelCase` は `"helloBigWorld"`。 |
 | 文字列 | `Distance` | `(a, b)` の 2つの `Str` | 2つの文字列が何文字ちがうかを表す、編集距離（レーベンシュタイン距離）の `Num` を返します。例：`("kitten", "sitting") >> Distance` は `3`。 |
+| 文字列 | `Capture` | `(text, pattern)` | 最初に合った部分の、かっこ `( )` の中身を `Str` の `List` で返します。かっこがなければ合った部分全体の 1 つ。合わなければ `null`。例：`"2026-11-27" >> Capture("(\\d+)-(\\d+)-(\\d+)")` は `["2026", "11", "27"]`。 |
+| 文字列 | `CaptureAll` | `(text, pattern)` | 合った部分すべてについて、かっこ `( )` の中身の `List` を並べた `List` を返します。例：`"a=1, b=2" >> CaptureAll("(\\w)=(\\d)")` は `[["a", "1"], ["b", "2"]]`。 |
+| 文字列 | `Basename` | `Str`（パス） | パスの最後の部分（ファイル名）を返します。例：`"docs/notes/readme.md" >> Basename` は `"readme.md"`。 |
+| 文字列 | `Dirname` | `Str`（パス） | パスの、最後の部分より前（フォルダ）を返します。なければ空の `Str`。例：`"docs/notes/readme.md" >> Dirname` は `"docs/notes"`。 |
+| 文字列 | `Extension` | `Str`（パス） | ファイル名の最後の `.` から後ろを、`.` つきで返します。なければ空の `Str`。例：`"docs/readme.md" >> Extension` は `".md"`。 |
+| 文字列 | `JoinPath` | `List` の `Str`、または値リスト | `/` でつないで、重なった `/` を 1 つにした `Str` を返します。例：`("docs/", "/notes", "a.md") >> JoinPath` は `"docs/notes/a.md"`。 |
 | コレクション | `Length` | `List`、`Dict`、`Str`、値リスト | 要素数、キー数、または Unicode コードポイント数を `Num` で返します。 |
 | コレクション | `Reverse` | `List` または `Str` | 逆順にした新しい `List` または `Str`（コードポイント単位）を返します。非破壊。 |
 | コレクション | `Get` | `(target, key)` または `(target, key, default)` | `List`・`Str` の添字（負ならうしろから。`Str` は 1 文字の `Str`）や `Dict` のキーに対応する値を返します。見つからないとき（`target` が `null` のときも）、`default` があればそれを返し、なければ `IndexError` / `KeyError`。 |
@@ -379,6 +393,8 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 変換 | `EscapeHtml` | `Str` | `<` `>` `&` `"` `'` を、HTML の中で安全な書き方に替えた `Str` を返します。例：`"<b>&</b>" >> EscapeHtml` は `"&lt;b&gt;&amp;&lt;/b&gt;"`。 |
 | 変換 | `Sha256` | `Str` | UTF-8 にして SHA-256 を取った、16 進の `Str`（64 文字）を返します。例：`"abc" >> Sha256` は `"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"`。 |
 | 変換 | `Uuid` | 入力は使いません | ランダムな UUID（`xxxxxxxx-xxxx-…` の `Str`）を返します。外部効果あり（毎回ちがう）。例：`null >> Uuid >> Length` は `36`。 |
+| 変換 | `QueryString` | `Dict` | キーと値を `a=1&b=2` の形の `Str` にします（値は `Str` 変換して URL 用に書き換えます）。値が `List` の `Dict` は使えません。例：`{"q": "pop corn", "page": 2} >> QueryString` は `"q=pop%20corn&page=2"`。 |
+| 変換 | `ParseQuery` | `Str`（`a=1&b=2`、先頭の `?` はあってもなくても） | キーと値の `Dict` にします。値はすべて `Str` です。例：`"?q=pop%20corn&page=2" >> ParseQuery` は `{"q": "pop corn", "page": "2"}`。 |
 
 ## 4. パイプライン、束縛、パイプ追加引数
 

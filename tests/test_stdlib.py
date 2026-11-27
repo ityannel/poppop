@@ -28,7 +28,7 @@ def test_every_documented_function_is_registered_once():
     assert len(names) == len(set(names))
     for name in names:
         assert name in BUILTIN_REGISTRY
-    assert len(names) >= 90
+    assert len(names) >= 105
 
 
 def test_every_function_has_an_example_and_a_description():
@@ -67,6 +67,12 @@ def test_new_functions_do_not_replace_older_ones():
         ('"%%%" >> Base64Decode.', "RuntimeError"),
         ("[1, 2, 3] >> Sample(9).", "RuntimeError"),
         ('{"a": 1} >> Pick("a").', "TypeError"),
+        ('"abc" >> Capture("(").', "RuntimeError"),
+        ("0 >> Log2.", "RuntimeError"),
+        ("([], 50) >> Percentile.", "RuntimeError"),
+        ("([1, 2], 101) >> Percentile.", "RuntimeError"),
+        ("(1, 60) >> ShiftLeft.", "RuntimeError"),
+        ("[1] >> QueryString.", "TypeError"),
     ],
 )
 def test_bad_input_is_a_clear_error(source, error_type):

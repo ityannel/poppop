@@ -27,7 +27,7 @@ from .evaluator import (
     _values_equal,
     format_popcorn_str,
 )
-from .pop_builtins import BUILTIN_REGISTRY, _type_error
+from .pop_builtins import BUILTIN_REGISTRY, _compile_pattern, _type_error
 
 DOCS = []
 _MAX_ITEMS = 100000
@@ -934,3 +934,140 @@ def builtin_Sha256(current, env, evaluator):
 @std(D, "Uuid", "入力は使いません", "ランダムな UUID（`xxxxxxxx-xxxx-…` の `Str`）を返します。外部効果あり（毎回ちがう）。", "文字列", [("null >> Uuid >> Length.", 36)])
 def builtin_Uuid(current, env, evaluator):
     return str(uuid.uuid4())
+
+
+# ================================================================
+# データ編集・API まわりの追加
+# ================================================================
+
+
+def _groups(match):
+    return [match.group(0)] if match.re.groups == 0 else [g for g in match.groups()]
+
+
+@std(S, "Capture", "`(text, pattern)`", "最初に合った部分の、かっこ `( )` の中身を `Str` の `List` で返します。かっこがなければ合った部分全体の 1 つ。合わなければ `null`。", "配列", [('"2026-11-27" >> Capture("(\\\\d+)-(\\\\d+)-(\\\\d+)").', ["2026", "11", "27"]), ('"abc" >> Capture("\\\\d").', None)])
+def builtin_Capture(current, env, evaluator):
+    text, pattern = _args(current, "Capture", "(Str, pattern)", 2)
+    text = _text(text, "Capture", "(Str, pattern)")
+    match = _compile_pattern(pattern, "Capture").search(text)
+    return None if match is None else _groups(match)
+
+
+@std(S, "CaptureAll", "`(text, pattern)`", "合った部分すべてについて、かっこ `( )` の中身の `List` を並べた `List` を返します。", "配列", [('"a=1, b=2" >> CaptureAll("(\\\\w)=(\\\\d)").', [["a", "1"], ["b", "2"]])])
+def builtin_CaptureAll(current, env, evaluator):
+    text, pattern = _args(current, "CaptureAll", "(Str, pattern)", 2)
+    text = _text(text, "CaptureAll", "(Str, pattern)")
+    return [_groups(m) for m in _compile_pattern(pattern, "CaptureAll").finditer(text)]
+
+
+@std(N, "Log2", "0 より大きい `Num`", "2 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。", "数値", [("8 >> Log2.", 3)])
+def builtin_Log2(current, env, evaluator):
+    x = _num(current, "Log2", "Num")
+    if x <= 0:
+        _fail("Log2 requires a Num greater than 0")
+    return _to_num(math.log2(x))
+
+
+@std(N, "Log10", "0 より大きい `Num`", "10 を底とする対数の `Num` を返します。0 以下は `RuntimeError`。", "数値", [("1000 >> Log10.", 3)])
+def builtin_Log10(current, env, evaluator):
+    x = _num(current, "Log10", "Num")
+    if x <= 0:
+        _fail("Log10 requires a Num greater than 0")
+    return _to_num(math.log10(x))
+
+
+@std(N, "Percentile", "`(values, p)`（`p` は 0 から 100）", "並べたときの `p` パーセントの位置の値を、間を直線でつないで求めた `Num` を返します（50 は `Median` と同じ）。", "数値", [("([1, 2, 3, 4, 5], 50) >> Percentile.", 3), ("([10, 20, 30, 40], 25) >> Percentile.", 17.5)])
+def builtin_Percentile(current, env, evaluator):
+    values, p = _args(current, "Percentile", "(non-empty List of Num, p from 0 to 100)", 2)
+    values = sorted(_numbers(values, "Percentile", "(non-empty List of Num, p from 0 to 100)"))
+    p = _num(p, "Percentile", "(non-empty List of Num, p from 0 to 100)")
+    if not values:
+        _fail("Percentile requires a non-empty List")
+    if not 0 <= p <= 100:
+        _fail("Percentile p must be from 0 to 100")
+    position = (len(values) - 1) * p / 100
+    low = math.floor(position)
+    high = math.ceil(position)
+    return _to_num(values[low] + (values[high] - values[low]) * (position - low))
+
+
+def _bits(current, name):
+    a, b = (_whole(v, name, "(whole Num, whole Num)") for v in _args(current, name, "(whole Num, whole Num)", 2))
+    return a, b
+
+
+@std(N, "BitAnd", "`(a, b)` の 2つの整数値", "ビットごとの AND の `Num` を返します。", "数値", [("(12, 10) >> BitAnd.", 8)])
+def builtin_BitAnd(current, env, evaluator):
+    a, b = _bits(current, "BitAnd")
+    return _to_num(a & b)
+
+
+@std(N, "BitOr", "`(a, b)` の 2つの整数値", "ビットごとの OR の `Num` を返します。", "数値", [("(12, 10) >> BitOr.", 14)])
+def builtin_BitOr(current, env, evaluator):
+    a, b = _bits(current, "BitOr")
+    return _to_num(a | b)
+
+
+@std(N, "BitXor", "`(a, b)` の 2つの整数値", "ビットごとの XOR の `Num` を返します。", "数値", [("(12, 10) >> BitXor.", 6)])
+def builtin_BitXor(current, env, evaluator):
+    a, b = _bits(current, "BitXor")
+    return _to_num(a ^ b)
+
+
+@std(N, "ShiftLeft", "`(n, bits)`（`bits` は 0 から 52）", "`n` を左に `bits` ビットずらした `Num` を返します（`1 >> ShiftLeft(3)` は `8`）。", "数値", [("(1, 3) >> ShiftLeft.", 8)])
+def builtin_ShiftLeft(current, env, evaluator):
+    n, bits = _bits(current, "ShiftLeft")
+    if not 0 <= bits <= 52:
+        _fail("ShiftLeft bits must be from 0 to 52")
+    return _to_num(n << bits)
+
+
+@std(N, "ShiftRight", "`(n, bits)`（`bits` は 0 から 52）", "`n` を右に `bits` ビットずらした `Num` を返します（負の数は符号を保ちます）。", "数値", [("(8, 3) >> ShiftRight.", 1)])
+def builtin_ShiftRight(current, env, evaluator):
+    n, bits = _bits(current, "ShiftRight")
+    if not 0 <= bits <= 52:
+        _fail("ShiftRight bits must be from 0 to 52")
+    return _to_num(n >> bits)
+
+
+@std(D, "QueryString", "`Dict`", "キーと値を `a=1&b=2` の形の `Str` にします（値は `Str` 変換して URL 用に書き換えます）。値が `List` の `Dict` は使えません。", "文字列", [('{"q": "pop corn", "page": 2} >> QueryString.', "q=pop%20corn&page=2")])
+def builtin_QueryString(current, env, evaluator):
+    if not isinstance(current, dict):
+        _type_error("QueryString requires Dict")
+    pairs = []
+    for key, value in current.items():
+        if isinstance(value, (list, tuple, dict)):
+            _type_error("QueryString requires a Dict whose values are not List or Dict")
+        pairs.append(urllib.parse.quote(str(key), safe="") + "=" + urllib.parse.quote(format_popcorn_str(value), safe=""))
+    return "&".join(pairs)
+
+
+@std(D, "ParseQuery", "`Str`（`a=1&b=2`、先頭の `?` はあってもなくても）", "キーと値の `Dict` にします。値はすべて `Str` です。", "辞書", [('"?q=pop%20corn&page=2" >> ParseQuery.', {"q": "pop corn", "page": "2"})])
+def builtin_ParseQuery(current, env, evaluator):
+    text = _text(current, "ParseQuery", "Str").lstrip("?")
+    return {k: v for k, v in urllib.parse.parse_qsl(text, keep_blank_values=True)}
+
+
+@std(S, "Basename", "`Str`（パス）", "パスの最後の部分（ファイル名）を返します。", "文字列", [('"docs/notes/readme.md" >> Basename.', "readme.md")])
+def builtin_Basename(current, env, evaluator):
+    return _text(current, "Basename", "Str").rstrip("/").split("/")[-1]
+
+
+@std(S, "Dirname", "`Str`（パス）", "パスの、最後の部分より前（フォルダ）を返します。なければ空の `Str`。", "文字列", [('"docs/notes/readme.md" >> Dirname.', "docs/notes")])
+def builtin_Dirname(current, env, evaluator):
+    text = _text(current, "Dirname", "Str").rstrip("/")
+    return text.rsplit("/", 1)[0] if "/" in text else ""
+
+
+@std(S, "Extension", "`Str`（パス）", "ファイル名の最後の `.` から後ろを、`.` つきで返します。なければ空の `Str`。", "文字列", [('"docs/readme.md" >> Extension.', ".md"), ('"Makefile" >> Extension.', "")])
+def builtin_Extension(current, env, evaluator):
+    name = _text(current, "Extension", "Str").rstrip("/").split("/")[-1]
+    return name[name.rfind("."):] if "." in name.strip(".") and not name.startswith(".") else ""
+
+
+@std(S, "JoinPath", "`List` の `Str`、または値リスト", "`/` でつないで、重なった `/` を 1 つにした `Str` を返します。", "文字列", [('("docs/", "/notes", "a.md") >> JoinPath.', "docs/notes/a.md")])
+def builtin_JoinPath(current, env, evaluator):
+    items = list(current) if isinstance(current, (list, tuple)) else [current]
+    parts = [_text(v, "JoinPath", "List of Str") for v in items]
+    joined = "/".join(p for p in parts if p != "")
+    return re.sub(r"/{2,}", "/", joined)

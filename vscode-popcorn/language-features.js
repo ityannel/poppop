@@ -210,7 +210,23 @@ const STANDARD_FUNCTIONS = Object.freeze({
     UrlDecode: { description: "% 記号の書き方を、もとの文字に戻した Str を返します。例：\"a%20b%26c\" >> UrlDecode は \"a b&c\"。", output: "文字列" },
     EscapeHtml: { description: "< > & \" ' を、HTML の中で安全な書き方に替えた Str を返します。例：\"<b>&</b>\" >> EscapeHtml は \"&lt;b&gt;&amp;&lt;/b&gt;\"。", output: "文字列" },
     Sha256: { description: "UTF-8 にして SHA-256 を取った、16 進の Str（64 文字）を返します。例：\"abc\" >> Sha256 は \"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"。", output: "文字列" },
-    Uuid: { description: "ランダムな UUID（xxxxxxxx-xxxx-… の Str）を返します。外部効果あり（毎回ちがう）。例：null >> Uuid >> Length は 36。", output: "文字列" }
+    Uuid: { description: "ランダムな UUID（xxxxxxxx-xxxx-… の Str）を返します。外部効果あり（毎回ちがう）。例：null >> Uuid >> Length は 36。", output: "文字列" },
+    Capture: { description: "最初に合った部分の、かっこ ( ) の中身を Str の List で返します。かっこがなければ合った部分全体の 1 つ。合わなければ null。例：\"2026-11-27\" >> Capture(\"(\\\\d+)-(\\\\d+)-(\\\\d+)\") は [\"2026\", \"11\", \"27\"]。", output: "配列" },
+    CaptureAll: { description: "合った部分すべてについて、かっこ ( ) の中身の List を並べた List を返します。例：\"a=1, b=2\" >> CaptureAll(\"(\\\\w)=(\\\\d)\") は [[\"a\", \"1\"], [\"b\", \"2\"]]。", output: "配列" },
+    Log2: { description: "2 を底とする対数の Num を返します。0 以下は RuntimeError。例：8 >> Log2 は 3。", output: "数値" },
+    Log10: { description: "10 を底とする対数の Num を返します。0 以下は RuntimeError。例：1000 >> Log10 は 3。", output: "数値" },
+    Percentile: { description: "並べたときの p パーセントの位置の値を、間を直線でつないで求めた Num を返します（50 は Median と同じ）。例：([1, 2, 3, 4, 5], 50) >> Percentile は 3。", output: "数値" },
+    BitAnd: { description: "ビットごとの AND の Num を返します。例：(12, 10) >> BitAnd は 8。", output: "数値" },
+    BitOr: { description: "ビットごとの OR の Num を返します。例：(12, 10) >> BitOr は 14。", output: "数値" },
+    BitXor: { description: "ビットごとの XOR の Num を返します。例：(12, 10) >> BitXor は 6。", output: "数値" },
+    ShiftLeft: { description: "n を左に bits ビットずらした Num を返します（1 >> ShiftLeft(3) は 8）。例：(1, 3) >> ShiftLeft は 8。", output: "数値" },
+    ShiftRight: { description: "n を右に bits ビットずらした Num を返します（負の数は符号を保ちます）。例：(8, 3) >> ShiftRight は 1。", output: "数値" },
+    QueryString: { description: "キーと値を a=1&b=2 の形の Str にします（値は Str 変換して URL 用に書き換えます）。値が List の Dict は使えません。例：{\"q\": \"pop corn\", \"page\": 2} >> QueryString は \"q=pop%20corn&page=2\"。", output: "文字列" },
+    ParseQuery: { description: "キーと値の Dict にします。値はすべて Str です。例：\"?q=pop%20corn&page=2\" >> ParseQuery は {\"q\": \"pop corn\", \"page\": \"2\"}。", output: "辞書" },
+    Basename: { description: "パスの最後の部分（ファイル名）を返します。例：\"docs/notes/readme.md\" >> Basename は \"readme.md\"。", output: "文字列" },
+    Dirname: { description: "パスの、最後の部分より前（フォルダ）を返します。なければ空の Str。例：\"docs/notes/readme.md\" >> Dirname は \"docs/notes\"。", output: "文字列" },
+    Extension: { description: "ファイル名の最後の . から後ろを、. つきで返します。なければ空の Str。例：\"docs/readme.md\" >> Extension は \".md\"。", output: "文字列" },
+    JoinPath: { description: "/ でつないで、重なった / を 1 つにした Str を返します。例：(\"docs/\", \"/notes\", \"a.md\") >> JoinPath は \"docs/notes/a.md\"。", output: "文字列" }
 });
 
 const SYSTEM_KEYWORDS = Object.freeze({
