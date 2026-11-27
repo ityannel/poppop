@@ -192,6 +192,17 @@ def test_dictionary_access_and_error_types():
     expect_error('{"a": 1} >> d. d[0].', "TypeError")
 
 
+def test_read_field_of_current_value_mid_pipeline():
+    src = '`{"city": "東京", "tags": ["a", "b"]}` >> raw. '
+    assert run_code(src + "raw >> FromJson >> @::city.") == "東京"
+    assert run_code(src + "raw >> FromJson >> (@::city).") == "東京"
+    assert run_code(src + "raw >> FromJson >> @::tags[-1] >> Uppercase.") == "B"
+    assert run_code(src + "raw >> FromJson >> @::city >> c. c.") == "東京"
+    expect_error(src + "raw >> FromJson >> @::nope.", "KeyError")
+    # 名前つきの値のフィールドへ流すのは、これまでどおり代入の誤りとして知らせる
+    expect_error('{"a": 1} >> d. 5 >> d::a.', "RuntimeError")
+
+
 def test_tuple_vs_list_semantics():
     assert run_code("(1, 2) >> Type.") == "Tuple"
     assert run_code("[1, 2] >> Type.") == "List"
