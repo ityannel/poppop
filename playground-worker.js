@@ -19,6 +19,7 @@ const SOURCE_FILES = [
   "evaluator.py",
   "pop_builtins.py",
   "pop_stdlib.py",
+  "pop_ai.py",
   "cli.py",
   "migrate.py",
   "modules.py",

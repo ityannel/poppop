@@ -226,7 +226,9 @@ const STANDARD_FUNCTIONS = Object.freeze({
     Basename: { description: "パスの最後の部分（ファイル名）を返します。例：\"docs/notes/readme.md\" >> Basename は \"readme.md\"。", output: "文字列" },
     Dirname: { description: "パスの、最後の部分より前（フォルダ）を返します。なければ空の Str。例：\"docs/notes/readme.md\" >> Dirname は \"docs/notes\"。", output: "文字列" },
     Extension: { description: "ファイル名の最後の . から後ろを、. つきで返します。なければ空の Str。例：\"docs/readme.md\" >> Extension は \".md\"。", output: "文字列" },
-    JoinPath: { description: "/ でつないで、重なった / を 1 つにした Str を返します。例：(\"docs/\", \"/notes\", \"a.md\") >> JoinPath は \"docs/notes/a.md\"。", output: "文字列" }
+    JoinPath: { description: "/ でつないで、重なった / を 1 つにした Str を返します。例：(\"docs/\", \"/notes\", \"a.md\") >> JoinPath は \"docs/notes/a.md\"。", output: "文字列" },
+    Ask: { description: "AI に聞いて、答えの Str を返します。options は Dict（model・system・temperature・max_tokens・timeout）。つなぎ先は環境変数 POPCORN_AI_URL・POPCORN_AI_KEY・POPCORN_AI_MODEL・POPCORN_AI_PROTOCOL で決めます（ソースに鍵を書かない）。外部効果あり（結果が毎回ちがうことがあります）。例：\"PopCorn を一言で\" >> Ask は データを >> で流して学べる言語です。", output: "文字列" },
+    AskJson: { description: "AI に「JSON だけで答えて」と頼み、答えを PopCorn の値（Dict・List など）にして返します。JSON として読めないときは RuntimeError。options は Dict（model・system・temperature・max_tokens・timeout）。つなぎ先は環境変数 POPCORN_AI_URL・POPCORN_AI_KEY・POPCORN_AI_MODEL・POPCORN_AI_PROTOCOL で決めます（ソースに鍵を書かない）。外部効果あり。例：\"りんごの色を {\\\"color\\\": ...} の形で\" >> AskJson >> Get(\"color\") は 赤。", output: "要素" }
 });
 
 const SYSTEM_KEYWORDS = Object.freeze({

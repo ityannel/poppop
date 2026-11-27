@@ -395,6 +395,28 @@ Null  Bool  Num  Str  List  Dict  Tuple
 | 変換 | `Uuid` | 入力は使いません | ランダムな UUID（`xxxxxxxx-xxxx-…` の `Str`）を返します。外部効果あり（毎回ちがう）。例：`null >> Uuid >> Length` は `36`。 |
 | 変換 | `QueryString` | `Dict` | キーと値を `a=1&b=2` の形の `Str` にします（値は `Str` 変換して URL 用に書き換えます）。値が `List` の `Dict` は使えません。例：`{"q": "pop corn", "page": 2} >> QueryString` は `"q=pop%20corn&page=2"`。 |
 | 変換 | `ParseQuery` | `Str`（`a=1&b=2`、先頭の `?` はあってもなくても） | キーと値の `Dict` にします。値はすべて `Str` です。例：`"?q=pop%20corn&page=2" >> ParseQuery` は `{"q": "pop corn", "page": "2"}`。 |
+| AI | `Ask` | `Str`、または `(Str, options)` | AI に聞いて、答えの `Str` を返します。`options` は `Dict`（`model`・`system`・`temperature`・`max_tokens`・`timeout`）。つなぎ先は環境変数 `POPCORN_AI_URL`・`POPCORN_AI_KEY`・`POPCORN_AI_MODEL`・`POPCORN_AI_PROTOCOL` で決めます（ソースに鍵を書かない）。外部効果あり（結果が毎回ちがうことがあります）。例：`"PopCorn を一言で" >> Ask` は `データを >> で流して学べる言語です`。（答えは AI しだいです） |
+| AI | `AskJson` | `Str`、または `(Str, options)` | AI に「JSON だけで答えて」と頼み、答えを PopCorn の値（`Dict`・`List` など）にして返します。JSON として読めないときは `RuntimeError`。`options` は `Dict`（`model`・`system`・`temperature`・`max_tokens`・`timeout`）。つなぎ先は環境変数 `POPCORN_AI_URL`・`POPCORN_AI_KEY`・`POPCORN_AI_MODEL`・`POPCORN_AI_PROTOCOL` で決めます（ソースに鍵を書かない）。外部効果あり。例：`"りんごの色を {\"color\": ...} の形で" >> AskJson >> Get("color")` は `赤`。（答えは AI しだいです） |
+
+### AI につなぐ（`Ask`、`AskJson`）
+
+`Ask` と `AskJson` は、特定の会社やサービスに決め打ちしていません。つなぎ先は、環境変数で決めます。ソースコードには、URL も鍵も書きません。
+
+| 環境変数 | 意味 |
+|---|---|
+| `POPCORN_AI_URL` | 送り先の URL（必須。既定のサービスはありません） |
+| `POPCORN_AI_KEY` | 鍵（なくてもかまいません。手元で動かす AI には要りません） |
+| `POPCORN_AI_MODEL` | モデル名（`model` オプションで、そのつど変えられます） |
+| `POPCORN_AI_PROTOCOL` | `openai`（既定）か `anthropic` |
+
+`openai` は、多くのサービスや、手元で動かす AI が話せる `chat/completions` の形です。`anthropic` は `messages` の形です。どちらも、この 2 つの形で話せる送り先なら、URL を替えるだけで使えます。鍵や URL は、エラーの文章に出しません。
+
+```popcorn
+"りんごを英語で" >> Ask >> Display.
+("果物を 3 つ、JSON の配列で", {"system": "短く答える"}) >> AskJson >> Display.
+```
+
+ブラウザの Playground では、まだ使えません（環境変数と鍵の置き場所がないため）。`popcorn script.pop` で動かすときに使えます。
 
 ## 4. パイプライン、束縛、パイプ追加引数
 
@@ -1236,7 +1258,7 @@ x >> Check:
 value >> Reverse >> value.
 ```
 
-`Display`、`Input`、`Debug`、`ReadFile`、`WriteFile`、`Fetch`、`PostFetch`、`HttpRequest`、`Env`、`Args`、`Now`、`Sleep`、`Random` のように、画面・入出力・ネットワーク・ファイル・時間・乱数へ働きかける処理は「外部効果処理」です。
+`Display`、`Input`、`Debug`、`ReadFile`、`WriteFile`、`Fetch`、`PostFetch`、`HttpRequest`、`Ask`、`AskJson`、`Env`、`Args`、`Now`、`Sleep`、`Random` のように、画面・入出力・ネットワーク・ファイル・時間・乱数へ働きかける処理は「外部効果処理」です。
 
 外部効果処理も、特記がない限り結果の値を次のパイプ段階へ渡します。`Display` と `Debug` は表示したあとに元の値をそのまま返し、`WriteFile` は書き込んだあとに `content` をそのまま返します。
 
@@ -1253,7 +1275,7 @@ value >> Reverse >> value.
 | `KeyError` | `Dict` にないキーへのアクセス（デフォルト値なしの `Get` や `::`） |
 | `RuntimeError` | 0 除算、`NaN`/`Infinity`、`Loop` 外の `Break`、関数外の `Return`、深すぎる再帰、壊れた JSON、正しくない正規表現、輪になった `Use` |
 | `IOError` | `ReadFile` / `WriteFile` の失敗、`Use` するファイルが読めないとき |
-| `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` の通信失敗や HTTP エラー |
+| `NetworkError` | `Fetch` / `PostFetch` / `HttpRequest` / `Ask` / `AskJson` の通信失敗や HTTP エラー |
 | `UserError` | `Throw` を評価したとき |
 | `AssertionError` | `Expect`・`Assert`・`ExpectError` で確かめたことが成り立たなかったとき（17章） |
 

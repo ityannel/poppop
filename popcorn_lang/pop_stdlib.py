@@ -33,10 +33,10 @@ DOCS = []
 _MAX_ITEMS = 100000
 
 
-def std(category, name, usage, doc, output, ex=()):
+def std(category, name, usage, doc, output, ex=(), demo=()):
     def register(fn):
         BUILTIN_REGISTRY[name] = fn
-        DOCS.append({"category": category, "name": name, "usage": usage, "doc": doc, "output": output, "ex": list(ex)})
+        DOCS.append({"category": category, "name": name, "usage": usage, "doc": doc, "output": output, "ex": list(ex), "demo": list(demo)})
         return fn
 
     return register
@@ -1071,3 +1071,6 @@ def builtin_JoinPath(current, env, evaluator):
     parts = [_text(v, "JoinPath", "List of Str") for v in items]
     joined = "/".join(p for p in parts if p != "")
     return re.sub(r"/{2,}", "/", joined)
+
+
+from . import pop_ai  # noqa: E402,F401

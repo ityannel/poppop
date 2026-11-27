@@ -33,7 +33,7 @@ def test_every_documented_function_is_registered_once():
 
 def test_every_function_has_an_example_and_a_description():
     for doc in pop_stdlib.DOCS:
-        assert doc["ex"], doc["name"]
+        assert doc["ex"] or doc["demo"], doc["name"]
         assert doc["doc"] and doc["usage"] and doc["output"], doc["name"]
 
 
