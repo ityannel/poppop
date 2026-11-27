@@ -573,6 +573,7 @@
       document.documentElement.classList.remove("gate-open");
       if (before && before !== document.body && before.focus) before.focus({ preventScroll: true });
       setTimeout(() => gate.remove(), reduced ? 0 : 420);
+      document.dispatchEvent(new CustomEvent("popcorn:gate", { detail: { sound: on } }));
     }
     yes.addEventListener("click", () => finish(true));
     no.addEventListener("click", () => finish(false));

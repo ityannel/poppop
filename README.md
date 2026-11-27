@@ -86,11 +86,18 @@ The site has two pages:
 
 - `/` is the introduction site (`index.html` and `lp/`). Every demo on it uses
   output checked against the real interpreter. The examples and the optional
-  background music credit live in `lp/data.js`. The 3D pipe at the top is
-  `lp/hero3d.js`, built on three.js (`lp/vendor/`, MIT). It is skipped when
-  WebGL is missing or the visitor prefers reduced motion. Every visit starts
-  by asking whether to play sound (only the volume is remembered). The symbol
-  background of the last blue band is `lp/field.js`.
+  background music credit live in `lp/data.js`. The page does not scroll: the
+  visitor sits in a movie theater, and each section is a scene on the screen
+  (`#screen`), switched by wheel, swipe, arrow keys or the reel at the bottom
+  (`lp/scenes.js`). A scene that is only a little too tall is scaled down to
+  fit; a much taller one scrolls inside the screen first. The 3D room around
+  the screen (seats, curtains, the people in front, thrown popcorn) is
+  `lp/theater.js`, built on three.js (`lp/vendor/`, MIT); the screen is a
+  window into it, so the room moves with the pointer while the screen stays
+  put. Without WebGL only the room is missing, and with reduced motion the
+  room stays still and the countdown is skipped. Every visit starts by asking
+  whether to play sound (only the volume is remembered). The symbol
+  background of the last scene is `lp/field.js`.
   Sound files are in `lp/audio/`: the background music "Jazz Brunch" by Kevin
   MacLeod (incompetech.com, CC BY 4.0) and a sprite of 12 single pops (0.25 s
   each) cut from "Pop-Corn: Corn bursting" on BigSoundBank (CC0). Both credits
