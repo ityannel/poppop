@@ -2894,3 +2894,5 @@ h1, h2, h3, .hero-catch, .section-head h2, .finale h2 { letter-spacing: .02em; }
   .gm-tile { padding: 12px 10px; }
   .gm-tile b { font-size: 15px; }
 }
+
+.gm-choice.is-wrong { animation: gm-shake .4s ease; }

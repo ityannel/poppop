@@ -52,10 +52,10 @@
 
   function meta() {
     return [
-      { id: "rhythm", icon: "🥁", color: "c-yellow", title: L("ポップ・リズム", "Pop Rhythm"), sub: L("リズムにのって、プログラムを打つ", "Hit the beat, type a program") },
-      { id: "quiz", icon: "🧠", color: "c-sky", title: L("ポップ・クイズ", "Pop Quiz"), sub: L("出力を、当てよう", "Guess the output") },
-      { id: "bugs", icon: "🐛", color: "c-pink", title: L("バグ探し", "Bug Hunt"), sub: L("エラーを読んで、直そう", "Read the error, fix it") },
-      { id: "puzzle", icon: "🧩", color: "c-mint", title: L("ならべかえ", "Card Order"), sub: L("読む順に、並べよう", "Put the cards in order") },
+      { id: "rhythm", icon: "🥁", color: "c-yellow", title: L("ポップ・リズム", "Pop Rhythm") },
+      { id: "quiz", icon: "🧠", color: "c-sky", title: L("ポップ・クイズ", "Pop Quiz") },
+      { id: "bugs", icon: "🐛", color: "c-pink", title: L("バグ探し", "Bug Hunt") },
+      { id: "puzzle", icon: "🧩", color: "c-mint", title: L("ならべかえ", "Card Order") },
     ];
   }
 
@@ -139,11 +139,9 @@
       <button class="gm-tile ${g.color}" type="button" data-act="${g.id}">
         <span class="gm-ico" aria-hidden="true">${g.icon}</span>
         <b>${esc(g.title)}</b>
-        <small>${esc(g.sub)}</small>
         <span class="gm-stars" aria-label="${esc(L("ベスト", "Best"))}: ${best[g.id] || 0} / 3">${starText(best[g.id] || 0)}</span>
       </button>`).join("");
     show(`
-      <p class="gm-lead">${esc(L("PopCorn を、あそびながら覚えよう。ぜんぶ、本物のプログラムで出来ています。", "Learn PopCorn by playing. Every game uses real programs."))}</p>
       <div class="gm-grid">${tiles}</div>`, "is-menu",
     { rhythm: rhythmSelect, quiz: quizStart, bugs: bugsStart, puzzle: puzzleStart });
   }
@@ -157,9 +155,9 @@
         ${lines || ""}
         <div class="gm-actions">
           <button class="btn btn-yellow" type="button" data-act="again">${esc(L("もう一回", "Play again"))}</button>
-          ${next ? `<button class="btn btn-pink" type="button" data-act="next">${esc(L("つぎの曲へ", "Next song"))}</button>` : ""}
-          <button class="btn btn-paper" type="button" data-act="menu">${esc(L("ゲームの一覧", "All games"))}</button>
-          ${source ? `<a class="btn btn-blue" href="${esc(api.playgroundUrl(source))}">${esc(L("Playground で、動かしてみる", "Run it in the Playground"))}</a>` : ""}
+          ${next ? `<button class="btn btn-pink" type="button" data-act="next">${esc(L("つぎへ", "Next"))}</button>` : ""}
+          <button class="btn btn-paper" type="button" data-act="menu">${esc(L("一覧", "Games"))}</button>
+          ${source ? `<a class="btn btn-blue" href="${esc(api.playgroundUrl(source))}">${"Playground ↗"}</a>` : ""}
         </div>
       </div>`, "", { again, next }, title);
   }
@@ -173,15 +171,13 @@
     const lanes = DATA.rhythm.lanes;
     const slow = api.store.get(SLOW_KEY) === "1" || (api.store.get(SLOW_KEY) === null && api.reduced);
     show(`
-      <p class="gm-lead">${esc(L("落ちてくる札を、線にぴったりで押そう。押した順に、プログラムができあがる。", "Press the lane when a card reaches the line. The program builds up in the order you play."))}</p>
-      <ul class="rh-guide">${lanes.map((l) => `<li class="k-${l.kind}"><b>${esc(tx(l.label))}</b><span>${esc(tx(l.hint))}</span><kbd>${l.key}</kbd></li>`).join("")}</ul>
+      <ul class="rh-guide">${lanes.map((l) => `<li class="k-${l.kind}"><b>${esc(tx(l.label))}</b><kbd>${l.key}</kbd></li>`).join("")}</ul>
       <div class="gm-songs">${DATA.rhythm.songs.map((s, i) => `
         <button class="gm-song" type="button" data-act="song${i}" ${i === 0 ? "data-autofocus" : ""}>
           <b>${i + 1}. ${esc(tx(s.title))}</b>
-          <span class="gm-song-code">${esc(s.code.replace(/\n/g, " "))}</span>
           <span class="gm-stars">${starText(best[`rhythm:${s.id}`] || 0)}</span>
         </button>`).join("")}</div>
-      <label class="gm-switch"><input type="checkbox" id="rhSlow" ${slow ? "checked" : ""}><span>${esc(L("ゆっくりモード", "Slow mode"))}</span></label>`, "",
+      <label class="gm-switch"><input type="checkbox" id="rhSlow" ${slow ? "checked" : ""}><span>${esc(L("ゆっくり", "Slow"))}</span></label>`, "",
     Object.fromEntries(DATA.rhythm.songs.map((s, i) => [`song${i}`, () => {
       const on = $("#rhSlow", bodyEl).checked;
       api.store.set(SLOW_KEY, on ? "1" : "0");
@@ -299,13 +295,11 @@
       const all = tally.miss === 0;
       const stars = all ? (tally.perfect / notes.length >= 0.8 ? 3 : tally.perfect / notes.length >= 0.5 ? 2 : 1) : 0;
       const shown = song.chunks.map(([text], i) => (notes[i].result === "miss" ? "／" : text)).join(" ").replace(" .", ".");
-      const lines = all
-        ? `<div class="gm-run">${code(song.code)}${term(song.output)}</div><p class="gm-learn">${esc(tx(song.learn))}</p>`
-        : `<div class="gm-run">${code(shown)}</div><p class="gm-learn">${esc(L(`ぬけた札が ${tally.miss} 枚。つながらないと、プログラムは動きません。もう一回、やってみよう。`, `${tally.miss} card(s) missed. A program with gaps will not run. Try once more.`))}</p>`;
+      const lines = `<div class="gm-run">${all ? code(song.code) + term(song.output) : code(shown)}</div>`;
       setBest(`rhythm:${song.id}`, stars);
       result({
         id: "rhythm", title: tx(song.title), stars,
-        headline: all ? L("できた！ 動いたよ", "You did it! It runs") : L("おしい！", "Almost!"),
+        headline: all ? L("できた！", "Nice!") : L("おしい！", "Almost!"),
         lines, source: all ? song.code : "",
         again: () => rhythmPlay(index, slow),
         next: all && index + 1 < DATA.rhythm.songs.length ? () => rhythmPlay(index + 1, slow) : null,
@@ -364,8 +358,12 @@
           if (!right) el.classList.add("is-wrong");
           api.playSound(right ? 1 : 0.4);
           const box = $(".gm-explain", bodyEl);
-          box.classList.add("show");
-          box.innerHTML = `<b>${right ? esc(L("せいかい！", "Correct!")) : esc(L("ざんねん", "Not quite"))}</b> ${esc(tx(q.explain))}`;
+          if (box) {
+            box.classList.add("show");
+            box.innerHTML = esc(tx(q.explain));
+          }
+          const out = $(".gm-term pre", bodyEl);
+          if (out && q.kind === "output") out.textContent = q.output;
           const next = $("[data-act=next]", bodyEl);
           next.style.visibility = "visible";
           next.focus({ preventScroll: true });
@@ -376,18 +374,18 @@
         if (i < items.length) ask();
         else result({
           id: "quiz", title: L("ポップ・クイズ", "Pop Quiz"), stars: starsFor(ok, items.length),
-          headline: L(`${items.length} 問中 ${ok} 問、せいかい`, `${ok} of ${items.length} correct`),
-          lines: `<p class="gm-learn">${esc(ok === items.length ? L("ぜんぶ読めました。もう PopCorn が読めますね。", "You read them all. You can already read PopCorn.") : L("まちがえた所は、コードを左から順に読みなおそう。", "Read the code again from left to right."))}</p>`,
+          headline: `${ok} / ${items.length}`,
           again: quizStart,
         });
       };
       show(`
         ${progress(i, items.length)}
-        <p class="gm-ask">${esc(tx(q.ask))}</p>
+        ${q.ask ? `<p class="gm-ask">${esc(tx(q.ask))}</p>` : ""}
         ${code(q.code)}
+        ${q.kind === "output" ? term("?") : ""}
         <div class="gm-choices">${order.map((k, pos) => `<button class="gm-choice" type="button" data-act="c${pos}">${esc(tx(q.choices[k]))}</button>`).join("")}</div>
-        <p class="gm-explain" aria-live="polite"></p>
-        <div class="gm-actions"><button class="btn btn-yellow" type="button" data-act="next" style="visibility:hidden">${esc(i + 1 < items.length ? L("つぎへ", "Next") : L("けっかを見る", "See the result"))}</button></div>`,
+        ${q.explain ? '<p class="gm-explain" aria-live="polite"></p>' : ""}
+        <div class="gm-actions"><button class="btn btn-yellow" type="button" data-act="next" style="visibility:hidden">${esc(L("つぎへ", "Next"))}</button></div>`,
       "", acts, L("ポップ・クイズ", "Pop Quiz"));
       delete bodyEl.dataset.locked;
     };
@@ -410,16 +408,13 @@
             missed = true;
             el.classList.add("is-wrong");
             el.disabled = true;
-            const box = $(".gm-explain", bodyEl);
-            box.classList.add("show");
-            box.innerHTML = `<b>${esc(L("ちがうみたい", "Not that one"))}</b> ${esc(tx(b.hint))}`;
             return;
           }
           if (!missed) first += 1;
           api.playSound(1);
           $$(".gm-choice", bodyEl).forEach((c) => { c.disabled = true; });
           el.classList.add("is-right");
-          $(".gm-fixed", bodyEl).innerHTML = `<p class="gm-label">${esc(L("直したら、動いた！", "Fixed. It runs!"))}</p>${code(b.fixed)}${term(b.output)}`;
+          $(".gm-fixed", bodyEl).innerHTML = `${code(b.fixed)}${term(b.output)}`;
           $(".gm-fixed", bodyEl).classList.add("show");
           const next = $("[data-act=next]", bodyEl);
           next.style.visibility = "visible";
@@ -431,21 +426,17 @@
         if (i < items.length) ask();
         else result({
           id: "bugs", title: L("バグ探し", "Bug Hunt"), stars: starsFor(first, items.length),
-          headline: L(`${items.length} 件中 ${first} 件、1回で直せた`, `Fixed ${first} of ${items.length} on the first try`),
-          lines: `<p class="gm-learn">${esc(L("エラーは、場所と理由を教えてくれます。まず、読んでみよう。", "An error tells you where and why. Read it first."))}</p>`,
+          headline: `${first} / ${items.length}`,
           again: bugsStart,
         });
       };
       show(`
         ${progress(i, items.length)}
-        <p class="gm-ask">${esc(L("このプログラムは、エラーになります。", "This program has an error."))}</p>
         ${code(b.code)}
         ${term(api.localize(b.error), false)}
-        <p class="gm-ask">${esc(L("どう直す？", "How do you fix it?"))}</p>
         <div class="gm-choices">${order.map((k, pos) => `<button class="gm-choice" type="button" data-act="c${pos}">${esc(tx(b.choices[k]))}</button>`).join("")}</div>
-        <p class="gm-explain" aria-live="polite"></p>
         <div class="gm-fixed"></div>
-        <div class="gm-actions"><button class="btn btn-yellow" type="button" data-act="next" style="visibility:hidden">${esc(i + 1 < items.length ? L("つぎへ", "Next") : L("けっかを見る", "See the result"))}</button></div>`,
+        <div class="gm-actions"><button class="btn btn-yellow" type="button" data-act="next" style="visibility:hidden">${esc(L("つぎへ", "Next"))}</button></div>`,
       "", acts, L("バグ探し", "Bug Hunt"));
     };
     ask();
@@ -467,7 +458,7 @@
       const draw = () => {
         $(".pz-slots", bodyEl).innerHTML = placed.length
           ? placed.map((k, pos) => `<button class="pz-chip placed" type="button" data-act="out${pos}">${esc(p.chips[k])}</button>`).join("")
-          : `<span class="pz-empty">${esc(L("ここに、カードを置く", "Put the cards here"))}</span>`;
+          : `<span class="pz-empty">…</span>`;
         $(".pz-pool", bodyEl).innerHTML = order.filter((k) => !placed.includes(k)).map((k) => `<button class="pz-chip" type="button" data-act="in${k}">${esc(p.chips[k])}</button>`).join("");
         $("[data-act=check]", bodyEl).disabled = !placed.length;
       };
@@ -481,9 +472,6 @@
             slots.classList.remove("shake");
             void slots.offsetWidth;
             slots.classList.add("shake");
-            const box = $(".gm-explain", bodyEl);
-            box.classList.add("show");
-            box.innerHTML = `<b>${esc(L("ちがうみたい", "Not yet"))}</b> ${esc(L("左から右へ、上から下へ、読む順に並べよう。", "Read left to right, top to bottom."))} ${p.hint ? esc(tx(p.hint)) : ""}`;
             return;
           }
           done = true;
@@ -491,7 +479,7 @@
           api.playSound(1);
           $$(".pz-chip", bodyEl).forEach((c) => { c.disabled = true; });
           $("[data-act=check]", bodyEl).disabled = true;
-          $(".gm-fixed", bodyEl).innerHTML = `<p class="gm-label">${esc(L("動いた！", "It runs!"))}</p>${code(text)}${term(p.output)}`;
+          $(".gm-fixed", bodyEl).innerHTML = `${code(text)}${term(p.output)}`;
           $(".gm-fixed", bodyEl).classList.add("show");
           const next = $("[data-act=next]", bodyEl);
           next.style.visibility = "visible";
@@ -503,8 +491,7 @@
           if (i < items.length) ask();
           else result({
             id: "puzzle", title: L("ならべかえ", "Card Order"), stars: starsFor(first, items.length),
-            headline: L(`${items.length} 問中 ${first} 問、1回で出来た`, `${first} of ${items.length} on the first try`),
-            lines: `<p class="gm-learn">${esc(L("PopCorn は、左から右、上から下へ読みます。順番が変わると、答えも変わります。", "PopCorn reads left to right, top to bottom. Change the order and the answer changes."))}</p>`,
+            headline: `${first} / ${items.length}`,
             again: puzzleStart,
           });
         },
@@ -517,16 +504,14 @@
       }
       show(`
         ${progress(i, items.length)}
-        <p class="gm-ask">${esc(L("この出力になるように、カードを並べよう", "Order the cards to print this"))}</p>
         ${term(p.output)}
         <div class="pz-slots${sep === "\n" ? " col" : ""}" aria-live="polite"></div>
         <div class="pz-pool${sep === "\n" ? " col" : ""}"></div>
-        <p class="gm-explain" aria-live="polite"></p>
         <div class="gm-fixed"></div>
         <div class="gm-actions">
           <button class="btn btn-yellow" type="button" data-act="check">${esc(L("できた！", "Done!"))}</button>
           <button class="btn btn-paper" type="button" data-act="reset">${esc(L("もどす", "Reset"))}</button>
-          <button class="btn btn-pink" type="button" data-act="next" style="visibility:hidden">${esc(i + 1 < items.length ? L("つぎへ", "Next") : L("けっかを見る", "See the result"))}</button>
+          <button class="btn btn-pink" type="button" data-act="next" style="visibility:hidden">${esc(L("つぎへ", "Next"))}</button>
         </div>`, "", acts, L("ならべかえ", "Card Order"));
       draw();
     };
@@ -554,9 +539,9 @@
       inviteEl.setAttribute("aria-label", L("ミニゲームのお誘い", "Mini game invitation"));
       inviteEl.innerHTML = `
         <span class="gm-invite-ico" aria-hidden="true">🥁</span>
-        <p><b>${esc(L("10 ポップ！", "10 pops!"))}</b><br>${esc(L("リズムゲームで、PopCorn を覚えよう。", "Learn PopCorn with a rhythm game."))}</p>
+        <p><b>${esc(L("10 ポップ！", "10 pops!"))}</b> ${esc(L("リズムゲーム？", "Rhythm game?"))}</p>
         <div class="gm-invite-btns">
-          <button class="btn btn-small btn-yellow" type="button" data-go>${esc(L("やってみる", "Play"))}</button>
+          <button class="btn btn-small btn-yellow" type="button" data-go>${esc(L("やる", "Play"))}</button>
           <button class="btn btn-small btn-paper" type="button" data-later>${esc(L("あとで", "Later"))}</button>
         </div>`;
       document.body.appendChild(inviteEl);

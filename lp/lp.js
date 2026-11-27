@@ -491,7 +491,7 @@
 
   function openGate() {
     const title = L("音が出ますが、よろしいですか？", "This site has sound. Is that OK?");
-    const hint = L("あとから右上の 🔊 で切り替えられます。", "You can switch it anytime with 🔊 at the top.");
+    const hint = L("あとから 🔊 で切り替え", "Switch anytime with 🔊");
     const yesText = L("はい", "Yes");
     const noText = L("いいえ", "No");
     const gate = document.createElement("div");
@@ -594,10 +594,10 @@
   const countBox = countEl.closest(".pop-count");
   let pops = 0;
   const MILESTONES = new Map([
-    [10, L("10 ポップ！ いい調子。", "10 pops! Nice.")],
-    [50, L("50 ポップ！ PopCorn 職人ですね。", "50 pops! A true PopCorn pro.")],
-    [100, L("100 ポップ！ もう止まらない…！", "100 pops! You can't stop now…!")],
-    [300, L("300 ポップ！ ここまで来た人は、なかなかいません。", "300 pops! Very few people make it this far.")],
+    [10, L("10 ポップ！", "10 pops!")],
+    [50, L("50 ポップ！", "50 pops!")],
+    [100, L("100 ポップ！", "100 pops!")],
+    [300, L("300 ポップ！", "300 pops!")],
   ]);
 
   function burst(x, y, power = 1) {
@@ -858,19 +858,18 @@
 
   /* ---------- 01 rules ---------- */
   const RULES = EN ? [
-    { sym: ">>", title: "Pass the value right", text: "Values flow left to right through >> and change shape at every step." },
-    { sym: ".", title: "End with a period", text: "Every statement ends with a . and a new name goes on the far right." },
-    { sym: ":", title: "Longer work: colon and indent", text: "Work done for each item goes after : on indented lines." },
+    { sym: ">>", title: "Pass the value right", text: "" },
+    { sym: ".", title: "End with a period", text: "" },
+    { sym: ":", title: "Longer work: colon and indent", text: "" },
   ] : [
-    { sym: ">>", title: "値を、右へ渡す", text: "値は >> で、左から右へ流れていきます。通るたびに、形を変えていきます。" },
-    { sym: ".", title: "文は、ピリオドで終わる", text: "文の終わりは . です。名前を付けるときも、いちばん右に書きます。" },
-    { sym: ":", title: "長い処理は、: と字下げ", text: "ひとつずつ処理したい中身は、: のあと、字下げして書きます。" },
+    { sym: ">>", title: "値を、右へ渡す", text: "" },
+    { sym: ".", title: "文は、ピリオドで終わる", text: "" },
+    { sym: ":", title: "長い処理は、: と字下げ", text: "" },
   ];
   $("#ruleGrid").innerHTML = RULES.map((rule, i) => `
     <article class="rule-card reveal">
       <span class="rule-sym" aria-hidden="true">${esc(rule.sym)}</span>
       <h3>${esc(rule.title)}</h3>
-      <p>${esc(rule.text).replace(/(&gt;&gt;|\s\.\s|:)/, (m) => `<code>${m.trim()}</code>`)}</p>
       <pre class="code">${highlight(DATA.rules[i].code)}</pre>
       <div class="rule-run">
         <button class="btn btn-small btn-paper" type="button" data-rule="${i}"><svg aria-hidden="true"><use href="#i-play"/></svg>${L("実行", "Run")}</button>
@@ -961,7 +960,7 @@
       await wait(reduced ? 0 : 750);
       if (run !== orderRun) return;
     }
-    $("#orderResult").textContent = L(`どちらも答えは ${DATA.order.output}。でも、目の動きはこんなにちがいます。`, `Both answer ${DATA.order.output}. But look how differently your eyes move.`);
+    $("#orderResult").textContent = L(`どちらも ${DATA.order.output}`, `Both give ${DATA.order.output}`);
   });
 
   /* ---------- 03 lab ---------- */
@@ -1060,8 +1059,8 @@
       if (result.error) {
         failed = true;
         const hint = Array.isArray(value)
-          ? L("空っぽのリストからは、選べません。", "There's nothing to pick from an empty list.")
-          : L("数になったあとは、リスト用のブロックをつなげません。", "Once it's a single number, list blocks can't follow.");
+          ? L("空っぽのリストからは、選べません", "There's nothing to pick from an empty list.")
+          : L("数になったあとは、リスト用のブロックをつなげません", "Once it's a single number, list blocks can't follow.");
         items.push(`<li class="st g-${stage.group} err" style="--i:${i}" data-index="${k}" draggable="true">
           <div class="st-head"><code>${esc(stage.code)}</code>${tools}</div>
           <p class="st-err">${esc(localize(result.error))}</p>
@@ -1337,7 +1336,7 @@
     const lines = peek.lines.filter((_, i) => peekOn[i]);
     $("#peekOut").innerHTML = lines.length
       ? lines.map((l) => `<span class="warn">${esc(l.slice(0, l.indexOf("]") + 1))}</span>${esc(l.slice(l.indexOf("]") + 1))}`).join("\n")
-      : `<span class="dim">${L("（何も表示されません。&gt;&gt; をタップしてみよう）", "(Nothing is shown. Try tapping a &gt;&gt;)")}</span>`;
+      : `<span class="dim">${L("（&gt;&gt; をタップ）", "(Tap a &gt;&gt;)")}</span>`;
   }
   $("#peekCode").addEventListener("click", (event) => {
     const op = event.target.closest("[data-op]");
@@ -1378,8 +1377,8 @@
       <span class="ff-step ${num.error ? "swap" : "skip"}">0</span><span class="ff-arrow">&gt;&gt;</span>
       <span class="ff-step swap">age = ${esc(String(age))}</span>
       <p class="ff-note">${num.error
-        ? `<span class="err">${esc(localize(num.error))}</span><br>${L("エラーが起きたので、<code>0</code> に差し替えて進みました。", "An error happened, so it switched to <code>0</code> and kept going.")}`
-        : L("エラーは起きませんでした。<code>&gt;!&gt;</code> の右の <code>0</code> は使われません。", "No error, so the <code>0</code> after <code>&gt;!&gt;</code> isn't used.")}</p>`;
+        ? `<span class="err">${esc(localize(num.error))}</span><br>${L("エラー → <code>0</code> に差し替え", "Error → swapped to <code>0</code>")}`
+        : L("エラーなし", "No error")}</p>`;
   }
   $("#fallbackInput").maxLength = 24;
   $("#fallbackInput").addEventListener("input", renderFallback);
@@ -1543,7 +1542,7 @@
     const b = event.target.closest("[data-ex]");
     if (!b) return;
     loadExample(b.dataset.ex);
-    consoleEl.innerHTML = `<p class="console-hint">${L("「実行」を押してみよう。", "Press Run.")}</p>`;
+    consoleEl.innerHTML = `<p class="console-hint">${L("「実行」を押す", "Press Run")}</p>`;
   });
   loadExample(currentExample);
 
@@ -1564,7 +1563,7 @@
       worker = new Worker(rootUrl("playground-worker.js"));
     } catch (error) {
       setStatus("error", L("準備できませんでした", "Couldn't load"));
-      line(esc(L(`この画面では動かせませんでした（${error.message}）。Playground で試してください。`, `Couldn't run it here (${error.message}). Please try the Playground.`)), "out-line out-err");
+      line(esc(L(`この画面では動きませんでした（${error.message}）`, `Couldn't run it here (${error.message}). Please try the Playground.`)), "out-line out-err");
       worker = null;
       return;
     }
@@ -1573,7 +1572,7 @@
       setStatus("error", L("準備できませんでした", "Couldn't load"));
       toast(L("準備できませんでした", "Couldn't load"), "err", 2600);
       finishRun();
-      line(L("実行環境を読み込めませんでした。ネットワークを確かめて、もう一度押してください。", "Couldn't load the runtime. Check your connection and press Run again."), "out-line out-err");
+      line(L("読み込めませんでした（通信を確かめて、もう一度）", "Couldn't load the runtime. Check your connection and press Run again."), "out-line out-err");
       worker?.terminate();
       worker = null;
     });
@@ -1593,7 +1592,7 @@
       setStatus("error", L("準備できませんでした", "Couldn't load"));
       toast(L("準備できませんでした", "Couldn't load"), "err", 2600);
       finishRun();
-      line(esc(L(`実行環境を読み込めませんでした（${msg.message}）。ネットワークを確かめて、もう一度押してください。`, `Couldn't load the runtime (${msg.message}). Check your connection and press Run again.`)), "out-line out-err");
+      line(esc(L(`読み込めませんでした（${msg.message}）`, `Couldn't load the runtime (${msg.message}). Check your connection and press Run again.`)), "out-line out-err");
       worker?.terminate();
       worker = null;
     } else if (msg.type === "stream") {
@@ -1671,7 +1670,7 @@
     pendingRun = null;
     finishRun();
     $(".loading-line", consoleEl)?.remove();
-    line(L("止めました。もう一度「実行」を押すと、準備からやり直します。", "Stopped. Press Run again to start over."), "out-line out-meta");
+    line(L("止めました", "Stopped"), "out-line out-meta");
     toast(L("止めました", "Stopped"), "info", 1600);
     setStatus("idle", L("止めました", "Stopped"));
   });
@@ -1688,9 +1687,9 @@
     "How many kernels have you popped?",
   ] : [
     "PopCorn は、左から右へ読むだけ！",
-    "まちがえても、ぼくがヒントを出すよ。",
+    "まちがえても、ヒントを出すよ",
     "Map と Filter を覚えたら、もう一人前！",
-    "エラーは、こわくない。日本語で教えるからね。",
+    "エラーは、こわくないよ",
     "ポップコーン、いくつポップさせた？",
   ];
   let robotLine = 0;
@@ -1716,7 +1715,7 @@
     if (!b) return;
     const l = DATA.lessons[Number(b.dataset.lesson)];
     $$("#lessons .lesson").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    say(EN ? `Lesson ${l.badge}: “${l.title}”. ${l.intro.replace(/`/g, "")}` : `レッスン ${l.badge}「${l.title}」。${l.intro.replace(/`/g, "")}`);
+    say(EN ? `Lesson ${l.badge}: “${l.title}”. ${l.intro.replace(/`/g, "")}` : `レッスン ${l.badge}「${l.title}」 ${l.intro.replace(/`/g, "")}`);
     track("pc_lp_lesson", l.badge);
   });
   if (!reduced) {
@@ -1747,7 +1746,7 @@
       await navigator.clipboard.writeText(text);
       toast(L("コピーしました", "Copied"), "ok", 1800);
     } catch {
-      toast(L("コピーできませんでした。選んでコピーしてください", "Couldn't copy. Please select it and copy."), "err");
+      toast(L("コピーできませんでした", "Couldn't copy"), "err");
     }
   });
 

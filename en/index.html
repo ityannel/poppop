@@ -122,9 +122,9 @@
           <p class="badge"><span>PopCorn 1</span>Experimental alpha</p>
           <h1 class="hero-title">
             <img class="hero-logo" src="../lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267">
-            <span class="hero-catch">Runs the way <em>you write.</em></span>
+            <span class="hero-catch">Runs the way <em>you write</em></span>
           </h1>
-          <p class="hero-lead">PopCorn is a tiny programming language where values flow left to right through <code class="pipe-chip">&gt;&gt;</code>. Read it once, and you know what happens.</p>
+          <p class="hero-lead">PopCorn is a tiny programming language that connects values with <code class="pipe-chip">&gt;&gt;</code></p>
           <div class="hero-cta">
             <a class="btn btn-big btn-blue" href="../playground/">Try it in your browser<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
             <a class="btn btn-big btn-paper" href="#lab">Play with it</a>
@@ -147,12 +147,11 @@
           </div>
           <div class="crt-chin" aria-hidden="true"><span class="crt-brand">PopCorn 1</span><i class="crt-vents"></i><i class="crt-led"></i></div>
           </div>
-          <figcaption class="hero-caption"><span class="dot-live" aria-hidden="true"></span>Each time a value passes <b>&gt;&gt;</b>, it changes shape</figcaption>
         </figure>
       </div>
       <div class="hero-hint wrap">
         <div class="tray" id="kernels" role="group" aria-label="Popcorn kernels"></div>
-        <p>Tap a kernel to pop it</p>
+        <p>Tap a kernel</p>
       </div>
     </section>
 
@@ -164,8 +163,7 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>01</span>Rules<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
-          <h2>Just three things<br class="sp"> to learn.</h2>
-          <p class="lead">A PopCorn statement reads like a sentence: left to right, ending with a <b>.</b></p>
+          <h2>Just three things<br class="sp"> to learn</h2>
         </header>
         <div class="rule-grid" id="ruleGrid"></div>
       </div>
@@ -175,19 +173,16 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>02</span>Reading<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
-          <h2>Read order<br class="sp"> is run order.</h2>
-          <p class="lead">“Pick the even numbers, double them, add them up.” Compare two ways to write it.</p>
+          <h2>Read order<br class="sp"> is run order</h2>
         </header>
         <div class="order-grid reveal">
           <article class="order-card order-nested">
             <h3>Nested calls<small> (Python)</small></h3>
             <div class="order-code" id="orderNested"></div>
-            <p class="order-note">Start at the innermost <code>nums</code> and work outward. Your eyes jump right to left and back.</p>
           </article>
           <article class="order-card order-pop">
             <h3>PopCorn<small> (in order)</small></h3>
             <div class="order-code" id="orderPop"></div>
-            <p class="order-note">Left to right, in the order you wrote it. Your eyes just move forward.</p>
           </article>
         </div>
         <div class="center reveal">
@@ -202,7 +197,6 @@
         <header class="section-head reveal">
           <p class="eyebrow"><span>03</span>Play<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span><span class="how how-drag"><svg aria-hidden="true"><use href="#i-drag"/></svg>Drag</span><span class="how how-hold"><svg aria-hidden="true"><use href="#i-hold"/></svg>Hold</span></span></p>
           <h2>Pipeline workshop</h2>
-          <p class="lead">Connect blocks and watch the values flow. Errors are part of the fun.</p>
         </header>
         <div class="lab-board reveal" data-nopop>
           <div class="lab-presets">
@@ -230,8 +224,7 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>04</span>Conditions<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
-          <h2>Conditions,<br class="sp"> top to bottom.</h2>
-          <p class="lead"><code>Check</code> tries each <code>when</code> from the top and picks the first match. Tap a number.</p>
+          <h2>Conditions,<br class="sp"> top to bottom</h2>
         </header>
         <div class="check-grid reveal">
           <div class="check-left">
@@ -253,8 +246,7 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>05</span>Tools<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>Type</span></span></p>
-          <h2>Handy symbols,<br class="sp"> clear errors.</h2>
-          <p class="lead">Peek into the flow, guard it, or split it without stopping. When something goes wrong, PopCorn shows you where.</p>
+          <h2>Handy symbols,<br class="sp"> clear errors</h2>
         </header>
         <div class="tool-box reveal" data-nopop>
           <div class="tool-tabs" role="tablist" aria-label="Tools" id="toolTabs">
@@ -268,8 +260,6 @@
           <div class="tool-panel" role="tabpanel" id="panel-peek" aria-labelledby="tab-peek">
             <div class="tool-text">
               <h3>Peek into the flow</h3>
-              <p>Change <code>&gt;&gt;</code> to <code>&gt;?&gt;</code> to print the value passing through. The value itself stays the same. Tap a <b>&gt;&gt;</b> in the code.</p>
-              <p class="tool-hint"><code>line 1 after Range</code> tells you where you are, and <code>(List)</code> is the value's type.</p>
             </div>
             <div class="tool-demo">
               <div class="code code-dark peek-code" id="peekCode"></div>
@@ -280,7 +270,6 @@
           <div class="tool-panel" role="tabpanel" id="panel-fallback" aria-labelledby="tab-fallback" hidden>
             <div class="tool-text">
               <h3>If it fails, swap it</h3>
-              <p>If anything left of <code>&gt;!&gt;</code> raises an error, the value on the right takes its place and the flow goes on. Type something that isn't a number.</p>
             </div>
             <div class="tool-demo">
               <label class="fb-input">
@@ -296,7 +285,6 @@
           <div class="tool-panel" role="tabpanel" id="panel-fork" aria-labelledby="tab-fork" hidden>
             <div class="tool-text">
               <h3>One value, many results</h3>
-              <p><code>Fork</code> sends the same value down several paths at once. Change the numbers.</p>
             </div>
             <div class="tool-demo">
               <div class="fork-inputs" id="forkInputs"></div>
@@ -308,7 +296,6 @@
           <div class="tool-panel" role="tabpanel" id="panel-test" aria-labelledby="tab-test" hidden>
             <div class="tool-text">
               <h3>Tests, written in PopCorn</h3>
-              <p>Any function whose name starts with <code>Test</code> is a test. Run <code>popcorn test</code> to see what doesn't match. Test reports are in Japanese for now.</p>
               <label class="switch">
                 <input type="checkbox" id="testBug">
                 <span class="switch-ui" aria-hidden="true"></span>
@@ -324,7 +311,6 @@
           <div class="tool-panel" role="tabpanel" id="panel-error" aria-labelledby="tab-error" hidden>
             <div class="tool-text">
               <h3>Errors that point at the spot</h3>
-              <p>PopCorn tells you where and why it stopped. Try a common mistake on purpose. In the Playground, errors are also explained in Japanese.</p>
               <div class="chip-row" id="errorChips"></div>
             </div>
             <div class="tool-demo">
@@ -340,8 +326,7 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>06</span>Try<span class="hows"><span class="sr-only">How to play: </span><span class="how how-type"><svg aria-hidden="true"><use href="#i-type"/></svg>Type</span></span></p>
-          <h2>Real PopCorn,<br class="sp"> right here.</h2>
-          <p class="lead">The same interpreter as the Playground runs inside this page. Edit the code and press <b>Run</b>.</p>
+          <h2>Real PopCorn,<br class="sp"> right here</h2>
         </header>
         <div class="ide reveal" data-nopop>
           <div class="ide-examples" id="tryExamples" role="group" aria-label="Examples"></div>
@@ -361,7 +346,7 @@
               <a class="btn btn-ghost-dark" id="tryOpen" href="../playground/">Open in Playground<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
             </div>
             <div class="ide-console" id="tryConsole" aria-live="polite">
-              <p class="console-hint">Results show up here. The first run takes a moment to load.</p>
+              <p class="console-hint">Press Run</p>
             </div>
           </div>
         </div>
@@ -372,8 +357,7 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>07</span>Learn<span class="hows"><span class="sr-only">How to play: </span><span class="how how-tap"><svg aria-hidden="true"><use href="#i-tap"/></svg>Tap</span></span></p>
-          <h2>Learn with<br class="sp"> Robot.</h2>
-          <p class="lead">Robot (ロボット君) in the Playground has 8 lessons, checked by the real interpreter, with hints, answers and help with errors. The lessons are in Japanese for now.</p>
+          <h2>Learn with<br class="sp"> Robot</h2>
         </header>
         <div class="learn-grid reveal">
           <div class="robot-stage">
@@ -386,12 +370,11 @@
               </span>
               <span class="robot-cheek l"></span><span class="robot-cheek r"></span>
             </button>
-            <div class="robot-bubble" id="robotBubble" aria-live="polite">Hi! I'm Robot. Tap a lesson below.</div>
+            <div class="robot-bubble" id="robotBubble" aria-live="polite">Hi! Tap a lesson</div>
           </div>
           <div class="lesson-path">
             <ol class="lessons" id="lessons"></ol>
-            <p class="learn-note">You can also ask an AI tutor (Gemini) questions or for practice problems. Your progress is saved in your browser.</p>
-            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 Review with a game</button>
+            <button class="btn btn-big btn-yellow" type="button" data-open-games>🎮 Games</button>
             <a class="btn btn-big btn-blue" href="../playground/">Go meet Robot<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </div>
         </div>
@@ -402,19 +385,17 @@
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow"><span>08</span>Start</p>
-          <h2>Pick where<br class="sp"> to write.</h2>
+          <h2>Pick where<br class="sp"> to write</h2>
         </header>
         <div class="start-grid">
           <article class="start-card c-blue reveal">
             <p class="start-tag">Easiest</p>
             <h3>Playground</h3>
-            <p>No install. Open your browser to write, run and share. Comes with examples and lessons (in Japanese).</p>
             <a class="btn btn-paper" href="../playground/">Open<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </article>
           <article class="start-card c-yellow reveal">
             <p class="start-tag">Python 3.10+</p>
             <h3>Command line</h3>
-            <p>Run files on your computer and test them with <code>popcorn test</code>.</p>
             <div class="copy-box">
               <pre id="installCmd">git clone https://github.com/ityannel/poppop
 cd poppop
@@ -426,7 +407,6 @@ popcorn program.pop</pre>
           <article class="start-card c-pink reveal">
             <p class="start-tag">VS Code</p>
             <h3>Editor extension</h3>
-            <p>Hover help in Japanese, a data-flow view, problem highlights and a run command. It lives in <code>vscode-popcorn</code> in the repository.</p>
             <a class="btn btn-paper" href="https://github.com/ityannel/poppop/tree/main/vscode-popcorn" rel="noopener">View on GitHub<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </article>
         </div>
@@ -436,9 +416,9 @@ popcorn program.pop</pre>
     <section class="finale" id="finale">
       <div class="wrap">
         <p class="finale-kicker">Ready?</p>
-        <h2>Now,<br class="sp"> let's pop.</h2>
+        <h2>Now,<br class="sp"> let's pop</h2>
         <a class="btn btn-huge btn-yellow" href="../playground/" id="finaleBtn">Open the Playground<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
-        <p class="finale-hint" id="finaleHint" hidden><span class="hows"><span class="sr-only">How to play: </span><span class="how how-throw"><svg aria-hidden="true"><use href="#i-throw"/></svg>Grab and throw</span></span>Tap an empty spot to pop more</p>
+        <p class="finale-hint" id="finaleHint" hidden><span class="hows"><span class="sr-only">How to play: </span><span class="how how-throw"><svg aria-hidden="true"><use href="#i-throw"/></svg>Grab and throw</span></span>Tap anywhere</p>
       </div>
     </section>
   </main>
@@ -447,7 +427,7 @@ popcorn program.pop</pre>
     <div class="wrap footer-inner">
       <div class="footer-about">
         <img src="../lp/img/popcorn-logo.webp" alt="PopCorn" width="1440" height="267" loading="lazy">
-        <p>PopCorn is an experimental programming language made by Itya, an information engineering student at NIT Hakodate College in Japan. Its syntax and behavior may still change.</p>
+        <p>An experimental programming language by Itya, NIT Hakodate College</p>
       </div>
       <ul class="footer-links">
         <li><a href="../playground/">Playground</a></li>
